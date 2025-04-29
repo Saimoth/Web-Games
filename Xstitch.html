@@ -22,10 +22,11 @@
       margin: 0 0.5rem;
       font-size: 1rem;
     }
-    select, button {
+    select, button, input[type=range] {
       padding: 0.4rem 0.8rem;
       font-size: 1rem;
       margin-left: 0.3rem;
+      vertical-align: middle;
     }
     #info {
       margin-top: 0.5rem;
@@ -66,14 +67,17 @@
       Palette:
       <select id="paletteSelect">
         <option>Standard</option>
-        <option>Cool</option>
-        <option>Warm</option>
-        <option>Summer</option>
-        <option>Winter</option>
-        <option>Autumn</option>
-        <option>Spring</option>
-        <option>Vibrant</option>
       </select>
+    </label>
+    <label>
+      Slash threshold:
+      <input type="range" id="diag1Thresh" min="0" max="100" value="75">
+      <span id="diag1Val">75</span>%
+    </label>
+    <label>
+      Cross threshold:
+      <input type="range" id="diag2Thresh" min="0" max="100" value="25">
+      <span id="diag2Val">25</span>%
     </label>
     <button id="uploadBtn">Upload Photo</button>
     <input type="file" id="fileInput" accept="image/*" style="display:none">
@@ -83,7 +87,7 @@
   <div id="output"></div>
 
   <script>
-    // 32-colour palettes
+    // only the Standard 32-colour palette
     const palettes = {
       Standard: [
         "#000000","#FFFFFF","#555555","#AAAAAA","#333333","#CCCCCC",
@@ -91,101 +95,54 @@
         "#800000","#008000","#000080","#808000","#800080","#008080",
         "#FFA500","#A52A2A","#228B22","#DAA520","#2E8B57","#6B8E23",
         "#800020","#406080","#608040","#804060","#408060","#604080"
-      ],
-      Cool: [
-        "#000000","#FFFFFF","#001F3F","#003F7F","#005FBF","#007FFF",
-        "#009FFF","#00BFFF","#00FFFF","#1FFFFF","#3FFFFF","#5FFFFF",
-        "#7FFFFF","#9FFFFF","#005F5F","#007F7F","#009F9F","#00BFBF",
-        "#00DFDF","#00FFFF","#1FDFFF","#3FDFFF","#5FDFFF","#7FDFFF",
-        "#9FDFFF","#BFDFFF","#007080","#0090A0","#00A0B0","#00B0C0",
-        "#00C0D0","#00D0E0"
-      ],
-      Warm: [
-        "#000000","#FFFFFF","#7F0000","#9F0000","#BF0000","#DF0000",
-        "#FF0000","#FF1F00","#FF3F00","#FF5F00","#FF7F00","#FF9F00",
-        "#FFBF00","#FFDF00","#FFFF00","#FFFF1F","#FFFF3F","#FFFF5F",
-        "#FFFF7F","#FFFF9F","#FFCC66","#FFAA33","#FF8822","#FF6611",
-        "#FF4422","#FF2200","#CC3300","#AA5500","#886600","#664400",
-        "#442200","#220000"
-      ],
-      Summer: [
-        "#000000","#FFFFFF","#FFCCCC","#FF99CC","#FF66CC","#FF33CC",
-        "#FF00CC","#CC00AA","#CC3399","#CC6699","#CC99CC","#99CCFF",
-        "#66CCFF","#33CCFF","#00CCFF","#00CC99","#33CC66","#66CC33",
-        "#99CC00","#CCCC33","#FFD699","#FFC366","#FFB033","#FF9F00",
-        "#CC7A00","#995500","#663300","#332200","#FFB6C1","#FFAEB9",
-        "#FF9FBF","#FF90C5"
-      ],
-      Winter: [
-        "#000000","#FFFFFF","#E6F0FF","#CCE0FF","#B3D1FF","#99C1FF",
-        "#80B2FF","#66A3FF","#4D94FF","#3385FF","#1A75FF","#0066FF",
-        "#005CE6","#0052CC","#0047B3","#003D99","#003380","#002A66",
-        "#00204D","#001533","#004466","#006688","#0088AA","#00AACC",
-        "#00CCEE","#1AD5FF","#33DEFF","#4DE7FF","#66F0FF","#80F9FF",
-        "#99FFFF","#B3FFFF"
-      ],
-      Autumn: [
-        "#000000","#FFFFFF","#662200","#773300","#884400","#995500",
-        "#AA6600","#BB7700","#CC8800","#DD9900","#EEAA00","#FFBB00",
-        "#FFCC33","#FF9933","#FF6633","#FF3333","#CC0033","#990033",
-        "#660033","#330019","#663300","#7F4422","#997744","#B38B6B",
-        "#CCAA99","#FFD9B3","#FFCC99","#FFB380","#FF9966","#FF8040",
-        "#FF6633","#FF4C1A"
-      ],
-      Spring: [
-        "#000000","#FFFFFF","#CCFFCC","#99FF99","#66FF66","#33FF33",
-        "#00FF00","#00CC00","#33CC66","#66CC99","#99CCCC","#CCFFEE",
-        "#99FFDD","#66FFCC","#33FFBB","#00FFAA","#00CC88","#00AA66",
-        "#008844","#006622","#004400","#002200","#FFCCCC","#FF9999",
-        "#FF6666","#FF3333","#FF0000","#CC0000","#990000","#660000",
-        "#330000","#660033"
-      ],
-      Vibrant: [
-        "#000000","#FFFFFF","#FF0000","#FF7F00","#FFFF00","#7FFF00",
-        "#00FF00","#00FF7F","#00FFFF","#007FFF","#0000FF","#7F00FF",
-        "#FF00FF","#FF0099","#FF0066","#FF0033","#FF0019","#FF3366",
-        "#FF6699","#FF99CC","#CC33FF","#9933FF","#6633FF","#3333FF",
-        "#3366FF","#3399FF","#33CCFF","#33FFFF","#33FFCC","#33FF99",
-        "#33FF66","#33FF33"
       ]
     };
 
-    // helpers
+    // helper: hex → [r,g,b]
     function hexToRgb(hex) {
       hex = hex.replace(/^#/, '');
       if (hex.length === 3) hex = hex.split('').map(c=>c+c).join('');
-      const val = parseInt(hex, 16);
-      return [(val >> 16) & 255, (val >> 8) & 255, val & 255];
+      const val = parseInt(hex,16);
+      return [(val>>16)&255, (val>>8)&255, val&255];
     }
+    // find two nearest palette colours
     function findTwoNearest(palette, r, g, b) {
-      let best1 = 0, best2 = 1, dist1 = Infinity, dist2 = Infinity;
-      palette.forEach((c, i) => {
-        const dr = r - c[0], dg = g - c[1], db = b - c[2];
-        const d = dr*dr + dg*dg + db*db;
-        if (d < dist1) {
-          dist2 = dist1; best2 = best1;
-          dist1 = d;    best1 = i;
-        } else if (d < dist2) {
-          dist2 = d;    best2 = i;
-        }
+      let i1=0, i2=1, d1=Infinity, d2=Infinity;
+      palette.forEach((c,i)=>{
+        const dr=r-c[0], dg=g-c[1], db=b-c[2], d=dr*dr+dg*dg+db*db;
+        if (d<d1) { d2=d1; i2=i1; d1=d; i1=i; }
+        else if (d<d2) { d2=d; i2=i; }
       });
-      return [ palette[best1], palette[best2] ];
+      return [ palette[i1], palette[i2] ];
     }
 
-    // DOM refs & state
+    // DOM refs
     const uploadBtn     = document.getElementById('uploadBtn');
     const fileInput     = document.getElementById('fileInput');
     const sizeSelect    = document.getElementById('sizeSelect');
     const paletteSelect = document.getElementById('paletteSelect');
+    const diag1Input    = document.getElementById('diag1Thresh');
+    const diag2Input    = document.getElementById('diag2Thresh');
+    const diag1Val      = document.getElementById('diag1Val');
+    const diag2Val      = document.getElementById('diag2Val');
     const info          = document.getElementById('info');
     const output        = document.getElementById('output');
 
     let origPixels = null, origW = 0, origH = 0;
 
-    // redraw with current settings
+    // update slider labels & redraw
+    function onSliderChange() {
+      diag1Val.textContent = diag1Input.value;
+      diag2Val.textContent = diag2Input.value;
+      redraw();
+    }
+    diag1Input.addEventListener('input', onSliderChange);
+    diag2Input.addEventListener('input', onSliderChange);
+
+    // main redraw
     function redraw() {
       if (!origPixels) return;
-      const maxSide = parseInt(sizeSelect.value, 10);
+      const maxSide = +sizeSelect.value;
       const scaledW = origW >= origH
         ? maxSide
         : Math.round(maxSide * origW / origH);
@@ -193,79 +150,106 @@
         ? maxSide
         : Math.round(maxSide * origH / origW);
 
-      const paletteRGB = palettes[paletteSelect.value].map(hexToRgb);
-      info.textContent = 
-        `Orig: ${origW}×${origH}px → ${scaledW}×${scaledH}px using “${paletteSelect.value}”`;
+      const palRGB = palettes.Standard.map(hexToRgb);
+      info.textContent = `Orig: ${origW}×${origH}px → ${scaledW}×${scaledH}px`;
 
-      // error buffers
+      // error-diffusion buffers
       const errR = Array(scaledH).fill().map(()=>Array(scaledW).fill(0));
       const errG = Array(scaledH).fill().map(()=>Array(scaledW).fill(0));
       const errB = Array(scaledH).fill().map(()=>Array(scaledW).fill(0));
 
-      const blockSize = 8;
+      // per-block data
+      const prim  = [], sec  = [], errMag = [], orient = [];
+      let maxErr = 0;
+      const bw = origW / scaledW, bh = origH / scaledH;
+
+      // first pass: average + quantize + diffuse
+      for (let y=0; y<scaledH; y++) {
+        prim[y]=[]; sec[y]=[]; errMag[y]=[]; orient[y]=[];
+        for (let x=0; x<scaledW; x++) {
+          let r=0,g=0,b=0,c=0;
+          const x0=Math.floor(x*bw), y0=Math.floor(y*bh);
+          const x1=Math.min(origW, Math.floor((x+1)*bw));
+          const y1=Math.min(origH, Math.floor((y+1)*bh));
+          for (let yy=y0; yy<y1; yy++) {
+            for (let xx=x0; xx<x1; xx++) {
+              const i=(yy*origW+xx)*4;
+              r+=origPixels[i];
+              g+=origPixels[i+1];
+              b+=origPixels[i+2];
+              c++;
+            }
+          }
+          r = (c?r/c:0) + errR[y][x];
+          g = (c?g/c:0) + errG[y][x];
+          b = (c?b/c:0) + errB[y][x];
+          [r,g,b] = [r,g,b].map(v=>Math.max(0,Math.min(255,v)));
+
+          const [pcol,scol] = findTwoNearest(palRGB, r, g, b);
+          const [pr,pg,pb] = pcol, [sr,sg,sb] = scol;
+          const er=r-pr, eg=g-pg, eb=b-pb;
+          // diffuse
+          [[1,0,7/16],[-1,1,3/16],[0,1,5/16],[1,1,1/16]].forEach(([dx,dy,f])=>{
+            const xx=x+dx, yy=y+dy;
+            if(xx>=0&&xx<scaledW&&yy>=0&&yy<scaledH){
+              errR[yy][xx] += er*f;
+              errG[yy][xx] += eg*f;
+              errB[yy][xx] += eb*f;
+            }
+          });
+
+          prim[y][x]   = pcol;
+          sec[y][x]    = scol;
+          const m = Math.hypot(er, eg, eb);
+          errMag[y][x] = m;
+          if (m > maxErr) maxErr = m;
+          orient[y][x] = Math.random()<0.5;
+        }
+      }
+
+      // second pass: render with thresholds
+      const t1 = +diag1Input.value, t2 = +diag2Input.value;
       const canvasOut = document.createElement('canvas');
+      const blockSize = 8;
       canvasOut.width  = scaledW * blockSize;
       canvasOut.height = scaledH * blockSize;
       const ctx = canvasOut.getContext('2d');
       canvasOut.style.imageRendering = 'pixelated';
 
-      const bw = origW / scaledW;
-      const bh = origH / scaledH;
-
-      for (let y = 0; y < scaledH; y++) {
-        for (let x = 0; x < scaledW; x++) {
-          // average block
-          const x0 = Math.floor(x * bw),
-                y0 = Math.floor(y * bh),
-                x1 = Math.min(origW, Math.floor((x + 1) * bw)),
-                y1 = Math.min(origH, Math.floor((y + 1) * bh));
-          let r=0, g=0, b=0, count=0;
-          for (let yy = y0; yy < y1; yy++) {
-            for (let xx = x0; xx < x1; xx++) {
-              const i = (yy * origW + xx) * 4;
-              r += origPixels[i];
-              g += origPixels[i+1];
-              b += origPixels[i+2];
-              count++;
-            }
-          }
-          r = (count ? r/count : 0) + errR[y][x];
-          g = (count ? g/count : 0) + errG[y][x];
-          b = (count ? b/count : 0) + errB[y][x];
-          [r,g,b] = [r,g,b].map(v => Math.max(0, Math.min(255, v)));
-
-          // find colours
-          const [prim, sec] = findTwoNearest(paletteRGB, r, g, b);
-          const [pr,pg,pb] = prim, [sr,sg,sb] = sec;
-
-          // diffuse error
-          const er = r - pr, eg = g - pg, eb = b - pb;
-          [[1,0,7/16],[-1,1,3/16],[0,1,5/16],[1,1,1/16]].forEach(([dx,dy,f])=>{
-            const xx = x + dx, yy = y + dy;
-            if (xx >= 0 && xx < scaledW && yy >= 0 && yy < scaledH) {
-              errR[yy][xx] += er * f;
-              errG[yy][xx] += eg * f;
-              errB[yy][xx] += eb * f;
-            }
-          });
-
-          // draw block & stitch
-          const px = x * blockSize, py = y * blockSize;
-          ctx.fillStyle   = `rgb(${pr},${pg},${pb})`;
-          ctx.fillRect(px, py, blockSize, blockSize);
+      for (let y=0; y<scaledH; y++) {
+        for (let x=0; x<scaledW; x++) {
+          const [pr,pg,pb] = prim[y][x];
+          const [sr,sg,sb] = sec[y][x];
+          const conf = errMag[y][x] / maxErr * 100;
+          const px = x*blockSize, py = y*blockSize;
+          ctx.fillStyle = `rgb(${pr},${pg},${pb})`;
+          ctx.fillRect(px,py,blockSize,blockSize);
           ctx.strokeStyle = `rgb(${sr},${sg},${sb})`;
-          ctx.lineWidth   = 1;
-          ctx.beginPath();
-          if ((x + y) % 2 === 0) {
-            ctx.moveTo(px, py + blockSize);
-            ctx.lineTo(px + blockSize, py);
-          } else {
-            ctx.moveTo(px, py);
-            ctx.lineTo(px + blockSize, py + blockSize);
-            ctx.moveTo(px, py + blockSize);
-            ctx.lineTo(px + blockSize, py);
+          ctx.lineWidth = 1;
+
+          // higher conf → fewer stitches, so we invert:
+          if (conf <= t1) {
+            ctx.beginPath();
+            if (orient[y][x]) {
+              ctx.moveTo(px,py);
+              ctx.lineTo(px+blockSize,py+blockSize);
+            } else {
+              ctx.moveTo(px,py+blockSize);
+              ctx.lineTo(px+blockSize,py);
+            }
+            ctx.stroke();
+            if (conf <= t2) {
+              ctx.beginPath();
+              if (orient[y][x]) {
+                ctx.moveTo(px,py+blockSize);
+                ctx.lineTo(px+blockSize,py);
+              } else {
+                ctx.moveTo(px,py);
+                ctx.lineTo(px+blockSize,py+blockSize);
+              }
+              ctx.stroke();
+            }
           }
-          ctx.stroke();
         }
       }
 
@@ -274,11 +258,8 @@
     }
 
     // events
-    [paletteSelect, sizeSelect].forEach(el => 
-      el.addEventListener('change', redraw)
-    );
-
-    uploadBtn.addEventListener('click', () => fileInput.click());
+    [sizeSelect, paletteSelect].forEach(el => el.addEventListener('change', redraw));
+    uploadBtn.addEventListener('click', ()=>fileInput.click());
     fileInput.addEventListener('change', e => {
       const file = e.target.files[0];
       if (!file || !file.type.startsWith('image/')) {
@@ -290,11 +271,11 @@
         img.onload = () => {
           origW = img.naturalWidth;
           origH = img.naturalHeight;
-          const tempC = document.createElement('canvas');
-          tempC.width = origW; tempC.height = origH;
-          const tempCtx = tempC.getContext('2d');
-          tempCtx.drawImage(img, 0, 0);
-          origPixels = tempCtx.getImageData(0, 0, origW, origH).data;
+          const tmp = document.createElement('canvas');
+          tmp.width = origW; tmp.height = origH;
+          const tctx = tmp.getContext('2d');
+          tctx.drawImage(img,0,0);
+          origPixels = tctx.getImageData(0,0,origW,origH).data;
           redraw();
         };
         img.src = ev.target.result;
