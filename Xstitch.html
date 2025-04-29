@@ -48,10 +48,13 @@
       margin: 0 auto;
     }
     #paletteGrid {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
       margin-top: 1rem;
+    }
+    #grayscaleRow, #vibrantRow {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 0.5rem;
+      flex-wrap: wrap;
     }
     .swatch {
       width: 30px;
@@ -83,7 +86,7 @@
   <div id="slider1">
     <label>
       Slash threshold:
-      <input type="range" id="diag1Thresh" min="0" max="100" value="75">
+      <input type="range" id="diag1Thresh" min="0" max="100" value="80">
       <span id="diag1Val">80</span>%
     </label>
   </div>
@@ -91,14 +94,17 @@
   <div id="slider2">
     <label>
       Cross threshold:
-      <input type="range" id="diag2Thresh" min="0" max="100" value="40">
+      <input type="range" id="diag2Thresh" min="0" max="100" value="50">
       <span id="diag2Val">50</span>%
     </label>
   </div>
 
   <div id="info"></div>
   <div id="output"></div>
-  <div id="paletteGrid"></div>
+  <div id="paletteGrid">
+    <div id="grayscaleRow"></div>
+    <div id="vibrantRow"></div>
+  </div>
 
   <script>
     // Helpers
@@ -109,12 +115,12 @@
       return [(val>>16)&255, (val>>8)&255, val&255];
     }
     function rgbToHsl(r,g,b){
-      r/=255;g/=255;b/=255;
+      r/=255; g/=255; b/=255;
       const max=Math.max(r,g,b), min=Math.min(r,g,b);
-      let h=0,s=0,l=(max+min)/2;
+      let h=0, s=0, l=(max+min)/2;
       if(max!==min){
         const d=max-min;
-        s=l>0.5?d/(2-max-min):d/(max+min);
+        s = l>0.5 ? d/(2-max-min) : d/(max+min);
         switch(max){
           case r: h=(g-b)/d + (g<b?6:0); break;
           case g: h=(b-r)/d + 2; break;
@@ -122,38 +128,40 @@
         }
         h/=6;
       }
-      return [h*360,s,l];
+      return [h*360, s, l];
     }
-    function findTwoNearest(palette,r,g,b){
-      let i1=0,i2=1,d1=Infinity,d2=Infinity;
+    function findTwoNearest(palette, r,g,b){
+      let i1=0, i2=1, d1=Infinity, d2=Infinity;
       palette.forEach((c,i)=>{
-        const dr=r-c[0], dg=g-c[1], db=b-c[2], d=dr*dr+dg*dg+db*db;
-        if(d<d1){d2=d1;i2=i1;d1=d;i1=i;}
-        else if(d<d2){d2=d;i2=i;}
+        const dr=r-c[0], dg=g-c[1], db=b-c[2];
+        const d=dr*dr+dg*dg+db*db;
+        if(d<d1){ d2=d1; i2=i1; d1=d; i1=i; }
+        else if(d<d2){ d2=d; i2=i; }
       });
-      return [palette[i1],palette[i2]];
+      return [palette[i1], palette[i2]];
     }
     function extractPalette(data){
       const sample=[];
       for(let i=0;i<data.length;i+=50*4){
         sample.push([data[i],data[i+1],data[i+2]]);
       }
-      const k=14,iters=10;
+      const k=14, iters=10;
       let centroids=Array.from({length:k},_=>sample[Math.floor(Math.random()*sample.length)]);
-      for(let it=0;it<iters;it++){
+      for(let iter=0;iter<iters;iter++){
         const clusters=Array.from({length:k},()=>[]);
         sample.forEach(p=>{
-          let best=0,bd=Infinity;
+          let best=0, bd=Infinity;
           centroids.forEach((c,i)=>{
-            const dr=p[0]-c[0],dg=p[1]-c[1],db=p[2]-c[2],d=dr*dr+dg*dg+db*db;
-            if(d<bd){bd=d;best=i;}
+            const dr=p[0]-c[0], dg=p[1]-c[1], db=p[2]-c[2];
+            const d=dr*dr+dg*dg+db*db;
+            if(d<bd){ bd=d; best=i; }
           });
           clusters[best].push(p);
         });
         centroids=centroids.map((c,i)=>{
           const cl=clusters[i];
           if(!cl.length) return c;
-          const sum=cl.reduce((acc,p)=>[acc[0]+p[0],acc[1]+p[1],acc[2]+p[2]],[0,0,0]);
+          const sum=cl.reduce((a,p)=>[a[0]+p[0],a[1]+p[1],a[2]+p[2]],[0,0,0]);
           return sum.map(v=>Math.round(v/cl.length));
         });
       }
@@ -162,21 +170,22 @@
         const dw=(255-c[0])**2+(255-c[1])**2+(255-c[2])**2;
         return db>10000 && dw>10000;
       }).slice(0,14);
-      const pal=[[0,0,0],[255,255,255],...filtered];
+      const pal=[[0,0,0],[255,255,255], ...filtered];
       pal.sort((a,b)=>rgbToHsl(a[0],a[1],a[2])[0] - rgbToHsl(b[0],b[1],b[2])[0]);
       return pal;
     }
 
-    const uploadBtn  = document.getElementById('uploadBtn');
-    const fileInput  = document.getElementById('fileInput');
-    const sizeSelect = document.getElementById('sizeSelect');
-    const d1Input    = document.getElementById('diag1Thresh');
-    const d2Input    = document.getElementById('diag2Thresh');
-    const d1Val      = document.getElementById('diag1Val');
-    const d2Val      = document.getElementById('diag2Val');
-    const info       = document.getElementById('info');
-    const output     = document.getElementById('output');
-    const paletteGrid= document.getElementById('paletteGrid');
+    const uploadBtn   = document.getElementById('uploadBtn');
+    const fileInput   = document.getElementById('fileInput');
+    const sizeSelect  = document.getElementById('sizeSelect');
+    const d1Input     = document.getElementById('diag1Thresh');
+    const d2Input     = document.getElementById('diag2Thresh');
+    const d1Val       = document.getElementById('diag1Val');
+    const d2Val       = document.getElementById('diag2Val');
+    const info        = document.getElementById('info');
+    const output      = document.getElementById('output');
+    const gsRow       = document.getElementById('grayscaleRow');
+    const vtRow       = document.getElementById('vibrantRow');
 
     let origPixels=null, origW=0, origH=0, paletteRGB=[];
 
@@ -289,12 +298,27 @@
 
       output.innerHTML=''; output.appendChild(canvasOut);
 
-      paletteGrid.innerHTML='';
-      paletteRGB.forEach(c=>{
+      // split by saturation threshold
+      const grayThresh = 0.2;
+      const grayscale = paletteRGB
+        .filter(c=>rgbToHsl(c[0],c[1],c[2])[1] < grayThresh)
+        .sort((a,b)=>rgbToHsl(a[0],a[1],a[2])[2] - rgbToHsl(b[0],b[1],b[2])[2]);
+      const vibrant = paletteRGB
+        .filter(c=>rgbToHsl(c[0],c[1],c[2])[1] >= grayThresh)
+        .sort((a,b)=>rgbToHsl(a[0],a[1],a[2])[0] - rgbToHsl(b[0],b[1],b[2])[0]);
+
+      gsRow.innerHTML=''; vtRow.innerHTML='';
+      grayscale.forEach(c=>{
         const d=document.createElement('div');
         d.className='swatch';
         d.style.background=`rgb(${c[0]},${c[1]},${c[2]})`;
-        paletteGrid.appendChild(d);
+        gsRow.appendChild(d);
+      });
+      vibrant.forEach(c=>{
+        const d=document.createElement('div');
+        d.className='swatch';
+        d.style.background=`rgb(${c[0]},${c[1]},${c[2]})`;
+        vtRow.appendChild(d);
       });
     }
 
