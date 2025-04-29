@@ -107,13 +107,7 @@
   </div>
 
   <script>
-    // Helpers
-    function hexToRgb(hex) {
-      hex = hex.replace(/^#/, '');
-      if (hex.length === 3) hex = hex.split('').map(c=>c+c).join('');
-      const val = parseInt(hex,16);
-      return [(val>>16)&255, (val>>8)&255, val&255];
-    }
+    // Convert RGB to HSL
     function rgbToHsl(r,g,b){
       r/=255; g/=255; b/=255;
       const max=Math.max(r,g,b), min=Math.min(r,g,b);
@@ -130,51 +124,76 @@
       }
       return [h*360, s, l];
     }
+
+    // Find two nearest palette colours
     function findTwoNearest(palette, r,g,b){
       let i1=0, i2=1, d1=Infinity, d2=Infinity;
       palette.forEach((c,i)=>{
         const dr=r-c[0], dg=g-c[1], db=b-c[2];
-        const d=dr*dr+dg*dg+db*db;
-        if(d<d1){ d2=d1; i2=i1; d1=d; i1=i; }
-        else if(d<d2){ d2=d; i2=i; }
+        const d = dr*dr + dg*dg + db*db;
+        if(d < d1){ d2=d1; i2=i1; d1=d; i1=i; }
+        else if(d < d2){ d2=d; i2=i; }
       });
       return [palette[i1], palette[i2]];
     }
+
+    // Extract a minimalist palette:
+    // always include black, mid grey, white,
+    // then up to 7 vibrant colours
     function extractPalette(data){
-      const sample=[];
-      for(let i=0;i<data.length;i+=50*4){
-        sample.push([data[i],data[i+1],data[i+2]]);
+      // sample pixels sparsely
+      const sample = [];
+      for(let i=0; i<data.length; i+=50*4){
+        sample.push([data[i], data[i+1], data[i+2]]);
       }
-      const k=14, iters=10;
-      let centroids=Array.from({length:k},_=>sample[Math.floor(Math.random()*sample.length)]);
-      for(let iter=0;iter<iters;iter++){
-        const clusters=Array.from({length:k},()=>[]);
+
+      // k-means for 12 clusters
+      const k=12, iters=8;
+      let centroids = Array.from({length:k},
+        ()=> sample[Math.floor(Math.random()*sample.length)]
+      );
+      for(let it=0; it<iters; it++){
+        const clusters = Array.from({length:k}, ()=>[]);
         sample.forEach(p=>{
           let best=0, bd=Infinity;
           centroids.forEach((c,i)=>{
             const dr=p[0]-c[0], dg=p[1]-c[1], db=p[2]-c[2];
-            const d=dr*dr+dg*dg+db*db;
+            const d = dr*dr+dg*dg+db*db;
             if(d<bd){ bd=d; best=i; }
           });
           clusters[best].push(p);
         });
-        centroids=centroids.map((c,i)=>{
+        centroids = centroids.map((c,i)=>{
           const cl=clusters[i];
           if(!cl.length) return c;
           const sum=cl.reduce((a,p)=>[a[0]+p[0],a[1]+p[1],a[2]+p[2]],[0,0,0]);
           return sum.map(v=>Math.round(v/cl.length));
         });
       }
-      const filtered=centroids.filter(c=>{
-        const db=c[0]*c[0]+c[1]*c[1]+c[2]*c[2];
-        const dw=(255-c[0])**2+(255-c[1])**2+(255-c[2])**2;
-        return db>10000 && dw>10000;
-      }).slice(0,14);
-      const pal=[[0,0,0],[255,255,255], ...filtered];
-      pal.sort((a,b)=>rgbToHsl(a[0],a[1],a[2])[0] - rgbToHsl(b[0],b[1],b[2])[0]);
-      return pal;
+
+      // split grey vs vibrant
+      const grayThresh = 0.2;
+      const vibrant = [], greys = [];
+      centroids.forEach(c=>{
+        const [,s,] = rgbToHsl(c[0],c[1],c[2]);
+        if(s < grayThresh) greys.push(c);
+        else vibrant.push(c);
+      });
+
+      // sort vibrant by hue, limit to 7
+      vibrant.sort((a,b)=>
+        rgbToHsl(a[0],a[1],a[2])[0] - rgbToHsl(b[0],b[1],b[2])[0]
+      );
+      const vibrantTrimmed = vibrant.slice(0, 7);
+
+      // final palette: black, mid grey, white, then vibrant
+      const black = [0,0,0];
+      const mid   = [128,128,128];
+      const white = [255,255,255];
+      return [black, mid, white, ...vibrantTrimmed];
     }
 
+    // DOM refs
     const uploadBtn   = document.getElementById('uploadBtn');
     const fileInput   = document.getElementById('fileInput');
     const sizeSelect  = document.getElementById('sizeSelect');
@@ -189,6 +208,7 @@
 
     let origPixels=null, origW=0, origH=0, paletteRGB=[];
 
+    // update slider labels & redraw
     function onSliderChange(){
       d1Val.textContent = d1Input.value;
       d2Val.textContent = d2Input.value;
@@ -197,33 +217,35 @@
     d1Input.addEventListener('input', onSliderChange);
     d2Input.addEventListener('input', onSliderChange);
 
+    // redraw function
     function redraw(){
       if(!origPixels) return;
       const maxSide = +sizeSelect.value;
-      const scaledW = origW >= origH
+      const scaledW = origW>=origH
         ? maxSide
-        : Math.round(maxSide * origW / origH);
-      const scaledH = origH > origW
+        : Math.round(maxSide*origW/origH);
+      const scaledH = origH>origW
         ? maxSide
-        : Math.round(maxSide * origH / origW);
-
+        : Math.round(maxSide*origH/origW);
       info.textContent = `Orig: ${origW}×${origH}px → ${scaledW}×${scaledH}px`;
 
+      // error buffers
       const errR = Array(scaledH).fill().map(()=>Array(scaledW).fill(0));
       const errG = Array(scaledH).fill().map(()=>Array(scaledW).fill(0));
       const errB = Array(scaledH).fill().map(()=>Array(scaledW).fill(0));
 
+      // per-block storage
       const prim=[], sec=[], errMag=[], orient=[];
       let maxErr=0;
-      const bw = origW/scaledW, bh = origH/scaledH;
+      const bw=origW/scaledW, bh=origH/scaledH;
 
       for(let y=0; y<scaledH; y++){
         prim[y]=[]; sec[y]=[]; errMag[y]=[]; orient[y]=[];
         for(let x=0; x<scaledW; x++){
-          let r=0, g=0, b=0, c=0;
-          const x0 = Math.floor(x*bw), y0 = Math.floor(y*bh);
-          const x1 = Math.min(origW, Math.floor((x+1)*bw));
-          const y1 = Math.min(origH, Math.floor((y+1)*bh));
+          let r=0,g=0,b=0,c=0;
+          const x0=Math.floor(x*bw), y0=Math.floor(y*bh);
+          const x1=Math.min(origW, Math.floor((x+1)*bw));
+          const y1=Math.min(origH, Math.floor((y+1)*bh));
           for(let yy=y0; yy<y1; yy++){
             for(let xx=x0; xx<x1; xx++){
               const i=(yy*origW+xx)*4;
@@ -233,12 +255,12 @@
               c++;
             }
           }
-          r = (c ? r/c : 0) + errR[y][x];
-          g = (c ? g/c : 0) + errG[y][x];
-          b = (c ? b/c : 0) + errB[y][x];
+          r = (c?r/c:0) + errR[y][x];
+          g = (c?g/c:0) + errG[y][x];
+          b = (c?b/c:0) + errB[y][x];
           [r,g,b] = [r,g,b].map(v=>Math.max(0,Math.min(255,v)));
 
-          const [pcol, scol] = findTwoNearest(paletteRGB, r,g,b);
+          const [pcol,scol] = findTwoNearest(paletteRGB, r,g,b);
           const [pr,pg,pb] = pcol, [sr,sg,sb] = scol;
           const er=r-pr, eg=g-pg, eb=b-pb;
           [[1,0,7/16],[-1,1,3/16],[0,1,5/16],[1,1,1/16]].forEach(([dx,dy,f])=>{
@@ -250,53 +272,53 @@
             }
           });
 
-          prim[y][x] = pcol;
-          sec[y][x] = scol;
+          prim[y][x]=pcol;
+          sec[y][x]=scol;
           const m = Math.hypot(er,eg,eb);
-          errMag[y][x] = m;
-          if(m>maxErr) maxErr = m;
-          orient[y][x] = Math.random() < 0.5;
+          errMag[y][x]=m;
+          if(m>maxErr) maxErr=m;
+          orient[y][x]=Math.random()<0.5;
         }
       }
 
-      const t1 = +d1Input.value, t2 = +d2Input.value;
-      const canvasOut = document.createElement('canvas');
-      const blockSize = 8;
-      canvasOut.width = scaledW * blockSize;
-      canvasOut.height = scaledH * blockSize;
-      const ctx = canvasOut.getContext('2d');
-      canvasOut.style.imageRendering = 'pixelated';
+      // draw to canvas
+      const t1=+d1Input.value, t2=+d2Input.value;
+      const canvasOut=document.createElement('canvas');
+      const bs=8;
+      canvasOut.width=scaledW*bs;
+      canvasOut.height=scaledH*bs;
+      const ctx=canvasOut.getContext('2d');
+      canvasOut.style.imageRendering='pixelated';
 
       for(let y=0; y<scaledH; y++){
         for(let x=0; x<scaledW; x++){
-          const [pr,pg,pb] = prim[y][x];
-          const [sr,sg,sb] = sec[y][x];
-          const conf = errMag[y][x] / maxErr * 100;
-          const px = x*blockSize, py = y*blockSize;
-          ctx.fillStyle = `rgb(${pr},${pg},${pb})`;
-          ctx.fillRect(px,py,blockSize,blockSize);
-          ctx.strokeStyle = `rgb(${sr},${sg},${sb})`;
-          ctx.lineWidth = 1;
+          const [pr,pg,pb]=prim[y][x];
+          const [sr,sg,sb]=sec[y][x];
+          const conf=errMag[y][x]/maxErr*100;
+          const px=x*bs, py=y*bs;
+          ctx.fillStyle=`rgb(${pr},${pg},${pb})`;
+          ctx.fillRect(px,py,bs,bs);
+          ctx.strokeStyle=`rgb(${sr},${sg},${sb})`;
+          ctx.lineWidth=1;
 
-          // use strict < so 0 thresholds draw nothing
           if(conf < t1){
             ctx.beginPath();
             if(orient[y][x]){
               ctx.moveTo(px,py);
-              ctx.lineTo(px+blockSize,py+blockSize);
+              ctx.lineTo(px+bs,py+bs);
             } else {
-              ctx.moveTo(px,py+blockSize);
-              ctx.lineTo(px+blockSize,py);
+              ctx.moveTo(px,py+bs);
+              ctx.lineTo(px+bs,py);
             }
             ctx.stroke();
             if(conf < t2){
               ctx.beginPath();
               if(orient[y][x]){
-                ctx.moveTo(px,py+blockSize);
-                ctx.lineTo(px+blockSize,py);
+                ctx.moveTo(px,py+bs);
+                ctx.lineTo(px+bs,py);
               } else {
                 ctx.moveTo(px,py);
-                ctx.lineTo(px+blockSize,py+blockSize);
+                ctx.lineTo(px+bs,py+bs);
               }
               ctx.stroke();
             }
@@ -304,18 +326,12 @@
         }
       }
 
-      output.innerHTML = '';
+      output.innerHTML=''; 
       output.appendChild(canvasOut);
 
-      // split by saturation threshold
-      const grayThresh = 0.2;
-      const grayscale = paletteRGB
-        .filter(c=>rgbToHsl(c[0],c[1],c[2])[1] < grayThresh)
-        .sort((a,b)=>rgbToHsl(a[0],a[1],a[2])[2] - rgbToHsl(b[0],b[1],b[2])[2]);
-      const vibrant = paletteRGB
-        .filter(c=>rgbToHsl(c[0],c[1],c[2])[1] >= grayThresh)
-        .sort((a,b)=>rgbToHsl(a[0],a[1],a[2])[0] - rgbToHsl(b[0],b[1],b[2])[0]);
-
+      // display palette
+      const grayscale = paletteRGB.slice(0,3);  // black, mid, white
+      const vibrant   = paletteRGB.slice(3);
       gsRow.innerHTML=''; vtRow.innerHTML='';
       grayscale.forEach(c=>{
         const d=document.createElement('div');
@@ -331,6 +347,7 @@
       });
     }
 
+    // file load & events
     uploadBtn.addEventListener('click',()=>fileInput.click());
     fileInput.addEventListener('change',e=>{
       const f=e.target.files[0];
@@ -352,7 +369,7 @@
       };
       reader.readAsDataURL(f);
     });
-    sizeSelect.addEventListener('change',redraw);
+    sizeSelect.addEventListener('change', redraw);
   </script>
 
 </body>
