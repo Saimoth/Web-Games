@@ -5,63 +5,26 @@
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Xstitch</title>
   <style>
-    body {
-      font-family: sans-serif;
-      text-align: center;
-      padding: 1.5rem;
-      background: #fafafa;
-      color: #333;
-    }
-    h1 {
-      margin-bottom: 1rem;
-    }
-    #controls, #slider1, #slider2 {
-      margin-bottom: 1rem;
-    }
+    body { font-family: sans-serif; text-align: center; padding: 1.5rem; background: #fafafa; color: #333; }
+    h1 { margin-bottom: 1rem; }
+    #controls, #slider1, #slider2 { margin-bottom: 1rem; }
     button, select, input[type=range] {
-      font-size: 1rem;
-      padding: 0.4rem 0.8rem;
-      margin-left: 0.3rem;
-      vertical-align: middle;
+      font-size: 1rem; padding: 0.4rem 0.8rem; margin-left: 0.3rem; vertical-align: middle;
     }
-    label {
-      font-size: 1rem;
-    }
-    #info {
-      margin-top: 0.5rem;
-      font-size: 0.9rem;
-      color: #555;
-    }
+    label { font-size: 1rem; }
+    #info { margin-top: 0.5rem; font-size: 0.9rem; color: #555; }
     #output {
-      margin: 1rem auto;
-      padding: 1rem;
-      max-width: 90vw;
-      background: #fff;
-      border: 1px solid #ddd;
+      margin: 1rem auto; padding: 1rem; max-width: 90vw;
+      background: #fff; border: 1px solid #ddd;
       box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
-    #output canvas {
-      width: 100%;
-      height: auto;
-      image-rendering: pixelated;
-      display: block;
-      margin: 0 auto;
-    }
-    #paletteGrid {
-      margin-top: 1rem;
-    }
+    #output canvas { width: 100%; height: auto; image-rendering: pixelated; display: block; margin: 0 auto; }
+    #paletteGrid { margin-top: 1rem; }
     #grayscaleRow, #vibrantRow {
-      display: flex;
-      justify-content: center;
-      margin-bottom: 0.5rem;
-      flex-wrap: wrap;
+      display: flex; justify-content: center; margin-bottom: 0.5rem; flex-wrap: wrap;
     }
     .swatch {
-      width: 30px;
-      height: 30px;
-      margin: 2px;
-      border: 1px solid #ccc;
-      box-sizing: border-box;
+      width: 30px; height: 30px; margin: 2px; border: 1px solid #ccc; box-sizing: border-box;
     }
   </style>
 </head>
@@ -101,158 +64,181 @@
 
   <div id="info"></div>
   <div id="output"></div>
+
   <div id="paletteGrid">
     <div id="grayscaleRow"></div>
     <div id="vibrantRow"></div>
   </div>
 
   <script>
-    // Convert RGB to HSL
-    function rgbToHsl(r, g, b) {
-      r /= 255; g /= 255; b /= 255;
-      const max = Math.max(r, g, b), min = Math.min(r, g, b);
-      let h = 0, s = 0, l = (max + min) / 2;
-      if (max !== min) {
-        const d = max - min;
-        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-        switch (max) {
-          case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-          case g: h = (b - r) / d + 2; break;
-          case b: h = (r - g) / d + 4; break;
+    // RGB→HSL
+    function rgbToHsl(r,g,b){
+      r/=255; g/=255; b/=255;
+      const max=Math.max(r,g,b), min=Math.min(r,g,b);
+      let h=0,s=0,l=(max+min)/2;
+      if(max!==min){
+        const d=max-min;
+        s = l>0.5 ? d/(2-max-min) : d/(max+min);
+        switch(max){
+          case r: h=(g-b)/d + (g<b?6:0); break;
+          case g: h=(b-r)/d + 2; break;
+          case b: h=(r-g)/d + 4; break;
         }
-        h /= 6;
+        h/=6;
       }
-      return [h * 360, s, l];
+      return [h*360,s,l];
     }
 
-    // Find two nearest palette colours
-    function findTwoNearest(palette, r, g, b) {
-      let i1 = 0, i2 = 1, d1 = Infinity, d2 = Infinity;
-      palette.forEach((c, i) => {
-        const dr = r - c[0], dg = g - c[1], db = b - c[2];
-        const d = dr*dr + dg*dg + db*db;
-        if (d < d1) { d2 = d1; i2 = i1; d1 = d; i1 = i; }
-        else if (d < d2) { d2 = d; i2 = i; }
+    // simple k-means on RGB triples
+    function kmeans(pixels, k, iters=8) {
+      const N = pixels.length;
+      let centroids = [];
+      for(let i=0;i<k;i++){
+        centroids.push(pixels[Math.floor(Math.random()*N)].slice());
+      }
+      let assignments = new Array(N);
+      for(let it=0; it<iters; it++){
+        // assign
+        for(let i=0;i<N;i++){
+          let best=0, bd=Infinity;
+          for(let j=0;j<k;j++){
+            const c=centroids[j];
+            const dr=pixels[i][0]-c[0], dg=pixels[i][1]-c[1], db=pixels[i][2]-c[2];
+            const d=dr*dr+dg*dg+db*db;
+            if(d<bd){ bd=d; best=j; }
+          }
+          assignments[i]=best;
+        }
+        // update
+        const sums = Array.from({length:k},()=>[0,0,0,0]);
+        for(let i=0;i<N;i++){
+          const grp = assignments[i];
+          sums[grp][0]+=pixels[i][0];
+          sums[grp][1]+=pixels[i][1];
+          sums[grp][2]+=pixels[i][2];
+          sums[grp][3]++;
+        }
+        for(let j=0;j<k;j++){
+          if(sums[j][3]>0){
+            centroids[j] = [
+              Math.round(sums[j][0]/sums[j][3]),
+              Math.round(sums[j][1]/sums[j][3]),
+              Math.round(sums[j][2]/sums[j][3])
+            ];
+          }
+        }
+      }
+      return centroids;
+    }
+
+    // build palette: sample every pixel, pick saturated clusters, fill with average clusters,
+    // then sort by brightness, merge identical brightness, and return
+    function extractPalette(data){
+      const pixels = [];
+      for(let i=0; i<data.length; i+=4){
+        pixels.push([data[i], data[i+1], data[i+2]]);
+      }
+      // pick saturated
+      const satThresh = 0.4;
+      const satPix = pixels.filter(p=>rgbToHsl(p[0],p[1],p[2])[1]>satThresh);
+      const satClusters = satPix.length
+        ? kmeans(satPix, Math.min(8, satPix.length))
+        : [];
+      // fill up to 16 total
+      const remain = 16 - 3 - satClusters.length;
+      const unsatPix = pixels.filter(p=>rgbToHsl(p[0],p[1],p[2])[1]<=satThresh);
+      const remClusters = (unsatPix.length && remain>0)
+        ? kmeans(unsatPix, Math.min(remain, unsatPix.length))
+        : [];
+      // initial palette
+      let pal = [
+        [0,0,0],       // black
+        [128,128,128], // mid-grey
+        [255,255,255], // white
+        ...satClusters,
+        ...remClusters
+      ];
+      // sort by brightness = (r+g+b)
+      pal.sort((a,b)=>(a[0]+a[1]+a[2]) - (b[0]+b[1]+b[2]));
+      // merge adjacent with same brightness
+      const merged = [];
+      for(let i=0;i<pal.length;i++){
+        let curr = pal[i];
+        if(i<pal.length-1 &&
+           (pal[i][0]+pal[i][1]+pal[i][2] === pal[i+1][0]+pal[i+1][1]+pal[i+1][2])) {
+          const next = pal[i+1];
+          curr = [
+            Math.round((curr[0]+next[0])/2),
+            Math.round((curr[1]+next[1])/2),
+            Math.round((curr[2]+next[2])/2)
+          ];
+          i++;
+        }
+        merged.push(curr);
+      }
+      return merged;
+    }
+
+    function findTwoNearest(palette, r,g,b){
+      let i1=0,i2=1,d1=Infinity,d2=Infinity;
+      palette.forEach((c,i)=>{
+        const dr=r-c[0], dg=g-c[1], db=b-c[2], d=dr*dr+dg*dg+db*db;
+        if(d<d1){ d2=d1; i2=i1; d1=d; i1=i; }
+        else if(d<d2){ d2=d; i2=i; }
       });
       return [palette[i1], palette[i2]];
     }
 
-    // Extract a minimalist palette: black, mid-grey, white, + up to 7 vivid hues
-    function extractPalette(data) {
-      // sample pixels
-      const sample = [];
-      for (let i = 0; i < data.length; i += 50*4) {
-        sample.push([data[i], data[i+1], data[i+2]]);
-      }
-      // k-means with 12 clusters
-      const k = 12, iters = 8;
-      let centroids = Array.from({length:k},
-        () => sample[Math.floor(Math.random() * sample.length)]
-      );
-      for (let it = 0; it < iters; it++) {
-        const clusters = Array.from({length:k}, () => []);
-        sample.forEach(p => {
-          let best = 0, bd = Infinity;
-          centroids.forEach((c, i) => {
-            const dr = p[0] - c[0], dg = p[1] - c[1], db = p[2] - c[2];
-            const d = dr*dr + dg*dg + db*db;
-            if (d < bd) { bd = d; best = i; }
-          });
-          clusters[best].push(p);
-        });
-        centroids = centroids.map((c, i) => {
-          const cl = clusters[i];
-          if (!cl.length) return c;
-          const sum = cl.reduce((a, p) => [a[0]+p[0], a[1]+p[1], a[2]+p[2]], [0,0,0]);
-          return sum.map(v => Math.round(v / cl.length));
-        });
-      }
-
-      // split grey vs vibrant
-      const grayThresh = 0.15;  // lower threshold to allow more colour
-      const vibrant = [], greys = [];
-      centroids.forEach(c => {
-        const [, s] = rgbToHsl(c[0], c[1], c[2]);
-        if (s < grayThresh) greys.push(c);
-        else vibrant.push(c);
-      });
-
-      // sort vibrant by hue, pick up to 7 evenly across range
-      vibrant.sort((a, b) => rgbToHsl(a[0],a[1],a[2])[0] - rgbToHsl(b[0],b[1],b[2])[0]);
-      const maxV = 7;
-      const vivTrim = [];
-      if (vibrant.length <= maxV) {
-        vivTrim.push(...vibrant);
-      } else {
-        for (let i = 0; i < maxV; i++) {
-          const idx = Math.round(i * (vibrant.length - 1) / (maxV - 1));
-          vivTrim.push(vibrant[idx]);
-        }
-      }
-
-      // final palette
-      const black = [0,0,0];
-      const mid   = [128,128,128];
-      const white = [255,255,255];
-      return [black, mid, white, ...vivTrim];
-    }
-
     // DOM refs
-    const uploadBtn  = document.getElementById('uploadBtn');
-    const fileInput  = document.getElementById('fileInput');
-    const sizeSelect = document.getElementById('sizeSelect');
-    const d1Input    = document.getElementById('diag1Thresh');
-    const d2Input    = document.getElementById('diag2Thresh');
-    const d1Val      = document.getElementById('diag1Val');
-    const d2Val      = document.getElementById('diag2Val');
-    const info       = document.getElementById('info');
-    const output     = document.getElementById('output');
-    const gsRow      = document.getElementById('grayscaleRow');
-    const vtRow      = document.getElementById('vibrantRow');
+    const uploadBtn = document.getElementById('uploadBtn'),
+          fileInput = document.getElementById('fileInput'),
+          sizeSelect = document.getElementById('sizeSelect'),
+          d1Input = document.getElementById('diag1Thresh'),
+          d2Input = document.getElementById('diag2Thresh'),
+          d1Val = document.getElementById('diag1Val'),
+          d2Val = document.getElementById('diag2Val'),
+          info = document.getElementById('info'),
+          output = document.getElementById('output'),
+          gsRow = document.getElementById('grayscaleRow'),
+          vtRow = document.getElementById('vibrantRow');
 
-    let origPixels = null, origW = 0, origH = 0, paletteRGB = [];
+    let origPixels=null, origW=0, origH=0, paletteRGB=[];
 
-    // update sliders
-    function onSliderChange() {
+    d1Input.addEventListener('input', ()=>{
       d1Val.textContent = d1Input.value;
+      redraw();
+    });
+    d2Input.addEventListener('input', ()=>{
       d2Val.textContent = d2Input.value;
       redraw();
-    }
-    d1Input.addEventListener('input', onSliderChange);
-    d2Input.addEventListener('input', onSliderChange);
+    });
 
-    // redraw mosaic
-    function redraw() {
-      if (!origPixels) return;
+    function redraw(){
+      if(!origPixels) return;
       const maxSide = +sizeSelect.value;
       const scaledW = origW >= origH
-        ? maxSide
-        : Math.round(maxSide * origW / origH);
+        ? maxSide : Math.round(maxSide * origW / origH);
       const scaledH = origH > origW
-        ? maxSide
-        : Math.round(maxSide * origH / origW);
+        ? maxSide : Math.round(maxSide * origH / origW);
       info.textContent = `Orig: ${origW}×${origH}px → ${scaledW}×${scaledH}px`;
 
-      // error buffers
-      const errR = Array(scaledH).fill().map(()=>Array(scaledW).fill(0));
-      const errG = Array(scaledH).fill().map(()=>Array(scaledW).fill(0));
-      const errB = Array(scaledH).fill().map(()=>Array(scaledW).fill(0));
-
-      // per-block
-      const prim = [], sec = [], errMag = [], orient = [];
-      let maxErr = 0;
+      const errR = Array(scaledH).fill().map(()=>Array(scaledW).fill(0)),
+            errG = Array(scaledH).fill().map(()=>Array(scaledW).fill(0)),
+            errB = Array(scaledH).fill().map(()=>Array(scaledW).fill(0));
+      const prim=[], sec=[], errMag=[], orient=[];
+      let maxErr=0;
       const bw = origW / scaledW, bh = origH / scaledH;
 
-      for (let y = 0; y < scaledH; y++) {
-        prim[y] = []; sec[y] = []; errMag[y] = []; orient[y] = [];
-        for (let x = 0; x < scaledW; x++) {
-          let r=0, g=0, b=0, c=0;
-          const x0 = Math.floor(x*bw), y0 = Math.floor(y*bh);
-          const x1 = Math.min(origW, Math.floor((x+1)*bw));
-          const y1 = Math.min(origH, Math.floor((y+1)*bh));
-          for (let yy=y0; yy<y1; yy++){
-            for (let xx=x0; xx<x1; xx++){
-              const i = (yy*origW+xx)*4;
+      for(let y=0; y<scaledH; y++){
+        prim[y]=[]; sec[y]=[]; errMag[y]=[]; orient[y]=[];
+        for(let x=0; x<scaledW; x++){
+          let r=0,g=0,b=0,c=0;
+          const x0 = Math.floor(x*bw), y0 = Math.floor(y*bh),
+                x1 = Math.min(origW, Math.floor((x+1)*bw)),
+                y1 = Math.min(origH, Math.floor((y+1)*bh));
+          for(let yy=y0; yy<y1; yy++){
+            for(let xx=x0; xx<x1; xx++){
+              const i = (yy*origW + xx)*4;
               r += origPixels[i];
               g += origPixels[i+1];
               b += origPixels[i+2];
@@ -264,66 +250,58 @@
           b = (c?b/c:0) + errB[y][x];
           [r,g,b] = [r,g,b].map(v=>Math.max(0,Math.min(255,v)));
 
-          const [pcol, scol] = findTwoNearest(paletteRGB, r, g, b);
+          const [pcol,scol] = findTwoNearest(paletteRGB, r,g,b);
           const [pr,pg,pb] = pcol, [sr,sg,sb] = scol;
-          const er = r-pr, eg = g-pg, eb = b-pb;
-          [[1,0,7/16],[-1,1,3/16],[0,1,5/16],[1,1,1/16]]
-            .forEach(([dx,dy,f])=>{
-              const xx=x+dx, yy=y+dy;
-              if (xx>=0&&xx<scaledW&&yy>=0&&yy<scaledH){
-                errR[yy][xx] += er*f;
-                errG[yy][xx] += eg*f;
-                errB[yy][xx] += eb*f;
-              }
-            });
+          const er=r-pr, eg=g-pg, eb=b-pb;
+          [[1,0,7/16],[-1,1,3/16],[0,1,5/16],[1,1,1/16]].forEach(([dx,dy,f])=>{
+            const xx=x+dx, yy=y+dy;
+            if(xx>=0&&xx<scaledW&&yy>=0&&yy<scaledH){
+              errR[yy][xx]+=er*f;
+              errG[yy][xx]+=eg*f;
+              errB[yy][xx]+=eb*f;
+            }
+          });
 
-          prim[y][x]   = pcol;
-          sec[y][x]    = scol;
+          prim[y][x]=pcol; sec[y][x]=scol;
           const m = Math.hypot(er,eg,eb);
-          errMag[y][x] = m;
+          errMag[y][x]=m;
           if(m>maxErr) maxErr=m;
           orient[y][x] = Math.random()<0.5;
         }
       }
 
-      // draw
-      const t1 = +d1Input.value, t2 = +d2Input.value;
-      const canvasOut = document.createElement('canvas');
-      const bs = 8;
-      canvasOut.width  = scaledW * bs;
-      canvasOut.height = scaledH * bs;
-      const ctx = canvasOut.getContext('2d');
-      canvasOut.style.imageRendering = 'pixelated';
+      const t1=+d1Input.value, t2=+d2Input.value,
+            bs=8,
+            canvasOut=document.createElement('canvas'),
+            ctx=canvasOut.getContext('2d');
+      canvasOut.width = scaledW*bs;
+      canvasOut.height= scaledH*bs;
+      canvasOut.style.imageRendering='pixelated';
 
-      for (let y=0; y<scaledH; y++){
-        for (let x=0; x<scaledW; x++){
-          const [pr,pg,pb] = prim[y][x];
-          const [sr,sg,sb] = sec[y][x];
-          const conf = errMag[y][x] / maxErr * 100;
-          const px = x*bs, py = y*bs;
+      for(let y=0; y<scaledH; y++){
+        for(let x=0; x<scaledW; x++){
+          const [pr,pg,pb] = prim[y][x],
+                [sr,sg,sb] = sec[y][x],
+                conf = errMag[y][x]/maxErr*100,
+                px = x*bs, py = y*bs;
           ctx.fillStyle   = `rgb(${pr},${pg},${pb})`;
           ctx.fillRect(px,py,bs,bs);
           ctx.strokeStyle = `rgb(${sr},${sg},${sb})`;
           ctx.lineWidth   = 1;
-
-          if (conf < t1) {
+          if(conf < t1){
             ctx.beginPath();
-            if (orient[y][x]) {
-              ctx.moveTo(px,py);
-              ctx.lineTo(px+bs,py+bs);
+            if(orient[y][x]){
+              ctx.moveTo(px,py); ctx.lineTo(px+bs,py+bs);
             } else {
-              ctx.moveTo(px,py+bs);
-              ctx.lineTo(px+bs,py);
+              ctx.moveTo(px,py+bs); ctx.lineTo(px+bs,py);
             }
             ctx.stroke();
-            if (conf < t2) {
+            if(conf < t2){
               ctx.beginPath();
-              if (orient[y][x]) {
-                ctx.moveTo(px,py+bs);
-                ctx.lineTo(px+bs,py);
+              if(orient[y][x]){
+                ctx.moveTo(px,py+bs); ctx.lineTo(px+bs,py);
               } else {
-                ctx.moveTo(px,py);
-                ctx.lineTo(px+bs,py+bs);
+                ctx.moveTo(px,py); ctx.lineTo(px+bs,py+bs);
               }
               ctx.stroke();
             }
@@ -334,34 +312,36 @@
       output.innerHTML = '';
       output.appendChild(canvasOut);
 
-      // show palette
-      const grayscale = paletteRGB.slice(0,3); // black, mid, white
-      const vibrant   = paletteRGB.slice(3);
+      // display into two rows by brightness order
+      const half = Math.ceil(paletteRGB.length/2);
+      const row1 = paletteRGB.slice(0, half);
+      const row2 = paletteRGB.slice(half);
+
       gsRow.innerHTML = '';
-      vtRow.innerHTML = '';
-      grayscale.forEach(c=>{
+      row1.forEach(c=>{
         const d = document.createElement('div');
-        d.className='swatch';
-        d.style.background=`rgb(${c[0]},${c[1]},${c[2]})`;
+        d.className = 'swatch';
+        d.style.background = `rgb(${c[0]},${c[1]},${c[2]})`;
         gsRow.appendChild(d);
       });
-      vibrant.forEach(c=>{
+
+      vtRow.innerHTML = '';
+      row2.forEach(c=>{
         const d = document.createElement('div');
-        d.className='swatch';
-        d.style.background=`rgb(${c[0]},${c[1]},${c[2]})`;
+        d.className = 'swatch';
+        d.style.background = `rgb(${c[0]},${c[1]},${c[2]})`;
         vtRow.appendChild(d);
       });
     }
 
-    // events
     uploadBtn.addEventListener('click', ()=>fileInput.click());
     fileInput.addEventListener('change', e=>{
       const f = e.target.files[0];
-      if (!f || !f.type.startsWith('image/')) return alert('Select an image file.');
+      if(!f||!f.type.startsWith('image/')) return alert('Select an image file.');
       const reader = new FileReader();
       reader.onload = ev => {
         const img = new Image();
-        img.onload = () => {
+        img.onload = ()=>{
           origW = img.naturalWidth;
           origH = img.naturalHeight;
           const tmp = document.createElement('canvas');
@@ -378,6 +358,5 @@
     });
     sizeSelect.addEventListener('change', redraw);
   </script>
-
 </body>
 </html>
