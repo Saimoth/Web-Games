@@ -18,7 +18,9 @@
       background: #fff; border: 1px solid #ddd;
       box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
-    #output canvas { width: 100%; height: auto; image-rendering: pixelated; display: block; margin: 0 auto; }
+    #output canvas { 
+      width: 100%; height: auto; image-rendering: pixelated; display: block; margin: 0 auto; 
+    }
     #paletteGrid { margin-top: 1rem; }
     #grayscaleRow, #vibrantRow {
       display: flex; justify-content: center; margin-bottom: 0.5rem; flex-wrap: wrap;
@@ -49,29 +51,28 @@
   <div id="slider1">
     <label>
       Slash threshold:
-      <input type="range" id="diag1Thresh" min="0" max="100" value="95">
-      <span id="diag1Val">95</span>%
+      <input type="range" id="diag1Thresh" min="0" max="100" value="75">
+      <span id="diag1Val">75</span>%
     </label>
   </div>
 
   <div id="slider2">
     <label>
       Cross threshold:
-      <input type="range" id="diag2Thresh" min="0" max="100" value="75">
-      <span id="diag2Val">75</span>%
+      <input type="range" id="diag2Thresh" min="0" max="100" value="50">
+      <span id="diag2Val">50</span>%
     </label>
   </div>
 
   <div id="info"></div>
   <div id="output"></div>
-
   <div id="paletteGrid">
     <div id="grayscaleRow"></div>
     <div id="vibrantRow"></div>
   </div>
 
   <script>
-    // RGB→HSL
+    // RGB → HSL
     function rgbToHsl(r,g,b){
       r/=255; g/=255; b/=255;
       const max=Math.max(r,g,b), min=Math.min(r,g,b);
@@ -98,6 +99,7 @@
       }
       let assignments = new Array(N);
       for(let it=0; it<iters; it++){
+        // assign
         for(let i=0;i<N;i++){
           let best=0, bd=Infinity;
           for(let j=0;j<k;j++){
@@ -108,7 +110,8 @@
           }
           assignments[i]=best;
         }
-        const sums = Array.from({length:k},()=>[0,0,0,0]);
+        // update
+        const sums = Array.from({length:k}, ()=>[0,0,0,0]);
         for(let i=0;i<N;i++){
           const grp = assignments[i];
           sums[grp][0]+=pixels[i][0];
@@ -129,23 +132,57 @@
       return centroids;
     }
 
-    // build palette: sample every pixel, pick saturated clusters, fill with average clusters,
-    // then sort by brightness, merge identical brightness
+    // merge close colours in-place
+    function refinePalette(pal){
+      const bThresh = 0.05 * 255, cThresh = 0.1 * 255;
+      for(let i=0; i<pal.length; i++){
+        let [r1,g1,b1] = pal[i];
+        let bright1 = (r1+g1+b1)/3;
+        let j = i+1;
+        while(j < pal.length){
+          const [r2,g2,b2] = pal[j];
+          const bright2 = (r2+g2+b2)/3;
+          if(Math.abs(bright1 - bright2) <= bThresh &&
+             Math.abs(r1 - r2) <= cThresh &&
+             Math.abs(g1 - g2) <= cThresh &&
+             Math.abs(b1 - b2) <= cThresh){
+            // merge into pal[i]
+            const avg = [
+              Math.round((r1+r2)/2),
+              Math.round((g1+g2)/2),
+              Math.round((b1+b2)/2)
+            ];
+            pal[i] = avg;
+            [r1,g1,b1] = avg;
+            bright1 = (avg[0]+avg[1]+avg[2])/3;
+            pal.splice(j,1);
+          } else {
+            j++;
+          }
+        }
+      }
+      return pal;
+    }
+
+    // build palette: sample every pixel, cluster, then refine
     function extractPalette(data){
       const pixels = [];
       for(let i=0; i<data.length; i+=4){
-        pixels.push([data[i], data[i+1], data[i+2]]);
+        pixels.push([data[i],data[i+1],data[i+2]]);
       }
+      // saturated clusters
       const satThresh = 0.4;
       const satPix = pixels.filter(p=>rgbToHsl(p[0],p[1],p[2])[1]>satThresh);
       const satClusters = satPix.length
         ? kmeans(satPix, Math.min(8, satPix.length))
         : [];
+      // remaining clusters to fill up to 16
       const remain = 16 - 3 - satClusters.length;
       const unsatPix = pixels.filter(p=>rgbToHsl(p[0],p[1],p[2])[1]<=satThresh);
       const remClusters = (unsatPix.length && remain>0)
         ? kmeans(unsatPix, Math.min(remain, unsatPix.length))
         : [];
+      // initial
       let pal = [
         [0,0,0],       // black
         [128,128,128], // mid-grey
@@ -153,23 +190,11 @@
         ...satClusters,
         ...remClusters
       ];
+      // sort by brightness
       pal.sort((a,b)=>(a[0]+a[1]+a[2]) - (b[0]+b[1]+b[2]));
-      const merged=[];
-      for(let i=0;i<pal.length;i++){
-        let curr=pal[i];
-        if(i<pal.length-1 &&
-           (pal[i][0]+pal[i][1]+pal[i][2] === pal[i+1][0]+pal[i+1][1]+pal[i+1][2])){
-          const next=pal[i+1];
-          curr=[
-            Math.round((curr[0]+next[0])/2),
-            Math.round((curr[1]+next[1])/2),
-            Math.round((curr[2]+next[2])/2)
-          ];
-          i++;
-        }
-        merged.push(curr);
-      }
-      return merged;
+      // refine
+      pal = refinePalette(pal);
+      return pal;
     }
 
     function findTwoNearest(palette,r,g,b){
@@ -182,17 +207,18 @@
       return [palette[i1],palette[i2]];
     }
 
-    const uploadBtn=document.getElementById('uploadBtn'),
-          fileInput=document.getElementById('fileInput'),
-          sizeSelect=document.getElementById('sizeSelect'),
-          d1Input=document.getElementById('diag1Thresh'),
-          d2Input=document.getElementById('diag2Thresh'),
-          d1Val=document.getElementById('diag1Val'),
-          d2Val=document.getElementById('diag2Val'),
-          info=document.getElementById('info'),
-          output=document.getElementById('output'),
-          gsRow=document.getElementById('grayscaleRow'),
-          vtRow=document.getElementById('vibrantRow');
+    // DOM refs
+    const uploadBtn  = document.getElementById('uploadBtn'),
+          fileInput  = document.getElementById('fileInput'),
+          sizeSelect = document.getElementById('sizeSelect'),
+          d1Input    = document.getElementById('diag1Thresh'),
+          d2Input    = document.getElementById('diag2Thresh'),
+          d1Val      = document.getElementById('diag1Val'),
+          d2Val      = document.getElementById('diag2Val'),
+          info       = document.getElementById('info'),
+          output     = document.getElementById('output'),
+          gsRow      = document.getElementById('grayscaleRow'),
+          vtRow      = document.getElementById('vibrantRow');
     let origPixels=null, origW=0, origH=0, paletteRGB=[];
 
     d1Input.addEventListener('input',()=>{
@@ -212,8 +238,7 @@
       const errR=Array(scaledH).fill().map(()=>Array(scaledW).fill(0)),
             errG=Array(scaledH).fill().map(()=>Array(scaledW).fill(0)),
             errB=Array(scaledH).fill().map(()=>Array(scaledW).fill(0));
-      const prim=[],sec=[],errMag=[],orient=[];
-      let maxErr=0;
+      const prim=[],sec=[],errMag=[],orient=[]; let maxErr=0;
       const bw=origW/scaledW, bh=origH/scaledH;
 
       for(let y=0;y<scaledH;y++){
@@ -240,28 +265,27 @@
           [[1,0,7/16],[-1,1,3/16],[0,1,5/16],[1,1,1/16]].forEach(([dx,dy,f])=>{
             const xx=x+dx, yy=y+dy;
             if(xx>=0&&xx<scaledW&&yy>=0&&yy<scaledH){
-              errR[yy][xx]+=er*f; errG[yy][xx]+=eg*f; errB[yy][xx]+=eb*f;
+              errR[yy][xx]+=er*f;
+              errG[yy][xx]+=eg*f;
+              errB[yy][xx]+=eb*f;
             }
           });
 
           prim[y][x]=pcol; sec[y][x]=scol;
-          const m=Math.hypot(er,eg,eb);
-          errMag[y][x]=m; if(m>maxErr) maxErr=m;
+          const m=Math.hypot(er,eg,eb); errMag[y][x]=m; if(m>maxErr) maxErr=m;
           orient[y][x]=Math.random()<0.5;
         }
       }
 
-      const t1=+d1Input.value, t2=+d2Input.value,
-            bs=8,
-            canvasOut=document.createElement('canvas'),
+      const t1=+d1Input.value, t2=+d2Input.value;
+      const bs=8, canvasOut=document.createElement('canvas'),
             ctx=canvasOut.getContext('2d');
       canvasOut.width=scaledW*bs; canvasOut.height=scaledH*bs;
       canvasOut.style.imageRendering='pixelated';
 
       for(let y=0;y<scaledH;y++){
         for(let x=0;x<scaledW;x++){
-          const [pr,pg,pb]=prim[y][x],
-                [sr,sg,sb]=sec[y][x],
+          const [pr,pg,pb]=prim[y][x],[sr,sg,sb]=sec[y][x],
                 conf=errMag[y][x]/maxErr*100,
                 px=x*bs, py=y*bs;
           ctx.fillStyle=`rgb(${pr},${pg},${pb})`;
@@ -270,19 +294,13 @@
           ctx.lineWidth=1;
           if(conf<t1){
             ctx.beginPath();
-            if(orient[y][x]){
-              ctx.moveTo(px,py); ctx.lineTo(px+bs,py+bs);
-            } else {
-              ctx.moveTo(px,py+bs); ctx.lineTo(px+bs,py);
-            }
+            if(orient[y][x]){ ctx.moveTo(px,py); ctx.lineTo(px+bs,py+bs); }
+            else           { ctx.moveTo(px,py+bs); ctx.lineTo(px+bs,py);    }
             ctx.stroke();
             if(conf<t2){
               ctx.beginPath();
-              if(orient[y][x]){
-                ctx.moveTo(px,py+bs); ctx.lineTo(px+bs,py);
-              } else {
-                ctx.moveTo(px,py); ctx.lineTo(px+bs,py+bs);
-              }
+              if(orient[y][x]){ ctx.moveTo(px,py+bs); ctx.lineTo(px+bs,py); }
+              else           { ctx.moveTo(px,py);    ctx.lineTo(px+bs,py+bs); }
               ctx.stroke();
             }
           }
@@ -291,8 +309,9 @@
 
       output.innerHTML=''; output.appendChild(canvasOut);
 
-      const half = Math.ceil(paletteRGB.length/2),
-            row1 = paletteRGB.slice(0,half),
+      // two roughly equal rows
+      const half = Math.ceil(paletteRGB.length/2);
+      const row1 = paletteRGB.slice(0,half),
             row2 = paletteRGB.slice(half);
       gsRow.innerHTML=''; vtRow.innerHTML='';
       row1.forEach(c=>{
@@ -307,8 +326,8 @@
       });
     }
 
-    uploadBtn.addEventListener('click',()=>fileInput.click());
-    fileInput.addEventListener('change',e=>{
+    uploadBtn.addEventListener('click', ()=>fileInput.click());
+    fileInput.addEventListener('change', e=>{
       const f=e.target.files[0];
       if(!f||!f.type.startsWith('image/')) return alert('Select an image file.');
       const reader=new FileReader();
@@ -327,7 +346,7 @@
       };
       reader.readAsDataURL(f);
     });
-    sizeSelect.addEventListener('change',redraw);
+    sizeSelect.addEventListener('change', redraw);
   </script>
 </body>
 </html>
