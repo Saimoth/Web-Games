@@ -13,20 +13,19 @@
       color: #333;
     }
     h1 {
-      margin-bottom: 0.5rem;
-    }
-    #controls {
       margin-bottom: 1rem;
     }
-    label {
-      margin: 0 0.5rem;
-      font-size: 1rem;
+    #controls, #slider1, #slider2 {
+      margin-bottom: 1rem;
     }
-    select, button, input[type=range] {
-      padding: 0.4rem 0.8rem;
+    button, select, input[type=range] {
       font-size: 1rem;
+      padding: 0.4rem 0.8rem;
       margin-left: 0.3rem;
       vertical-align: middle;
+    }
+    label {
+      font-size: 1rem;
     }
     #info {
       margin-top: 0.5rem;
@@ -68,26 +67,33 @@
   <h1>Xstitch</h1>
 
   <div id="controls">
+    <button id="uploadBtn">Upload Photo</button>
     <label>
       Scale:
       <select id="sizeSelect">
         <option value="32">32</option>
         <option value="64">64</option>
         <option value="128" selected>128</option>
+        <option value="256">256</option>
       </select>
     </label>
+    <input type="file" id="fileInput" accept="image/*" style="display:none">
+  </div>
+
+  <div id="slider1">
     <label>
       Slash threshold:
       <input type="range" id="diag1Thresh" min="0" max="100" value="75">
       <span id="diag1Val">75</span>%
     </label>
+  </div>
+
+  <div id="slider2">
     <label>
       Cross threshold:
       <input type="range" id="diag2Thresh" min="0" max="100" value="40">
       <span id="diag2Val">40</span>%
     </label>
-    <button id="uploadBtn">Upload Photo</button>
-    <input type="file" id="fileInput" accept="image/*" style="display:none">
   </div>
 
   <div id="info"></div>
@@ -102,123 +108,109 @@
       const val = parseInt(hex,16);
       return [(val>>16)&255, (val>>8)&255, val&255];
     }
-    function rgbToHsl(r, g, b) {
-      r /= 255; g /= 255; b /= 255;
-      const max = Math.max(r,g,b), min = Math.min(r,g,b);
-      let h=0, s=0, l = (max+min)/2;
-      if (max !== min) {
-        const d = max - min;
-        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-        switch (max) {
-          case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-          case g: h = (b - r) / d + 2; break;
-          case b: h = (r - g) / d + 4; break;
+    function rgbToHsl(r,g,b){
+      r/=255;g/=255;b/=255;
+      const max=Math.max(r,g,b), min=Math.min(r,g,b);
+      let h=0,s=0,l=(max+min)/2;
+      if(max!==min){
+        const d=max-min;
+        s=l>0.5?d/(2-max-min):d/(max+min);
+        switch(max){
+          case r: h=(g-b)/d + (g<b?6:0); break;
+          case g: h=(b-r)/d + 2; break;
+          case b: h=(r-g)/d + 4; break;
         }
-        h /= 6;
+        h/=6;
       }
-      return [h * 360, s, l];
+      return [h*360,s,l];
     }
-    function findTwoNearest(palette, r, g, b) {
-      let i1=0, i2=1, d1=Infinity, d2=Infinity;
+    function findTwoNearest(palette,r,g,b){
+      let i1=0,i2=1,d1=Infinity,d2=Infinity;
       palette.forEach((c,i)=>{
-        const dr=r-c[0], dg=g-c[1], db=b-c[2];
-        const d = dr*dr + dg*dg + db*db;
-        if (d < d1) { d2 = d1; i2 = i1; d1 = d; i1 = i; }
-        else if (d < d2) { d2 = d; i2 = i; }
+        const dr=r-c[0], dg=g-c[1], db=b-c[2], d=dr*dr+dg*dg+db*db;
+        if(d<d1){d2=d1;i2=i1;d1=d;i1=i;}
+        else if(d<d2){d2=d;i2=i;}
       });
-      return [ palette[i1], palette[i2] ];
+      return [palette[i1],palette[i2]];
     }
-
-    // k-means palette extraction (14 clusters + black & white = 16)
-    function extractPalette(data) {
-      const sample = [];
-      for (let i = 0; i < data.length; i += 50*4) {
-        sample.push([data[i], data[i+1], data[i+2]]);
+    function extractPalette(data){
+      const sample=[];
+      for(let i=0;i<data.length;i+=50*4){
+        sample.push([data[i],data[i+1],data[i+2]]);
       }
-      const k = 14;
-      let centroids = [];
-      for (let i = 0; i < k; i++) {
-        centroids.push(sample[Math.floor(Math.random()*sample.length)]);
-      }
-      for (let iter = 0; iter < 10; iter++) {
-        const clusters = Array.from({length:k}, ()=>[]);
-        sample.forEach(p => {
-          let best=0, bd=Infinity;
+      const k=14,iters=10;
+      let centroids=Array.from({length:k},_=>sample[Math.floor(Math.random()*sample.length)]);
+      for(let it=0;it<iters;it++){
+        const clusters=Array.from({length:k},()=>[]);
+        sample.forEach(p=>{
+          let best=0,bd=Infinity;
           centroids.forEach((c,i)=>{
-            const dr=p[0]-c[0], dg=p[1]-c[1], db=p[2]-c[2];
-            const d = dr*dr+dg*dg+db*db;
-            if (d<bd) { bd=d; best=i; }
+            const dr=p[0]-c[0],dg=p[1]-c[1],db=p[2]-c[2],d=dr*dr+dg*dg+db*db;
+            if(d<bd){bd=d;best=i;}
           });
           clusters[best].push(p);
         });
-        centroids = centroids.map((c,i)=>{
-          const cl = clusters[i];
-          if (!cl.length) return c;
-          const sum = cl.reduce((acc,p)=>[acc[0]+p[0],acc[1]+p[1],acc[2]+p[2]], [0,0,0]);
+        centroids=centroids.map((c,i)=>{
+          const cl=clusters[i];
+          if(!cl.length) return c;
+          const sum=cl.reduce((acc,p)=>[acc[0]+p[0],acc[1]+p[1],acc[2]+p[2]],[0,0,0]);
           return sum.map(v=>Math.round(v/cl.length));
         });
       }
-      const filtered = centroids.filter(c=>{
-        const db = c[0]*c[0]+c[1]*c[1]+c[2]*c[2];
-        const dw = (255-c[0])**2 + (255-c[1])**2 + (255-c[2])**2;
+      const filtered=centroids.filter(c=>{
+        const db=c[0]*c[0]+c[1]*c[1]+c[2]*c[2];
+        const dw=(255-c[0])**2+(255-c[1])**2+(255-c[2])**2;
         return db>10000 && dw>10000;
       }).slice(0,14);
-      const pal = [[0,0,0],[255,255,255],...filtered];
-      // sort by hue
-      pal.sort((a,b)=>{
-        const h1 = rgbToHsl(a[0],a[1],a[2])[0];
-        const h2 = rgbToHsl(b[0],b[1],b[2])[0];
-        return h1 - h2;
-      });
+      const pal=[[0,0,0],[255,255,255],...filtered];
+      pal.sort((a,b)=>rgbToHsl(a[0],a[1],a[2])[0] - rgbToHsl(b[0],b[1],b[2])[0]);
       return pal;
     }
 
-    const uploadBtn   = document.getElementById('uploadBtn');
-    const fileInput   = document.getElementById('fileInput');
-    const sizeSelect  = document.getElementById('sizeSelect');
-    const diag1Input  = document.getElementById('diag1Thresh');
-    const diag2Input  = document.getElementById('diag2Thresh');
-    const diag1Val    = document.getElementById('diag1Val');
-    const diag2Val    = document.getElementById('diag2Val');
-    const info        = document.getElementById('info');
-    const output      = document.getElementById('output');
-    const paletteGrid = document.getElementById('paletteGrid');
+    const uploadBtn  = document.getElementById('uploadBtn');
+    const fileInput  = document.getElementById('fileInput');
+    const sizeSelect = document.getElementById('sizeSelect');
+    const d1Input    = document.getElementById('diag1Thresh');
+    const d2Input    = document.getElementById('diag2Thresh');
+    const d1Val      = document.getElementById('diag1Val');
+    const d2Val      = document.getElementById('diag2Val');
+    const info       = document.getElementById('info');
+    const output     = document.getElementById('output');
+    const paletteGrid= document.getElementById('paletteGrid');
 
     let origPixels=null, origW=0, origH=0, paletteRGB=[];
 
-    function onSliderChange() {
-      diag1Val.textContent = diag1Input.value;
-      diag2Val.textContent = diag2Input.value;
+    function onSliderChange(){
+      d1Val.textContent=d1Input.value;
+      d2Val.textContent=d2Input.value;
       redraw();
     }
-    diag1Input.addEventListener('input', onSliderChange);
-    diag2Input.addEventListener('input', onSliderChange);
+    d1Input.addEventListener('input',onSliderChange);
+    d2Input.addEventListener('input',onSliderChange);
 
-    function redraw() {
-      if (!origPixels) return;
-      const maxSide = +sizeSelect.value;
-      const scaledW = origW >= origH ? maxSide : Math.round(maxSide * origW / origH);
-      const scaledH = origH > origW ? maxSide : Math.round(maxSide * origH / origW);
+    function redraw(){
+      if(!origPixels) return;
+      const maxSide=+sizeSelect.value;
+      const scaledW=origW>=origH?maxSide:Math.round(maxSide*origW/origH);
+      const scaledH=origH>origW?maxSide:Math.round(maxSide*origH/origW);
+      info.textContent=`Orig: ${origW}×${origH}px → ${scaledW}×${scaledH}px`;
 
-      info.textContent = `Orig: ${origW}×${origH}px → ${scaledW}×${scaledH}px`;
-
-      const errR = Array(scaledH).fill().map(()=>Array(scaledW).fill(0));
-      const errG = Array(scaledH).fill().map(()=>Array(scaledW).fill(0));
-      const errB = Array(scaledH).fill().map(()=>Array(scaledW).fill(0));
-
-      const prim=[], sec=[], errMag=[], orient=[];
+      const errR=Array(scaledH).fill().map(()=>Array(scaledW).fill(0));
+      const errG=Array(scaledH).fill().map(()=>Array(scaledW).fill(0));
+      const errB=Array(scaledH).fill().map(()=>Array(scaledW).fill(0));
+      const prim=[],sec=[],errMag=[],orient=[];
       let maxErr=0;
       const bw=origW/scaledW, bh=origH/scaledH;
 
-      for (let y=0; y<scaledH; y++) {
-        prim[y]=[]; sec[y]=[]; errMag[y]=[]; orient[y]=[];
-        for (let x=0; x<scaledW; x++) {
+      for(let y=0;y<scaledH;y++){
+        prim[y]=[];sec[y]=[];errMag[y]=[];orient[y]=[];
+        for(let x=0;x<scaledW;x++){
           let r=0,g=0,b=0,c=0;
-          const x0=Math.floor(x*bw), y0=Math.floor(y*bh);
+          const x0=Math.floor(x*bw),y0=Math.floor(y*bh);
           const x1=Math.min(origW,Math.floor((x+1)*bw));
           const y1=Math.min(origH,Math.floor((y+1)*bh));
-          for (let yy=y0; yy<y1; yy++) {
-            for (let xx=x0; xx<x1; xx++) {
+          for(let yy=y0;yy<y1;yy++){
+            for(let xx=x0;xx<x1;xx++){
               const i=(yy*origW+xx)*4;
               r+=origPixels[i];
               g+=origPixels[i+1];
@@ -232,10 +224,10 @@
           [r,g,b]=[r,g,b].map(v=>Math.max(0,Math.min(255,v)));
 
           const [pcol,scol]=findTwoNearest(paletteRGB,r,g,b);
-          const [pr,pg,pb]=pcol, [sr,sg,sb]=scol;
-          const er=r-pr, eg=g-pg, eb=b-pb;
+          const [pr,pg,pb]=pcol,[sr,sg,sb]=scol;
+          const er=r-pr,eg=g-pg,eb=b-pb;
           [[1,0,7/16],[-1,1,3/16],[0,1,5/16],[1,1,1/16]].forEach(([dx,dy,f])=>{
-            const xx=x+dx, yy=y+dy;
+            const xx=x+dx,yy=y+dy;
             if(xx>=0&&xx<scaledW&&yy>=0&&yy<scaledH){
               errR[yy][xx]+=er*f;
               errG[yy][xx]+=eg*f;
@@ -243,8 +235,7 @@
             }
           });
 
-          prim[y][x]=pcol;
-          sec[y][x]=scol;
+          prim[y][x]=pcol; sec[y][x]=scol;
           const m=Math.hypot(er,eg,eb);
           errMag[y][x]=m;
           if(m>maxErr) maxErr=m;
@@ -252,7 +243,7 @@
         }
       }
 
-      const t1=+diag1Input.value, t2=+diag2Input.value;
+      const t1=+d1Input.value, t2=+d2Input.value;
       const canvasOut=document.createElement('canvas');
       const blockSize=8;
       canvasOut.width=scaledW*blockSize;
@@ -260,20 +251,20 @@
       const ctx=canvasOut.getContext('2d');
       canvasOut.style.imageRendering='pixelated';
 
-      for (let y=0; y<scaledH; y++) {
-        for (let x=0; x<scaledW; x++) {
+      for(let y=0;y<scaledH;y++){
+        for(let x=0;x<scaledW;x++){
           const [pr,pg,pb]=prim[y][x];
           const [sr,sg,sb]=sec[y][x];
           const conf=errMag[y][x]/maxErr*100;
-          const px=x*blockSize, py=y*blockSize;
+          const px=x*blockSize,py=y*blockSize;
           ctx.fillStyle=`rgb(${pr},${pg},${pb})`;
           ctx.fillRect(px,py,blockSize,blockSize);
           ctx.strokeStyle=`rgb(${sr},${sg},${sb})`;
           ctx.lineWidth=1;
 
-          if (conf <= t1) {
+          if(conf<=t1){
             ctx.beginPath();
-            if (orient[y][x]) {
+            if(orient[y][x]){
               ctx.moveTo(px,py);
               ctx.lineTo(px+blockSize,py+blockSize);
             } else {
@@ -281,9 +272,9 @@
               ctx.lineTo(px+blockSize,py);
             }
             ctx.stroke();
-            if (conf <= t2) {
+            if(conf<=t2){
               ctx.beginPath();
-              if (orient[y][x]) {
+              if(orient[y][x]){
                 ctx.moveTo(px,py+blockSize);
                 ctx.lineTo(px+blockSize,py);
               } else {
@@ -296,10 +287,8 @@
         }
       }
 
-      output.innerHTML='';
-      output.appendChild(canvasOut);
+      output.innerHTML=''; output.appendChild(canvasOut);
 
-      // palette swatches
       paletteGrid.innerHTML='';
       paletteRGB.forEach(c=>{
         const d=document.createElement('div');
@@ -309,10 +298,10 @@
       });
     }
 
-    uploadBtn.addEventListener('click', ()=>fileInput.click());
-    fileInput.addEventListener('change', e=>{
+    uploadBtn.addEventListener('click',()=>fileInput.click());
+    fileInput.addEventListener('change',e=>{
       const f=e.target.files[0];
-      if(!f||!f.type.startsWith('image/')) return alert('Please select an image file.');
+      if(!f||!f.type.startsWith('image/')) return alert('Select an image file.');
       const reader=new FileReader();
       reader.onload=ev=>{
         const img=new Image();
@@ -330,7 +319,7 @@
       };
       reader.readAsDataURL(f);
     });
-    sizeSelect.addEventListener('change', redraw);
+    sizeSelect.addEventListener('change',redraw);
   </script>
 
 </body>
