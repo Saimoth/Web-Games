@@ -369,7 +369,7 @@
         }
       }
 
-      const bs=8, minChunk=sizeSelect.value/16;, maxChunk=sizeSelect.value/4;
+      const bs=8, minChunk=8;, maxChunk=32;
       const canvas=document.createElement('canvas'), ctx=canvas.getContext('2d');
       canvas.width=scaledW*bs; canvas.height=scaledH*bs;
       canvas.style.imageRendering='pixelated';
