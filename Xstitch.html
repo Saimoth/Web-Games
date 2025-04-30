@@ -134,79 +134,52 @@
       return centroids;
     }
 
-    // merge close colours in-place, then global dedupe
+    // merge close colours then dedupe
     function refinePalette(pal){
       const brightT=0.10*255, compT=0.15*255;
       for(let i=0; i<pal.length; i++){
-        let [r1,g1,b1] = pal[i];
-        let br1 = (r1+g1+b1)/3;
-        let j = i+1;
-        while(j < pal.length){
-          const [r2,g2,b2] = pal[j];
-          const br2 = (r2+g2+b2)/3;
-          if(
-            Math.abs(br1-br2) <= brightT &&
-            Math.abs(r1-r2) <= compT &&
-            Math.abs(g1-g2) <= compT &&
-            Math.abs(b1-b2) <= compT
-          ){
-            const avg = [
-              Math.round((r1+r2)/2),
-              Math.round((g1+g2)/2),
-              Math.round((b1+b2)/2)
-            ];
-            pal[i] = avg;
-            [r1,g1,b1] = avg;
-            br1 = (avg[0]+avg[1]+avg[2])/3;
+        let [r1,g1,b1] = pal[i], br1=(r1+g1+b1)/3, j=i+1;
+        while(j<pal.length){
+          const [r2,g2,b2]=pal[j], br2=(r2+g2+b2)/3;
+          if(Math.abs(br1-br2)<=brightT &&
+             Math.abs(r1-r2)<=compT &&
+             Math.abs(g1-g2)<=compT &&
+             Math.abs(b1-b2)<=compT){
+            const avg=[Math.round((r1+r2)/2),Math.round((g1+g2)/2),Math.round((b1+b2)/2)];
+            pal[i]=avg; [r1,g1,b1]=avg; br1=(avg[0]+avg[1]+avg[2])/3;
             pal.splice(j,1);
-          } else {
-            j++;
-          }
+          } else j++;
         }
       }
-      // global dedupe
-      const deduped = [], globT = 0.12*255;
+      const deduped=[], globT=0.12*255;
       pal.forEach(c=>{
         if(!deduped.some(d=>{
-          const dr=c[0]-d[0], dg=c[1]-d[1], db=c[2]-d[2];
-          return Math.hypot(dr,dg,db) < globT;
+          return Math.hypot(c[0]-d[0],c[1]-d[1],c[2]-d[2])<globT;
         })) deduped.push(c);
       });
       return deduped;
     }
 
-    // build 16-colour palette
+    // build 16-col palette
     function extractPalette(data){
-      const pixels = [];
-      for(let i=0; i<data.length; i+=4){
-        pixels.push([data[i],data[i+1],data[i+2]]);
-      }
-      const satT = 0.4;
-      const satPix = pixels.filter(p=>rgbToHsl(...p)[1] > satT);
-      const satClusters = satPix.length
-        ? kmeans(satPix, Math.min(8, satPix.length))
-        : [];
-      const remain = 16 - 3 - satClusters.length;
-      const unsatPix = pixels.filter(p=>rgbToHsl(...p)[1] <= satT);
-      const unsatClusters = (unsatPix.length && remain>0)
-        ? kmeans(unsatPix, Math.min(remain, unsatPix.length))
-        : [];
-      let pal = [
-        [0,0,0],
-        [128,128,128],
-        [255,255,255],
-        ...satClusters,
-        ...unsatClusters
-      ];
-      pal.sort((a,b)=>(a[0]+a[1]+a[2]) - (b[0]+b[1]+b[2]));
+      const pixels=[];
+      for(let i=0;i<data.length;i+=4) pixels.push([data[i],data[i+1],data[i+2]]);
+      const satT=0.4;
+      const sat=pixels.filter(p=>rgbToHsl(...p)[1]>satT);
+      const satC=sat.length? kmeans(sat,Math.min(8,sat.length)) : [];
+      const remain=16-3-satC.length;
+      const unsat=pixels.filter(p=>rgbToHsl(...p)[1]<=satT);
+      const remC=(unsat.length&&remain>0)? kmeans(unsat,Math.min(remain,unsat.length)):[];
+      let pal=[[0,0,0],[128,128,128],[255,255,255],...satC,...remC];
+      pal.sort((a,b)=>(a[0]+a[1]+a[2])-(b[0]+b[1]+b[2]));
       return refinePalette(pal);
     }
 
-    // find colour in palette that contrasts most with base
+    // find contrast colour
     function findContrastColour(base,pal){
       let best=pal[0], bd=-1;
       pal.forEach(c=>{
-        const d = Math.hypot(c[0]-base[0], c[1]-base[1], c[2]-base[2]);
+        const d=Math.hypot(c[0]-base[0],c[1]-base[1],c[2]-base[2]);
         if(d>bd){ bd=d; best=c; }
       });
       return best;
@@ -227,327 +200,258 @@
           gsRow      = document.getElementById('grayscaleRow'),
           vtRow      = document.getElementById('vibrantRow');
 
-    let origPixels = null,
-        origW = 0,
-        origH = 0,
-        paletteRGB = [],
-        origEdgeGx, origEdgeGy, origEdgeMag, origMaxG;
+    let origPixels=null, origW=0, origH=0, paletteRGB, origEdgeGx, origEdgeGy, origEdgeMag, origMaxG;
 
-    // slider events
-    d1Input.addEventListener('input', ()=>{
-      d1Val.textContent = d1Input.value;
-      redraw();
-    });
-    d2Input.addEventListener('input', ()=>{
-      d2Val.textContent = d2Input.value;
-      redraw();
-    });
-    edgeInput.addEventListener('input', ()=>{
-      edgeVal.textContent = (+edgeInput.value).toFixed(2);
-      redraw();
-    });
+    d1Input.addEventListener('input',()=>{ d1Val.textContent=d1Input.value; redraw(); });
+    d2Input.addEventListener('input',()=>{ d2Val.textContent=d2Input.value; redraw(); });
+    edgeInput.addEventListener('input',()=>{ edgeVal.textContent=(+edgeInput.value).toFixed(2); redraw(); });
 
-    // upload logic with pre-shrink for very large images
-    uploadBtn.addEventListener('click', ()=> fileInput.click());
+    uploadBtn.addEventListener('click',()=>fileInput.click());
+    sizeSelect.addEventListener('change', redraw);
+
     fileInput.addEventListener('change', e=>{
-      const f = e.target.files[0];
-      if(!f || !f.type.startsWith('image/')) return alert('Select an image file.');
-      const reader = new FileReader();
-      reader.onload = ev => {
-        const img = new Image();
-        img.onload = () => {
-          // shrink if longest side >512
-          let w = img.naturalWidth, h = img.naturalHeight;
-          const maxAllowed = 512;
-          const maxSide = Math.max(w,h);
-          if(maxSide > maxAllowed){
-            const factor = maxAllowed / maxSide;
-            w = Math.round(w * factor);
-            h = Math.round(h * factor);
+      const f=e.target.files[0];
+      if(!f||!f.type.startsWith('image/')) return alert('Select an image file.');
+      const reader=new FileReader();
+      reader.onload=ev=>{
+        const img=new Image();
+        img.onload=()=>{
+          // ** Only changed block: shrink if largest side > 512 **
+          let w=img.naturalWidth, h=img.naturalHeight;
+          const maxAllowed=512, maxSide=Math.max(w,h);
+          if(maxSide>maxAllowed){
+            const scale=maxAllowed/maxSide;
+            w=Math.round(w*scale);
+            h=Math.round(h*scale);
           }
-          origW = w;
-          origH = h;
-
-          // draw (possibly shrunk) source
-          const tmp = document.createElement('canvas');
-          tmp.width = origW; tmp.height = origH;
-          const tctx = tmp.getContext('2d');
-          tctx.drawImage(img, 0, 0, origW, origH);
-          const id = tctx.getImageData(0,0,origW,origH);
-          origPixels = id.data;
-
-          // palette first
-          paletteRGB = extractPalette(origPixels);
-
-          // compute Sobel on original (shrunk) image
-          origEdgeGx = Array(origH).fill().map(()=>Array(origW).fill(0));
-          origEdgeGy = Array(origH).fill().map(()=>Array(origW).fill(0));
-          origEdgeMag= Array(origH).fill().map(()=>Array(origW).fill(0));
-          origMaxG   = 0;
-          // luminance
-          const lum = Array(origH).fill().map(()=>Array(origW).fill(0));
-          for(let y=0; y<origH; y++){
-            for(let x=0; x<origW; x++){
+          origW=w; origH=h;
+          // draw shrunk image
+          const tmp=document.createElement('canvas');
+          tmp.width=origW; tmp.height=origH;
+          const tctx=tmp.getContext('2d');
+          tctx.drawImage(img,0,0,origW,origH);
+          const id=tctx.getImageData(0,0,origW,origH);
+          origPixels=id.data;
+          // palette & Sobel unchanged
+          paletteRGB=extractPalette(origPixels);
+          // compute Sobel on origPixels → origEdgeGx, origEdgeGy, origEdgeMag, origMaxG
+          const lum=Array(origH).fill().map(()=>Array(origW).fill(0));
+          origEdgeGx=Array(origH).fill().map(()=>Array(origW).fill(0));
+          origEdgeGy=Array(origH).fill().map(()=>Array(origW).fill(0));
+          origEdgeMag=Array(origH).fill().map(()=>Array(origW).fill(0));
+          origMaxG=0;
+          for(let y=0;y<origH;y++){
+            for(let x=0;x<origW;x++){
               const i=(y*origW+x)*4;
-              lum[y][x] = 0.299*id.data[i]
-                        + 0.587*id.data[i+1]
-                        + 0.114*id.data[i+2];
+              lum[y][x]=0.299*id.data[i]+0.587*id.data[i+1]+0.114*id.data[i+2];
             }
           }
-          for(let y=1; y<origH-1; y++){
-            for(let x=1; x<origW-1; x++){
-              const gx =
-                -lum[y-1][x-1] + lum[y-1][x+1] +
-                -2*lum[y  ][x-1] + 2*lum[y  ][x+1] +
-                -lum[y+1][x-1] + lum[y+1][x+1];
-              const gy =
-                -lum[y-1][x-1] - 2*lum[y-1][x] - lum[y-1][x+1] +
-                 lum[y+1][x-1] + 2*lum[y+1][x] + lum[y+1][x+1];
-              const g = Math.hypot(gx,gy);
-              origEdgeGx[y][x] = gx;
-              origEdgeGy[y][x] = gy;
-              origEdgeMag[y][x] = g;
-              if(g > origMaxG) origMaxG = g;
+          for(let y=1;y<origH-1;y++){
+            for(let x=1;x<origW-1;x++){
+              const gx=
+                -lum[y-1][x-1]+lum[y-1][x+1]+
+                -2*lum[y  ][x-1]+2*lum[y  ][x+1]+
+                -lum[y+1][x-1]+lum[y+1][x+1];
+              const gy=
+                -lum[y-1][x-1]-2*lum[y-1][x]-lum[y-1][x+1]+
+                 lum[y+1][x-1]+2*lum[y+1][x]+lum[y+1][x+1];
+              const g=Math.hypot(gx,gy);
+              origEdgeGx[y][x]=gx; origEdgeGy[y][x]=gy; origEdgeMag[y][x]=g;
+              if(g>origMaxG) origMaxG=g;
             }
           }
-
           redraw();
         };
-        img.src = ev.target.result;
+        img.src=ev.target.result;
       };
       reader.readAsDataURL(f);
     });
 
-    sizeSelect.addEventListener('change', redraw);
-
     function redraw(){
       if(!origPixels) return;
+      const maxSide=+sizeSelect.value;
+      const scaledW=origW>=origH?maxSide:Math.round(maxSide*origW/origH);
+      const scaledH=origH>origW?maxSide:Math.round(maxSide*origH/origW);
+      info.textContent=`${scaledW} x ${scaledH}`;
 
-      const maxSide = +sizeSelect.value;
-      const scaledW = origW >= origH
-                      ? maxSide
-                      : Math.round(maxSide * origW / origH);
-      const scaledH = origH > origW
-                      ? maxSide
-                      : Math.round(maxSide * origH / origW);
-
-      // show only the created image dimensions
-      info.textContent = `${scaledW} x ${scaledH}`;
-
-      const bw = origW / scaledW,
-            bh = origH / scaledH;
-
-      // prepare arrays
-      const errR = Array(scaledH).fill().map(()=>Array(scaledW).fill(0)),
-            errG = Array(scaledH).fill().map(()=>Array(scaledW).fill(0)),
-            errB = Array(scaledH).fill().map(()=>Array(scaledW).fill(0));
-      const prim = [], sec = [], errMag = [], slashOrient = [];
-      let maxErr = 0;
-
-      // dither + two-colour lookup
-      for(let y=0; y<scaledH; y++){
-        prim[y]=[]; sec[y]=[]; errMag[y]=[]; slashOrient[y]=[];
-        for(let x=0; x<scaledW; x++){
-          let r=0, g=0, b=0, count=0;
-          const x0 = Math.floor(x * bw),
-                y0 = Math.floor(y * bh),
-                x1 = Math.min(origW, Math.floor((x+1) * bw)),
-                y1 = Math.min(origH, Math.floor((y+1) * bh));
-          for(let yy=y0; yy<y1; yy++){
-            for(let xx=x0; xx<x1; xx++){
+      const bw=origW/scaledW, bh=origH/scaledH;
+      const errR=Array(scaledH).fill().map(()=>Array(scaledW).fill(0)),
+            errG=Array(scaledH).fill().map(()=>Array(scaledW).fill(0)),
+            errB=Array(scaledH).fill().map(()=>Array(scaledW).fill(0));
+      const prim=[], sec=[], errMagArr=[], slashOri=[]; let maxErr=0;
+      for(let y=0;y<scaledH;y++){
+        prim[y]=[]; sec[y]=[]; errMagArr[y]=[]; slashOri[y]=[];
+        for(let x=0;x<scaledW;x++){
+          let r=0,g=0,b=0,c=0;
+          const x0=Math.floor(x*bw), y0=Math.floor(y*bh),
+                x1=Math.min(origW,Math.floor((x+1)*bw)),
+                y1=Math.min(origH,Math.floor((y+1)*bh));
+          for(let yy=y0;yy<y1;yy++){
+            for(let xx=x0;xx<x1;xx++){
               const i=(yy*origW+xx)*4;
-              r += origPixels[i];
-              g += origPixels[i+1];
-              b += origPixels[i+2];
-              count++;
+              r+=origPixels[i]; g+=origPixels[i+1]; b+=origPixels[i+2]; c++;
             }
           }
-          r = (count? r/count : 0) + errR[y][x];
-          g = (count? g/count : 0) + errG[y][x];
-          b = (count? b/count : 0) + errB[y][x];
-          [r,g,b] = [r,g,b].map(v=>Math.max(0,Math.min(255,v)));
+          r=(c?r/c:0)+errR[y][x];
+          g=(c?g/c:0)+errG[y][x];
+          b=(c?b/c:0)+errB[y][x];
+          [r,g,b]=[r,g,b].map(v=>Math.max(0,Math.min(255,v)));
 
-          // nearest two colours
-          let i1=0, i2=1, d1=Infinity, d2=Infinity;
+          let i1=0,i2=1,d1=Infinity,d2=Infinity;
           paletteRGB.forEach((col,i)=>{
-            const dr = r-col[0],
-                  dg = g-col[1],
-                  db = b-col[2],
-                  d  = dr*dr + dg*dg + db*db;
-            if(d < d1){
-              d2 = d1; i2 = i1;
-              d1 = d;  i1 = i;
-            } else if(d < d2){
-              d2 = d;  i2 = i;
-            }
+            const dr=r-col[0], dg=g-col[1], db=b-col[2], d=dr*dr+dg*dg+db*db;
+            if(d<d1){ d2=d1; i2=i1; d1=d; i1=i; }
+            else if(d<d2){ d2=d; i2=i; }
           });
-          const pcol = paletteRGB[i1],
-                scol = paletteRGB[i2];
-          prim[y][x] = pcol;
-          sec[y][x] = scol;
+          prim[y][x]=paletteRGB[i1];
+          sec[y][x]=paletteRGB[i2];
 
-          // Floyd–Steinberg error diffusion
-          const [pr,pg,pb] = pcol;
-          const er = r - pr,
-                eg = g - pg,
-                eb = b - pb;
+          const [pr,pg,pb]=prim[y][x], er=r-pr, eg=g-pg, eb=b-pb;
           [[1,0,7/16],[-1,1,3/16],[0,1,5/16],[1,1,1/16]].forEach(([dx,dy,f])=>{
-            const xx = x+dx, yy = y+dy;
-            if(xx>=0 && xx<scaledW && yy>=0 && yy<scaledH){
-              errR[yy][xx] += er * f;
-              errG[yy][xx] += eg * f;
-              errB[yy][xx] += eb * f;
+            const xx=x+dx, yy=y+dy;
+            if(xx>=0&&xx<scaledW&&yy>=0&&yy<scaledH){
+              errR[yy][xx]+=er*f;
+              errG[yy][xx]+=eg*f;
+              errB[yy][xx]+=eb*f;
             }
           });
-
-          const m = Math.hypot(er,eg,eb);
-          errMag[y][x] = m;
-          if(m > maxErr) maxErr = m;
-          slashOrient[y][x] = Math.random() < 0.5;
+          const m=Math.hypot(er,eg,eb);
+          errMagArr[y][x]=m; if(m>maxErr) maxErr=m;
+          slashOri[y][x]=Math.random()<0.5;
         }
       }
 
-      // map Sobel into grid
-      const edgeMul = +edgeInput.value;
-      const cellHasEdge = Array(scaledH).fill().map(()=>Array(scaledW).fill(false));
-      const cellGxSum   = Array(scaledH).fill().map(()=>Array(scaledW).fill(0));
-      const cellGySum   = Array(scaledH).fill().map(()=>Array(scaledW).fill(0));
-      const cellMagSum  = Array(scaledH).fill().map(()=>Array(scaledW).fill(0));
-
-      for(let y=0; y<scaledH; y++){
-        const y0 = Math.floor(y * bh),
-              y1 = Math.min(origH, Math.floor((y+1)*bh));
-        for(let x=0; x<scaledW; x++){
-          const x0 = Math.floor(x * bw),
-                x1 = Math.min(origW, Math.floor((x+1)*bw));
-          let sumGx=0, sumGy=0, sumM=0;
-          for(let yy=y0; yy<y1; yy++){
-            for(let xx=x0; xx<x1; xx++){
-              const m = origEdgeMag[yy][xx];
-              if(m > origMaxG * edgeMul) cellHasEdge[y][x] = true;
-              sumGx += origEdgeGx[yy][xx] * m;
-              sumGy += origEdgeGy[yy][xx] * m;
-              sumM  += m;
+      // map Sobel
+      const edgeMul=+edgeInput.value;
+      const hasEdge=Array(scaledH).fill().map(()=>Array(scaledW).fill(false));
+      const gxSum=Array(scaledH).fill().map(()=>Array(scaledW).fill(0));
+      const gySum=Array(scaledH).fill().map(()=>Array(scaledW).fill(0));
+      const magSum=Array(scaledH).fill().map(()=>Array(scaledW).fill(0));
+      for(let y=0;y<scaledH;y++){
+        const y0=Math.floor(y*bh), y1=Math.min(origH,Math.floor((y+1)*bh));
+        for(let x=0;x<scaledW;x++){
+          const x0=Math.floor(x*bw), x1=Math.min(origW,Math.floor((x+1)*bw));
+          let sGx=0,sGy=0,sM=0;
+          for(let yy=y0;yy<y1;yy++){
+            for(let xx=x0;xx<x1;xx++){
+              const m=origEdgeMag[yy][xx];
+              if(m>origMaxG*edgeMul) hasEdge[y][x]=true;
+              sGx+=origEdgeGx[yy][xx]*m;
+              sGy+=origEdgeGy[yy][xx]*m;
+              sM+=m;
             }
           }
-          cellGxSum[y][x] = sumGx;
-          cellGySum[y][x] = sumGy;
-          cellMagSum[y][x] = sumM;
+          gxSum[y][x]=sGx; gySum[y][x]=sGy; magSum[y][x]=sM;
         }
       }
 
-      // gather candidates & keep top 20%
-      const candidates = [];
+      // top 20%
+      const candidates=[];
       for(let y=0;y<scaledH;y++){
         for(let x=0;x<scaledW;x++){
-          if(cellHasEdge[y][x]) candidates.push({x,y,sum:cellMagSum[y][x]});
+          if(hasEdge[y][x]) candidates.push({x,y,sum:magSum[y][x]});
         }
       }
-      candidates.sort((a,b)=>b.sum - a.sum);
-      let cutoffSum = 0;
-      if(candidates.length){
-        const idx = Math.floor(candidates.length * 0.2) - 1;
-        cutoffSum = candidates[Math.max(0, idx)].sum;
+      candidates.sort((a,b)=>b.sum-a.sum);
+      const idx=Math.floor(candidates.length*0.2)-1;
+      const cutoff=candidates.length?candidates[Math.max(0,idx)].sum:0;
+      const keepEdge=Array(scaledH).fill().map(()=>Array(scaledW).fill(false));
+      candidates.forEach(c=>{ if(c.sum>=cutoff) keepEdge[c.y][c.x]=true; });
+
+      const orient=Array(scaledH).fill().map(()=>Array(scaledW).fill(''));
+      for(let y=0;y<scaledH;y++){
+        for(let x=0;x<scaledW;x++){
+          if(!keepEdge[y][x]) continue;
+          const gx=gxSum[y][x], gy=gySum[y][x];
+          if(Math.abs(gx)>1.5*Math.abs(gy))      orient[y][x]='vertical';
+          else if(Math.abs(gy)>1.5*Math.abs(gx)) orient[y][x]='horizontal';
+          else                                   orient[y][x]=(gx*gy>0?'diag1':'diag2');
+        }
       }
-      const limitedHasEdge = Array(scaledH).fill().map(()=>Array(scaledW).fill(false));
-      candidates.forEach(c=>{
-        if(c.sum >= cutoffSum) limitedHasEdge[c.y][c.x] = true;
-      });
 
-      // draw
-      const bs = 8, minChunk = 10, maxChunk = 25;
-      const canvas = document.createElement('canvas'),
-            ctx    = canvas.getContext('2d');
-      canvas.width  = scaledW * bs;
-      canvas.height = scaledH * bs;
-      canvas.style.imageRendering = 'pixelated';
+      const bs=8, minChunk=10, maxChunk=25;
+      const canvas=document.createElement('canvas'), ctx=canvas.getContext('2d');
+      canvas.width=scaledW*bs; canvas.height=scaledH*bs;
+      canvas.style.imageRendering='pixelated';
+      const t1=+d1Input.value, t2=+d2Input.value;
 
-      const t1 = +d1Input.value, t2 = +d2Input.value;
-
-      // dithered stitches with X and cross
-      for(let y=0; y<scaledH; y++){
-        for(let x=0; x<scaledW; x++){
-          const [pr,pg,pb] = prim[y][x],
-                [sr,sg,sb] = sec[y][x],
-                conf = errMag[y][x]/maxErr*100,
-                px = x*bs, py = y*bs;
-          ctx.fillStyle   = `rgb(${pr},${pg},${pb})`;
+      // stitches
+      for(let y=0;y<scaledH;y++){
+        for(let x=0;x<scaledW;x++){
+          const [pr,pg,pb]=prim[y][x], [sr,sg,sb]=sec[y][x],
+                conf=errMagArr[y][x]/maxErr*100,
+                px=x*bs, py=y*bs;
+          ctx.fillStyle=`rgb(${pr},${pg},${pb})`;
           ctx.fillRect(px,py,bs,bs);
-          ctx.strokeStyle = `rgb(${sr},${sg},${sb})`;
-          ctx.lineWidth   = 1;
-          if(conf < t1){
+          ctx.strokeStyle=`rgb(${sr},${sg},${sb})`;
+          ctx.lineWidth=1;
+          if(conf<t1){
             ctx.beginPath();
-            if(slashOrient[y][x]) ctx.moveTo(px,py),ctx.lineTo(px+bs,py+bs);
-            else                   ctx.moveTo(px,py+bs),ctx.lineTo(px+bs,py);
+            if(slashOri[y][x]) ctx.moveTo(px,py),ctx.lineTo(px+bs,py+bs);
+            else               ctx.moveTo(px,py+bs),ctx.lineTo(px+bs,py);
             ctx.stroke();
-            if(conf < t2){
+            if(conf<t2){
               ctx.beginPath();
-              if(slashOrient[y][x]) ctx.moveTo(px,py+bs),ctx.lineTo(px+bs,py);
-              else                   ctx.moveTo(px,py),    ctx.lineTo(px+bs,py+bs);
+              if(slashOri[y][x]) ctx.moveTo(px,py+bs),ctx.lineTo(px+bs,py);
+              else               ctx.moveTo(px,py),    ctx.lineTo(px+bs,py+bs);
               ctx.stroke();
             }
           }
         }
       }
 
-      // flood-fill & draw edge chunks
-      const visited = Array(scaledH).fill().map(()=>Array(scaledW).fill(false));
-      const dirs    = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
-      for(let y=0; y<scaledH; y++){
-        for(let x=0; x<scaledW; x++){
-          if(!limitedHasEdge[y][x] || visited[y][x]) continue;
-          const stack = [[x,y]], comp = [];
-          visited[y][x] = true;
+      // edge chunks
+      const visited=Array(scaledH).fill().map(()=>Array(scaledW).fill(false));
+      const dirs=[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+      for(let y=0;y<scaledH;y++){
+        for(let x=0;x<scaledW;x++){
+          if(!keepEdge[y][x]||visited[y][x]) continue;
+          const stack=[[x,y]], comp=[]; visited[y][x]=true;
           while(stack.length){
-            const [cx,cy] = stack.pop();
-            comp.push([cx,cy]);
-            if(comp.length >= maxChunk) break;
+            const [cx,cy]=stack.pop(); comp.push([cx,cy]);
+            if(comp.length>=maxChunk) break;
             dirs.forEach(([dx,dy])=>{
-              const nx = cx+dx, ny = cy+dy;
-              if(nx>=0 && nx<scaledW && ny>=0 && ny<scaledH &&
-                 limitedHasEdge[ny][nx] && !visited[ny][nx]){
-                visited[ny][nx] = true;
-                stack.push([nx,ny]);
+              const nx=cx+dx, ny=cy+dy;
+              if(nx>=0&&nx<scaledW&&ny>=0&&ny<scaledH&&keepEdge[ny][nx]&&!visited[ny][nx]){
+                visited[ny][nx]=true; stack.push([nx,ny]);
               }
             });
           }
-          if(comp.length < minChunk) continue;
-          for(let i=0; i<comp.length; i+=maxChunk){
-            const chunk = comp.slice(i, i+maxChunk);
-            if(chunk.length < minChunk) break;
-            const [sx,sy] = chunk[0];
-            const ccol = findContrastColour(prim[sy][sx], paletteRGB);
-            ctx.strokeStyle = `rgb(${ccol[0]},${ccol[1]},${ccol[2]})`;
-            ctx.lineWidth = 2;
+          if(comp.length<minChunk) continue;
+          for(let i=0;i<comp.length;i+=maxChunk){
+            const chunk=comp.slice(i,i+maxChunk);
+            if(chunk.length<minChunk) break;
+            const [sx,sy]=chunk[0];
+            const ccol=findContrastColour(prim[sy][sx],paletteRGB);
+            ctx.strokeStyle=`rgb(${ccol[0]},${ccol[1]},${ccol[2]})`;
+            ctx.lineWidth=2;
             ctx.beginPath();
-            ctx.moveTo(chunk[0][0]*bs + bs/2, chunk[0][1]*bs + bs/2);
-            for(let j=1; j<chunk.length; j++){
-              ctx.lineTo(chunk[j][0]*bs + bs/2, chunk[j][1]*bs + bs/2);
+            ctx.moveTo(chunk[0][0]*bs+bs/2,chunk[0][1]*bs+bs/2);
+            for(let j=1;j<chunk.length;j++){
+              ctx.lineTo(chunk[j][0]*bs+bs/2,chunk[j][1]*bs+bs/2);
             }
             ctx.stroke();
           }
         }
       }
 
-      output.innerHTML = '';
-      output.appendChild(canvas);
+      output.innerHTML=''; output.appendChild(canvas);
 
-      // render palette swatches
-      const half = Math.ceil(paletteRGB.length/2),
-            row1 = paletteRGB.slice(0,half),
-            row2 = paletteRGB.slice(half);
-      gsRow.innerHTML = '';
-      vtRow.innerHTML = '';
+      // palette swatches
+      const half=Math.ceil(paletteRGB.length/2),
+            row1=paletteRGB.slice(0,half),
+            row2=paletteRGB.slice(half);
+      gsRow.innerHTML=''; vtRow.innerHTML='';
       row1.forEach(c=>{
-        const d = document.createElement('div');
-        d.className = 'swatch';
-        d.style.background = `rgb(${c[0]},${c[1]},${c[2]})`;
+        const d=document.createElement('div');
+        d.className='swatch';
+        d.style.background=`rgb(${c[0]},${c[1]},${c[2]})`;
         gsRow.appendChild(d);
       });
       row2.forEach(c=>{
-        const d = document.createElement('div');
-        d.className = 'swatch';
-        d.style.background = `rgb(${c[0]},${c[1]},${c[2]})`;
+        const d=document.createElement('div');
+        d.className='swatch';
+        d.style.background=`rgb(${c[0]},${c[1]},${c[2]})`;
         vtRow.appendChild(d);
       });
     }
