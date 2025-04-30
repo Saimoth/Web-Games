@@ -63,8 +63,8 @@
 
   <div id="slider3">
     <label>Edge threshold:
-      <input type="range" id="edgeThresh" min="0.00" max="0.80" step="0.01" value="0.10">
-      <span id="edgeVal">0.10</span>
+      <input type="range" id="edgeThresh" min="0.00" max="0.80" step="0.01" value="0.20">
+      <span id="edgeVal">0.20</span>
     </label>
   </div>
 
@@ -345,7 +345,7 @@
         }
       }
 
-      // top 20%
+      // top 50%
       const candidates=[];
       for(let y=0;y<scaledH;y++){
         for(let x=0;x<scaledW;x++){
@@ -353,7 +353,7 @@
         }
       }
       candidates.sort((a,b)=>b.sum-a.sum);
-      const idx=Math.floor(candidates.length*0.2)-1;
+      const idx=Math.floor(candidates.length*0.5)-1;
       const cutoff=candidates.length?candidates[Math.max(0,idx)].sum:0;
       const keepEdge=Array(scaledH).fill().map(()=>Array(scaledW).fill(false));
       candidates.forEach(c=>{ if(c.sum>=cutoff) keepEdge[c.y][c.x]=true; });
@@ -369,7 +369,7 @@
         }
       }
 
-      const bs=8, minChunk=10, maxChunk=25;
+      const bs=8, minChunk=10, maxChunk=40;
       const canvas=document.createElement('canvas'), ctx=canvas.getContext('2d');
       canvas.width=scaledW*bs; canvas.height=scaledH*bs;
       canvas.style.imageRendering='pixelated';
