@@ -35,8 +35,8 @@
   <h1>Xstitch</h1>
 
   <div id="controls">
-    <button id="uploadBtn">Upload Photo</button>
-    <label>Scale:
+    <button id="uploadBtn">Choose Photo</button>
+    <label>Size:
       <select id="sizeSelect">
         <option value="32">32</option>
         <option value="64">64</option>
@@ -63,8 +63,8 @@
 
   <div id="slider3">
     <label>Edge threshold:
-      <input type="range" id="edgeThresh" min="0.00" max="0.80" step="0.01" value="0.20">
-      <span id="edgeVal">0.20</span>
+      <input type="range" id="edgeThresh" min="0.00" max="0.80" step="0.01" value="0.30">
+      <span id="edgeVal">0.30</span>
     </label>
   </div>
 
@@ -94,25 +94,23 @@
       return [h*360,s,l];
     }
 
-    // simple k-means on RGB triples
+    // k-means clustering
     function kmeans(pixels, k, iters=8) {
       const N = pixels.length, centroids = [], assign = new Array(N);
-      for(let i=0;i<k;i++){
-        centroids.push(pixels[Math.floor(Math.random()*N)].slice());
-      }
+      for(let i=0;i<k;i++) centroids.push(pixels[Math.floor(Math.random()*N)].slice());
       for(let it=0; it<iters; it++){
-        // assign
         for(let i=0;i<N;i++){
           let best=0, bd=Infinity;
           for(let j=0;j<k;j++){
-            const c=centroids[j];
-            const dr=pixels[i][0]-c[0], dg=pixels[i][1]-c[1], db=pixels[i][2]-c[2];
-            const d=dr*dr+dg*dg+db*db;
+            const c=centroids[j],
+                  dr=pixels[i][0]-c[0],
+                  dg=pixels[i][1]-c[1],
+                  db=pixels[i][2]-c[2],
+                  d=dr*dr+dg*dg+db*db;
             if(d<bd){ bd=d; best=j; }
           }
           assign[i]=best;
         }
-        // update
         const sums = Array.from({length:k}, ()=>[0,0,0,0]);
         for(let i=0;i<N;i++){
           const g=assign[i];
@@ -134,18 +132,22 @@
       return centroids;
     }
 
-    // merge close colours then dedupe
+    // merge + dedupe palette
     function refinePalette(pal){
       const brightT=0.10*255, compT=0.15*255;
-      for(let i=0; i<pal.length; i++){
-        let [r1,g1,b1] = pal[i], br1=(r1+g1+b1)/3, j=i+1;
-        while(j<pal.length){
+      for(let i=0;i<pal.length;i++){
+        let [r1,g1,b1]=pal[i], br1=(r1+g1+b1)/3;
+        for(let j=i+1;j<pal.length;){
           const [r2,g2,b2]=pal[j], br2=(r2+g2+b2)/3;
           if(Math.abs(br1-br2)<=brightT &&
              Math.abs(r1-r2)<=compT &&
              Math.abs(g1-g2)<=compT &&
              Math.abs(b1-b2)<=compT){
-            const avg=[Math.round((r1+r2)/2),Math.round((g1+g2)/2),Math.round((b1+b2)/2)];
+            const avg=[
+              Math.round((r1+r2)/2),
+              Math.round((g1+g2)/2),
+              Math.round((b1+b2)/2)
+            ];
             pal[i]=avg; [r1,g1,b1]=avg; br1=(avg[0]+avg[1]+avg[2])/3;
             pal.splice(j,1);
           } else j++;
@@ -160,16 +162,14 @@
       return deduped;
     }
 
-    // build 16-col palette
+    // extract 16-col palette
     function extractPalette(data){
-      const pixels=[];
-      for(let i=0;i<data.length;i+=4) pixels.push([data[i],data[i+1],data[i+2]]);
-      const satT=0.4;
-      const sat=pixels.filter(p=>rgbToHsl(...p)[1]>satT);
-      const satC=sat.length? kmeans(sat,Math.min(8,sat.length)) : [];
-      const remain=16-3-satC.length;
-      const unsat=pixels.filter(p=>rgbToHsl(...p)[1]<=satT);
-      const remC=(unsat.length&&remain>0)? kmeans(unsat,Math.min(remain,unsat.length)):[];
+      const pixels=[]; for(let i=0;i<data.length;i+=4) pixels.push([data[i],data[i+1],data[i+2]]);
+      const satT=0.4, sat=pixels.filter(p=>rgbToHsl(...p)[1]>satT),
+            satC=sat.length? kmeans(sat,Math.min(8,sat.length)) : [],
+            remain=16-3-satC.length,
+            unsat=pixels.filter(p=>rgbToHsl(...p)[1]<=satT),
+            remC=(unsat.length&&remain>0)? kmeans(unsat,Math.min(remain,unsat.length)):[];
       let pal=[[0,0,0],[128,128,128],[255,255,255],...satC,...remC];
       pal.sort((a,b)=>(a[0]+a[1]+a[2])-(b[0]+b[1]+b[2]));
       return refinePalette(pal);
@@ -186,37 +186,37 @@
     }
 
     // DOM refs
-    const uploadBtn  = document.getElementById('uploadBtn'),
-          fileInput  = document.getElementById('fileInput'),
-          sizeSelect = document.getElementById('sizeSelect'),
-          d1Input    = document.getElementById('diag1Thresh'),
-          d2Input    = document.getElementById('diag2Thresh'),
-          edgeInput  = document.getElementById('edgeThresh'),
-          d1Val      = document.getElementById('diag1Val'),
-          d2Val      = document.getElementById('diag2Val'),
-          edgeVal    = document.getElementById('edgeVal'),
-          info       = document.getElementById('info'),
-          output     = document.getElementById('output'),
-          gsRow      = document.getElementById('grayscaleRow'),
-          vtRow      = document.getElementById('vibrantRow');
+    const uploadBtn=document.getElementById('uploadBtn'),
+          fileInput=document.getElementById('fileInput'),
+          sizeSelect=document.getElementById('sizeSelect'),
+          d1Input=document.getElementById('diag1Thresh'),
+          d2Input=document.getElementById('diag2Thresh'),
+          edgeInput=document.getElementById('edgeThresh'),
+          d1Val=document.getElementById('diag1Val'),
+          d2Val=document.getElementById('diag2Val'),
+          edgeVal=document.getElementById('edgeVal'),
+          info=document.getElementById('info'),
+          output=document.getElementById('output'),
+          gsRow=document.getElementById('grayscaleRow'),
+          vtRow=document.getElementById('vibrantRow');
 
-    let origPixels=null, origW=0, origH=0, paletteRGB, origEdgeGx, origEdgeGy, origEdgeMag, origMaxG;
+    let origPixels, origW=0, origH=0, paletteRGB, origEdgeGx, origEdgeGy, origEdgeMag, origMaxG;
 
-    d1Input.addEventListener('input',()=>{ d1Val.textContent=d1Input.value; redraw(); });
-    d2Input.addEventListener('input',()=>{ d2Val.textContent=d2Input.value; redraw(); });
-    edgeInput.addEventListener('input',()=>{ edgeVal.textContent=(+edgeInput.value).toFixed(2); redraw(); });
+    d1Input.oninput=()=>{ d1Val.textContent=d1Input.value; redraw(); };
+    d2Input.oninput=()=>{ d2Val.textContent=d2Input.value; redraw(); };
+    edgeInput.oninput=()=>{ edgeVal.textContent=(+edgeInput.value).toFixed(2); redraw(); };
 
     uploadBtn.addEventListener('click',()=>fileInput.click());
-    sizeSelect.addEventListener('change', redraw);
+    sizeSelect.addEventListener('change',redraw);
 
-    fileInput.addEventListener('change', e=>{
+    fileInput.addEventListener('change',e=>{
       const f=e.target.files[0];
       if(!f||!f.type.startsWith('image/')) return alert('Select an image file.');
       const reader=new FileReader();
       reader.onload=ev=>{
         const img=new Image();
         img.onload=()=>{
-          // ** Only changed block: shrink if largest side > 512 **
+          // shrink if largest side > 512
           let w=img.naturalWidth, h=img.naturalHeight;
           const maxAllowed=512, maxSide=Math.max(w,h);
           if(maxSide>maxAllowed){
@@ -225,16 +225,15 @@
             h=Math.round(h*scale);
           }
           origW=w; origH=h;
-          // draw shrunk image
           const tmp=document.createElement('canvas');
           tmp.width=origW; tmp.height=origH;
           const tctx=tmp.getContext('2d');
           tctx.drawImage(img,0,0,origW,origH);
           const id=tctx.getImageData(0,0,origW,origH);
           origPixels=id.data;
-          // palette & Sobel unchanged
+
           paletteRGB=extractPalette(origPixels);
-          // compute Sobel on origPixels → origEdgeGx, origEdgeGy, origEdgeMag, origMaxG
+
           const lum=Array(origH).fill().map(()=>Array(origW).fill(0));
           origEdgeGx=Array(origH).fill().map(()=>Array(origW).fill(0));
           origEdgeGy=Array(origH).fill().map(()=>Array(origW).fill(0));
@@ -260,6 +259,7 @@
               if(g>origMaxG) origMaxG=g;
             }
           }
+
           redraw();
         };
         img.src=ev.target.result;
@@ -321,7 +321,7 @@
         }
       }
 
-      // map Sobel
+      // map Sobel edges
       const edgeMul=+edgeInput.value;
       const hasEdge=Array(scaledH).fill().map(()=>Array(scaledW).fill(false));
       const gxSum=Array(scaledH).fill().map(()=>Array(scaledW).fill(0));
@@ -345,35 +345,30 @@
         }
       }
 
-      // top 50%
+      // gather candidates & keep top 50%
       const candidates=[];
       for(let y=0;y<scaledH;y++){
         for(let x=0;x<scaledW;x++){
           if(hasEdge[y][x]) candidates.push({x,y,sum:magSum[y][x]});
         }
       }
-      candidates.sort((a,b)=>b.sum-a.sum);
-      const idx=Math.floor(candidates.length*0.5)-1;
-      const cutoff=candidates.length?candidates[Math.max(0,idx)].sum:0;
-      const keepEdge=Array(scaledH).fill().map(()=>Array(scaledW).fill(false));
-      candidates.forEach(c=>{ if(c.sum>=cutoff) keepEdge[c.y][c.x]=true; });
+      candidates.sort((a,b)=>b.sum - a.sum);
+      const idx = Math.floor(candidates.length * 0.5) - 1;
+      const cutoff = candidates.length ? candidates[Math.max(0, idx)].sum : 0;
+      const keepEdge = Array(scaledH).fill().map(()=>Array(scaledW).fill(false));
+      candidates.forEach(c => {
+        if(c.sum >= cutoff) keepEdge[c.y][c.x] = true;
+      });
 
-      const orient=Array(scaledH).fill().map(()=>Array(scaledW).fill(''));
-      for(let y=0;y<scaledH;y++){
-        for(let x=0;x<scaledW;x++){
-          if(!keepEdge[y][x]) continue;
-          const gx=gxSum[y][x], gy=gySum[y][x];
-          if(Math.abs(gx)>1.5*Math.abs(gy))      orient[y][x]='vertical';
-          else if(Math.abs(gy)>1.5*Math.abs(gx)) orient[y][x]='horizontal';
-          else                                   orient[y][x]=(gx*gy>0?'diag1':'diag2');
-        }
-      }
-
-      const bs=8, minChunk=8;, maxChunk=32;
-      const canvas=document.createElement('canvas'), ctx=canvas.getContext('2d');
-      canvas.width=scaledW*bs; canvas.height=scaledH*bs;
-      canvas.style.imageRendering='pixelated';
-      const t1=+d1Input.value, t2=+d2Input.value;
+      // draw
+      const bs = 8;
+      const size = +sizeSelect.value;
+      const minChunk = Math.max(1, Math.floor(size/16));
+      const maxChunk = Math.max(1, Math.floor(size/4));
+      const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d');
+      canvas.width = scaledW * bs; canvas.height = scaledH * bs;
+      canvas.style.imageRendering = 'pixelated';
+      const t1 = +d1Input.value, t2 = +d2Input.value;
 
       // stitches
       for(let y=0;y<scaledH;y++){
