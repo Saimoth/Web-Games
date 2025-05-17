@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Spiral Image</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #fff;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    #container {
+      position: relative;
+      width: 100vw;
+      height: 80vh;
+    }
+    canvas {
+      background: #fff;
+      display: block;
+      width: 100vw;
+      height: 80vh;
+      touch-action: none;
+    }
+    #controls {
+      width: 100vw;
+      height: 20vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      margin-top: 8px;
+    }
+    #main-btn {
+      font-size: 18px;
+      padding: 12px 32px;
+      margin: 12px 0 0 0;
+      border: 1px solid #333;
+      border-radius: 7px;
+      background: #f9f9f9;
+    }
+    #file-input {
+      display: none;
+    }
+    #fill-box {
+      margin: 6px 0 0 0;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+    }
+    #fill {
+      margin-right: 6px;
+      width: 22px;
+      height: 22px;
+    }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <canvas id="spiral"></canvas>
+  </div>
+  <div id="controls">
+    <label id="fill-box"><input type="checkbox" id="fill" checked>Fill</label>
+    <button id="main-btn">Choose Image</button>
+    <input type="file" accept="image/*" id="file-input">
+  </div>
+<script>
+const canvas = document.getElementById('spiral');
+const ctx = canvas.getContext('2d');
+const mainBtn = document.getElementById('main-btn');
+const fileInput = document.getElementById('file-input');
+const fillBox = document.getElementById('fill');
+let fillSpiral = true;
+
+fillBox.addEventListener('change', function() {
+  fillSpiral = fillBox.checked;
+  draw();
+});
+
+// Initial mode is now 'circle'
+let mode = 'circle'; // spiral, circle, adjustImage, imageToSpiral
+let img = null;
+let imgParams = {
+  x: 0, y: 0, scale: 1, lastX: 0, lastY: 0, dragging: false, pinchStartDist: 0, lastScale: 1
+};
+const circleRadiusFactor = 0.45;
+
+let greyscaleImageData = null;
+let offscreenCanvas = null, offscreenCtx = null;
+
+function resizeCanvas() {
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = canvas.offsetWidth * dpr;
+  canvas.height = canvas.offsetHeight * dpr;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.scale(dpr, dpr);
+}
+
+function drawSpiralTrack(gapAtThetaFunc=null) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const width = canvas.offsetWidth;
+  const height = canvas.offsetHeight;
+  const cx = width / 2;
+  const cy = height / 2;
+  const spiralPitch = 4; // 4px between spiral loops
+  const minGap = 0.2;
+  const maxGap = 3.8;    // max 3.8px gap
+  const arcStep = 1;
+  const maxOffset = maxGap / 2;
+  const maxR = Math.min(width, height) * circleRadiusFactor;
+  const b = spiralPitch / (2 * Math.PI);
+  const turns = Math.floor(maxR / spiralPitch);
+  const thetaMax = turns * 2 * Math.PI;
+  const dTheta = 0.01;
+
+  let lastX = null, lastY = null, accumulated = 0;
+  let currentOffset = Math.random() * maxOffset;
+
+  const leftLine = [];
+  const rightLine = [];
+
+  for (let theta = 0; theta <= thetaMax; theta += dTheta) {
+    const r = b * theta;
+    if (r > maxR) break;
+    const x = cx + r * Math.cos(theta);
+    const y = cy + r * Math.sin(theta);
+
+    if (gapAtThetaFunc) {
+      // Use the function to set gap based on image sample
+      currentOffset = gapAtThetaFunc(x, y);
+    } else {
+      // Otherwise, keep random as before
+      if (lastX !== null && lastY !== null) {
+        const dx = x - lastX;
+        const dy = y - lastY;
+        const dist = Math.hypot(dx, dy);
+        accumulated += dist;
+        if (accumulated >= arcStep) {
+          currentOffset = Math.random() * maxOffset;
+          accumulated = 0;
+        }
+      }
+    }
+    // Clamp to safe gap range
+    currentOffset = Math.max(minGap / 2, Math.min(maxGap / 2, currentOffset));
+
+    const dr_dtheta = b;
+    const tx = (dr_dtheta * Math.cos(theta) - r * Math.sin(theta));
+    const ty = (dr_dtheta * Math.sin(theta) + r * Math.cos(theta));
+    const mag = Math.hypot(tx, ty);
+    const nx = -ty / mag;
+    const ny = tx / mag;
+
+    leftLine.push({x: x - currentOffset * nx, y: y - currentOffset * ny});
+    rightLine.push({x: x + currentOffset * nx, y: y + currentOffset * ny});
+    lastX = x;
+    lastY = y;
+  }
+
+  if (fillSpiral) {
+    // Fill between the two lines
+    ctx.beginPath();
+    leftLine.forEach((p, idx) => {
+      if (idx === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    });
+    for (let i = rightLine.length - 1; i >= 0; i--) {
+      const p = rightLine[i];
+      ctx.lineTo(p.x, p.y);
+    }
+    ctx.closePath();
+    ctx.fillStyle = '#000';
+    ctx.fill();
+  } else {
+    // Just draw the lines
+    ctx.beginPath();
+    leftLine.forEach((p, idx) => {
+      if (idx === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    });
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+
+    ctx.beginPath();
+    rightLine.forEach((p, idx) => {
+      if (idx === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    });
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+  }
+}
+
+function drawCircleGuide() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const width = canvas.offsetWidth;
+  const height = canvas.offsetHeight;
+  const cx = width / 2;
+  const cy = height / 2;
+  const r = Math.min(width, height) * circleRadiusFactor;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, 2 * Math.PI);
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+}
+
+function drawImageAndCircle() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const width = canvas.offsetWidth;
+  const height = canvas.offsetHeight;
+  // Draw image centered, scaled
+  if (img) {
+    ctx.save();
+    ctx.translate(imgParams.x, imgParams.y);
+    ctx.scale(imgParams.scale, imgParams.scale);
+    ctx.drawImage(img, -img.width / 2, -img.height / 2);
+    ctx.restore();
+  }
+  // Draw circle on top
+  const cx = width / 2;
+  const cy = height / 2;
+  const r = Math.min(width, height) * circleRadiusFactor;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, 2 * Math.PI);
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+}
+
+function draw() {
+  resizeCanvas();
+  if (mode === 'spiral' || mode === 'imageToSpiral') {
+    // If we have a sampled image to map, pass the function; else, normal random
+    if (mode === 'imageToSpiral' && greyscaleImageData) {
+      drawSpiralTrack(gapAtThetaFromImage);
+    } else {
+      drawSpiralTrack();
+    }
+    mainBtn.textContent = "Choose Image";
+  } else if (mode === 'circle') {
+    drawCircleGuide();
+    mainBtn.textContent = "Choose Image";
+  } else if (mode === 'adjustImage') {
+    drawImageAndCircle();
+    mainBtn.textContent = "Okay";
+  }
+}
+
+// --- IMAGE MANIPULATION ---
+
+function startImageManipulation() {
+  imgParams.x = canvas.offsetWidth / 2;
+  imgParams.y = canvas.offsetHeight / 2;
+  imgParams.scale = Math.min(
+    (Math.min(canvas.offsetWidth, canvas.offsetHeight) * circleRadiusFactor * 2) / Math.max(img.width, img.height),
+    1
+  );
+}
+
+let touchStartDist = 0;
+let pinchStartScale = 1;
+
+canvas.addEventListener('touchstart', e => {
+  if (mode !== 'adjustImage' || !img) return;
+  if (e.touches.length === 1) {
+    imgParams.dragging = true;
+    imgParams.lastX = e.touches[0].clientX - imgParams.x;
+    imgParams.lastY = e.touches[0].clientY - imgParams.y;
+  } else if (e.touches.length === 2) {
+    touchStartDist = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+    pinchStartScale = imgParams.scale;
+  }
+});
+
+canvas.addEventListener('touchmove', e => {
+  if (mode !== 'adjustImage' || !img) return;
+  if (e.touches.length === 1 && imgParams.dragging) {
+    imgParams.x = e.touches[0].clientX - imgParams.lastX;
+    imgParams.y = e.touches[0].clientY - imgParams.lastY;
+    draw();
+  } else if (e.touches.length === 2) {
+    const dist = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+    imgParams.scale = Math.max(0.1, Math.min(5, pinchStartScale * (dist / touchStartDist)));
+    draw();
+  }
+  e.preventDefault();
+});
+
+canvas.addEventListener('touchend', e => {
+  if (mode !== 'adjustImage' || !img) return;
+  imgParams.dragging = false;
+});
+
+canvas.addEventListener('mousedown', e => {
+  if (mode !== 'adjustImage' || !img) return;
+  imgParams.dragging = true;
+  imgParams.lastX = e.clientX - imgParams.x;
+  imgParams.lastY = e.clientY - imgParams.y;
+});
+canvas.addEventListener('mousemove', e => {
+  if (mode !== 'adjustImage' || !img) return;
+  if (imgParams.dragging) {
+    imgParams.x = e.clientX - imgParams.lastX;
+    imgParams.y = e.clientY - imgParams.lastY;
+    draw();
+  }
+});
+canvas.addEventListener('mouseup', e => {
+  if (mode !== 'adjustImage' || !img) return;
+  imgParams.dragging = false;
+});
+canvas.addEventListener('mouseleave', e => {
+  if (mode !== 'adjustImage' || !img) return;
+  imgParams.dragging = false;
+});
+
+// UI handlers
+mainBtn.addEventListener('click', () => {
+  if (mode === 'adjustImage') {
+    // Okay pressed - sample and render image as spiral
+    processAndGreyscaleImage();
+  } else {
+    mode = 'circle';
+    draw();
+    fileInput.value = '';
+    fileInput.click();
+  }
+});
+
+fileInput.addEventListener('change', e => {
+  if (fileInput.files && fileInput.files[0]) {
+    const reader = new FileReader();
+    reader.onload = evt => {
+      img = new window.Image();
+      img.onload = () => {
+        mode = 'adjustImage';
+        startImageManipulation();
+        draw();
+      };
+      img.src = evt.target.result;
+    };
+    reader.readAsDataURL(fileInput.files[0]);
+  }
+});
+
+// --- IMAGE TO SPIRAL MAPPING ---
+
+function processAndGreyscaleImage() {
+  // 1. Draw the positioned/scaled image to an offscreen canvas
+  const width = canvas.offsetWidth;
+  const height = canvas.offsetHeight;
+  offscreenCanvas = document.createElement('canvas');
+  offscreenCanvas.width = width;
+  offscreenCanvas.height = height;
+  offscreenCtx = offscreenCanvas.getContext('2d');
+  offscreenCtx.clearRect(0, 0, width, height);
+
+  // Draw the image, scaled and moved
+  offscreenCtx.save();
+  offscreenCtx.translate(imgParams.x, imgParams.y);
+  offscreenCtx.scale(imgParams.scale, imgParams.scale);
+  offscreenCtx.drawImage(img, -img.width / 2, -img.height / 2);
+  offscreenCtx.restore();
+
+  // 2. Get the image data and greyscale it
+  let imgData = offscreenCtx.getImageData(0, 0, width, height);
+  let data = imgData.data;
+  for (let i = 0; i < data.length; i += 4) {
+    // Standard luma formula
+    let grey = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
+    data[i] = data[i+1] = data[i+2] = grey;
+  }
+  offscreenCtx.putImageData(imgData, 0, 0);
+  greyscaleImageData = imgData;
+  // 3. Render spiral using new mapping mode
+  mode = 'imageToSpiral';
+  draw();
+}
+
+// This function is used to provide the gap at each spiral point based on image brightness
+function gapAtThetaFromImage(x, y) {
+  // Sample a small region for anti-aliasing (3x3 box)
+  const width = greyscaleImageData.width, height = greyscaleImageData.height;
+  let sum = 0, count = 0;
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      let sx = Math.round(x + dx);
+      let sy = Math.round(y + dy);
+      if (sx >= 0 && sx < width && sy >= 0 && sy < height) {
+        let idx = (sy * width + sx) * 4;
+        let grey = greyscaleImageData.data[idx];
+        sum += grey;
+        count++;
+      }
+    }
+  }
+  let avg = count > 0 ? sum / count : 255; // fallback to white if outside
+  // INVERTED mapping: white = minGap, black = maxGap
+  const minGap = 0.2, maxGap = 3.8;
+  let gap = maxGap - (maxGap - minGap) * (avg / 255);
+  return gap / 2; // we use ±gap/2 from spiral center
+}
+
+// Resize handler
+window.addEventListener('resize', draw);
+window.addEventListener('orientationchange', draw);
+
+// Initial sizing
+function initialSetup() {
+  canvas.width = canvas.offsetWidth;
+  canvas.height = canvas.offsetHeight;
+  draw();
+}
+setTimeout(initialSetup, 100);
+draw();
+</script>
+</body>
+</html>
