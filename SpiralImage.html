@@ -6,59 +6,59 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <style>
     html, body {
-      margin: 0;
-      padding: 0;
-      background: #fff;
-      width: 100vw;
-      height: 100vh;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-    #container {
-      position: relative;
-      width: 100vw;
-      height: 80vh;
-    }
-    canvas {
-      background: #fff;
-      display: block;
-      width: 100vw;
-      height: 80vh;
-      touch-action: none;
-    }
-    #controls {
-      width: 100vw;
-      height: 20vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: flex-start;
-      margin-top: 8px;
-    }
-    #main-btn {
-      font-size: 18px;
-      padding: 12px 32px;
-      margin: 12px 0 0 0;
-      border: 1px solid #333;
-      border-radius: 7px;
-      background: #f9f9f9;
-    }
-    #file-input {
-      display: none;
-    }
-    #fill-box {
-      margin: 6px 0 0 0;
-      font-size: 18px;
-      display: flex;
-      align-items: center;
-    }
-    #fill {
-      margin-right: 6px;
-      width: 22px;
-      height: 22px;
-    }
+  margin: 0;
+  padding: 0;
+  background: #fff;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+#container {
+  position: relative;
+  width: 100vw;
+  height: 80vh;
+}
+canvas {
+  background: #fff;
+  display: block;
+  width: 100vw;
+  height: 80vh;
+  touch-action: none;
+}
+#controls {
+  width: 100vw;
+  height: 14vh;      /* was 20vh, now less */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  margin-top: 2px;   /* was 8px */
+}
+#main-btn {
+  font-size: 18px;
+  padding: 12px 32px;
+  margin: 4px 0 0 0; /* was 12px */
+  border: 1px solid #333;
+  border-radius: 7px;
+  background: #f9f9f9;
+}
+#file-input {
+  display: none;
+}
+#fill-box {
+  margin: 2px 0 0 0; /* was 6px */
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+}
+#fill {
+  margin-right: 6px;
+  width: 22px;
+  height: 22px;
+}
   </style>
 </head>
 <body>
