@@ -10,23 +10,67 @@
         .tab { flex:1; padding: 16px 0; text-align: center; font-size: 1.3em; border: 2px solid #0072c6; border-bottom: none; background: #e6f1fb; }
         .tab.active { background: #fff; font-weight: bold; color: #0072c6; }
         .tab-content { border: 2px solid #0072c6; border-top: none; padding: 22px; background: #fff; border-radius: 0 0 8px 8px; }
-        .form-group { margin-bottom: 22px; font-size: 1.18em; }
-        label { display: block; margin-bottom: 7px; }
-        input[type="number"], input[type="text"] {
-            width: 90%; padding: 12px; font-size: 1.15em; border-radius: 6px; border: 1.5px solid #b0c8e0; margin-bottom: 7px;
+
+        .form-group {
+            display: flex;
+            align-items: center;
+            margin-bottom: 18px;
+            font-size: 1.1em;
+            flex-wrap: nowrap;
         }
-        input[type="checkbox"] { width: 20px; height: 20px; vertical-align: middle; }
+        .form-group label {
+            min-width: 130px;
+            margin-right: 8px;
+            margin-bottom: 0;
+            white-space: nowrap;
+        }
+        .form-group input[type="number"], 
+        .form-group input[type="text"] {
+            width: 90px;
+            margin-right: 5px;
+            margin-bottom: 0;
+            padding: 10px;
+            font-size: 1.06em;
+            border-radius: 6px;
+            border: 1.5px solid #b0c8e0;
+        }
+        .years-months {
+            width: 45px !important;
+        }
+        .form-group input[type="checkbox"] { width: 20px; height: 20px; margin-right: 6px; }
+        .unit {
+            margin-left: 2px;
+            margin-right: 20px;
+            white-space: nowrap;
+            font-size: 0.98em;
+            color: #456;
+        }
+        .stacked-group {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        .stacked-input-row, .repayment-input-row {
+            margin-left: 27px;
+            margin-top: 5px;
+            display: flex;
+            align-items: center;
+        }
         button {
-            padding: 14px 0; font-size: 1.2em; width: 100%;
+            padding: 14px 0; font-size: 1.15em; width: 100%;
             background: #0072c6; color: #fff; border: none; border-radius: 7px; font-weight: bold; margin-top: 10px;
         }
         #results-section { margin-top: 30px; }
+        #monthly-payment { font-size:1.13em; margin-bottom: 18px; }
         #chart-container { width: 100%; max-width: 99vw; height: 250px; margin: 0 auto 30px auto; }
-        #log { background: #f7fafd; border: 1.5px solid #cce1f7; border-radius: 8px; max-height: 190px; overflow-y: auto; padding: 18px; font-size: 1.02em; }
+        #log { background: #f7fafd; border: 1.5px solid #cce1f7; border-radius: 8px; max-height: 190px; overflow-y: auto; padding: 18px; font-size: 0.97em; }
         @media (max-width: 600px) {
             .tab, button { font-size: 1em; }
             .tab-content, #log { padding: 10px; }
             #chart-container { height: 170px; }
+            .form-group { flex-wrap: wrap; font-size: 1em;}
+            .form-group label, .form-group .unit { min-width: unset; margin-bottom: 4px; }
+            .stacked-input-row, .repayment-input-row { margin-left: 0; }
         }
     </style>
 </head>
@@ -40,31 +84,48 @@
 <div class="tab-content" id="mortgage-tab">
     <h2 style="font-size:1.5em;">Mortgage Calculator</h2>
     <div class="form-group">
-        <label>£ Borrowed:</label>
-        <input type="number" id="mortgage-amount" value="165000" min="0" step="1000">
+        <label for="mortgage-amount">£ Borrowed:</label>
+        <input type="number" id="mortgage-amount" value="250000" min="0" step="1000">
+        <span class="unit">pounds</span>
     </div>
     <div class="form-group">
-        <label>Interest Rate (% per year):</label>
-        <input type="number" id="mortgage-rate" value="3.5" min="0" step="0.01">
+        <label for="mortgage-rate">Interest Rate:</label>
+        <input type="number" id="mortgage-rate" value="4" min="0" step="0.01">
+        <span class="unit">% per year</span>
     </div>
-    <div class="form-group">
-        <label>Repayment Period:</label>
-        <input type="number" id="mortgage-years" value="15" min="0" step="1"> years
-        <input type="number" id="mortgage-months" value="0" min="0" max="11" step="1"> months
+    <div class="form-group" style="flex-direction: column; align-items: flex-start;">
+        <label for="mortgage-years" style="min-width:unset;">Repayment Period:</label>
+        <div class="repayment-input-row">
+            <input type="number" class="years-months" id="mortgage-years" value="25" min="0" step="1">
+            <span class="unit">years</span>
+            <input type="number" class="years-months" id="mortgage-months" value="0" min="0" max="11" step="1">
+            <span class="unit">months</span>
+        </div>
     </div>
-    <div class="form-group">
-        <input type="checkbox" id="overpayment-check" onchange="toggleOverpayment()" checked>
-        <label for="overpayment-check" style="display:inline;">Include Overpayment?</label>
-        <input type="number" id="overpayment-amount" value="200" min="0" step="10"> per month
+    <div class="form-group stacked-group">
+        <div>
+            <input type="checkbox" id="overpayment-check" onchange="toggleOverpayment()">
+            <label for="overpayment-check" style="margin-right:8px;">Include Overpayment?</label>
+        </div>
+        <div class="stacked-input-row">
+            <input type="number" id="overpayment-amount" value="200" min="0" step="10" disabled>
+            <span class="unit">per month</span>
+        </div>
     </div>
-    <div class="form-group">
-        <input type="checkbox" id="payrise-check" onchange="togglePayrise()">
-        <label for="payrise-check" style="display:inline;">Include Payrise?</label>
-        <input type="number" id="payrise-percent" value="3" min="0" max="100" step="0.1" disabled> % per year
+    <div class="form-group stacked-group">
+        <div>
+            <input type="checkbox" id="payrise-check" onchange="togglePayrise()">
+            <label for="payrise-check" style="margin-right:8px;">Include Payrise?</label>
+        </div>
+        <div class="stacked-input-row">
+            <input type="number" id="payrise-percent" value="3" min="0" max="100" step="0.1" disabled>
+            <span class="unit">% per year</span>
+        </div>
     </div>
     <button onclick="calculateMortgage()">Calculate</button>
     <div id="results-section" style="display:none;">
-        <div id="summary" style="font-size:1.18em; margin-bottom:22px;"></div>
+        <div id="summary" style="font-size:1.13em; margin-bottom:12px;"></div>
+        <div id="monthly-payment"></div>
         <div id="chart-container">
             <canvas id="mortgage-chart"></canvas>
         </div>
@@ -120,6 +181,10 @@ function calculateMortgage() {
     const monthlyPayment = (monthlyRate === 0)
         ? (principal / periodMonths)
         : (principal * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -periodMonths));
+    
+    // Show initial monthly payment
+    document.getElementById('monthly-payment').innerHTML =
+        `<b>Initial Monthly Repayment:</b> £${monthlyPayment.toLocaleString(undefined, {maximumFractionDigits:2})}`;
 
     // Simulation: track balance, total paid, interest, logs, for each month
     let balance = principal, totalPaid = 0, totalInterest = 0;
@@ -132,11 +197,9 @@ function calculateMortgage() {
     while (balance > 0.01 && month < 1000 * 12) {
         // Increase overpayment every year if payrise enabled
         if (payriseChecked && month > 0 && month % 12 === 0) {
-            // Apply payrise to overpayment and accumulate
             cumulativePayrise += currentOverpay * payrise / 100;
             currentOverpay += currentOverpay * payrise / 100;
         }
-        // Calculate interest for this month
         let interest = balance * monthlyRate;
         let payment = Math.min(monthlyPayment + (overpayChecked ? currentOverpay : 0) + cumulativePayrise, balance + interest);
         let principalPaid = payment - interest;
@@ -146,19 +209,16 @@ function calculateMortgage() {
         totalPaid += payment;
         totalInterest += interest;
 
-        // Record for chart
         chartData.push(balance < 0 ? 0 : balance);
         labels.push('Month ' + (month + 1));
 
-        // Record for log every 3 months or at the end
         if (month % 3 === 0 || balance < 0.01) {
-            log.push(`Month ${month+1}: Balance £${balance.toFixed(2)}, Paid £${totalPaid.toFixed(2)}, Interest £${totalInterest.toFixed(2)}`);
+            log.push(`Month ${month+1}: Balance £${balance.toFixed(2)}, Payment £${payment.toFixed(2)}, Paid £${totalPaid.toFixed(2)}, Interest £${totalInterest.toFixed(2)}`);
         }
 
         month++;
     }
 
-    // Output summary
     let summary = `
         <b>Total months to repay:</b> ${month} <br>
         <b>Total years:</b> ${(month/12).toFixed(2)} <br>
@@ -167,13 +227,12 @@ function calculateMortgage() {
     `;
     document.getElementById('summary').innerHTML = summary;
     document.getElementById('results-section').style.display = '';
-
-    // Output log
     document.getElementById('log').innerHTML = log.join('<br>');
 
-    // Plot chart
+    // Plot chart with YEARS on the x-axis (2 yearly ticks if more than 15 years)
     if(window.mortgageChartObj) window.mortgageChartObj.destroy();
     const ctx = document.getElementById('mortgage-chart').getContext('2d');
+    const totalYears = Math.ceil(periodMonths / 12);
     window.mortgageChartObj = new Chart(ctx, {
         type: 'line',
         data: {
@@ -191,7 +250,23 @@ function calculateMortgage() {
             plugins: { legend: { display: false } },
             scales: {
                 y: { beginAtZero: true, title: { display:true, text:'Balance (£)' } },
-                x: { display: false }
+                x: { 
+                    title: { display: true, text: 'Years' },
+                    ticks: {
+                        callback: function(value, index, values) {
+                            // If loan is more than 15 years, show every 2 years, else every year
+                            if (totalYears > 15) {
+                                if (index % 24 === 0) return (index / 12);
+                            } else {
+                                if (index % 12 === 0) return (index / 12);
+                            }
+                            return '';
+                        },
+                        autoSkip: false,
+                        maxRotation: 0,
+                        minRotation: 0
+                    }
+                }
             }
         }
     });
