@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Mortgage & Pension Calculator</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 10px; background: #fafcff; }
+        .tabs { display: flex; cursor: pointer; }
+        .tab { flex:1; padding: 16px 0; text-align: center; font-size: 1.3em; border: 2px solid #0072c6; border-bottom: none; background: #e6f1fb; }
+        .tab.active { background: #fff; font-weight: bold; color: #0072c6; }
+        .tab-content { border: 2px solid #0072c6; border-top: none; padding: 22px; background: #fff; border-radius: 0 0 8px 8px; }
+        .form-group { margin-bottom: 22px; font-size: 1.18em; }
+        label { display: block; margin-bottom: 7px; }
+        input[type="number"], input[type="text"] {
+            width: 90%; padding: 12px; font-size: 1.15em; border-radius: 6px; border: 1.5px solid #b0c8e0; margin-bottom: 7px;
+        }
+        input[type="checkbox"] { width: 20px; height: 20px; vertical-align: middle; }
+        button {
+            padding: 14px 0; font-size: 1.2em; width: 100%;
+            background: #0072c6; color: #fff; border: none; border-radius: 7px; font-weight: bold; margin-top: 10px;
+        }
+        #results-section { margin-top: 30px; }
+        #chart-container { width: 100%; max-width: 99vw; height: 250px; margin: 0 auto 30px auto; }
+        #log { background: #f7fafd; border: 1.5px solid #cce1f7; border-radius: 8px; max-height: 190px; overflow-y: auto; padding: 18px; font-size: 1.02em; }
+        @media (max-width: 600px) {
+            .tab, button { font-size: 1em; }
+            .tab-content, #log { padding: 10px; }
+            #chart-container { height: 170px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="tabs">
+    <div class="tab active" onclick="showTab('mortgage')">Mortgage</div>
+    <div class="tab" onclick="showTab('pension')">Pension</div>
+</div>
+
+<div class="tab-content" id="mortgage-tab">
+    <h2 style="font-size:1.5em;">Mortgage Calculator</h2>
+    <div class="form-group">
+        <label>£ Borrowed:</label>
+        <input type="number" id="mortgage-amount" value="165000" min="0" step="1000">
+    </div>
+    <div class="form-group">
+        <label>Interest Rate (% per year):</label>
+        <input type="number" id="mortgage-rate" value="3.5" min="0" step="0.01">
+    </div>
+    <div class="form-group">
+        <label>Repayment Period:</label>
+        <input type="number" id="mortgage-years" value="15" min="0" step="1"> years
+        <input type="number" id="mortgage-months" value="0" min="0" max="11" step="1"> months
+    </div>
+    <div class="form-group">
+        <input type="checkbox" id="overpayment-check" onchange="toggleOverpayment()" checked>
+        <label for="overpayment-check" style="display:inline;">Include Overpayment?</label>
+        <input type="number" id="overpayment-amount" value="200" min="0" step="10"> per month
+    </div>
+    <div class="form-group">
+        <input type="checkbox" id="payrise-check" onchange="togglePayrise()">
+        <label for="payrise-check" style="display:inline;">Include Payrise?</label>
+        <input type="number" id="payrise-percent" value="3" min="0" max="100" step="0.1" disabled> % per year
+    </div>
+    <button onclick="calculateMortgage()">Calculate</button>
+    <div id="results-section" style="display:none;">
+        <div id="summary" style="font-size:1.18em; margin-bottom:22px;"></div>
+        <div id="chart-container">
+            <canvas id="mortgage-chart"></canvas>
+        </div>
+        <div>
+            <strong>Repayment Log (every 3 months):</strong>
+            <div id="log"></div>
+        </div>
+    </div>
+</div>
+
+<div class="tab-content" id="pension-tab" style="display:none;">
+    <h2 style="font-size:1.5em;">Pension Calculator</h2>
+    <p style="font-size:1.1em;">Pension calculator coming soon!</p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+function showTab(tabName) {
+    document.getElementById('mortgage-tab').style.display = (tabName === 'mortgage') ? '' : 'none';
+    document.getElementById('pension-tab').style.display = (tabName === 'pension') ? '' : 'none';
+    var tabs = document.getElementsByClassName('tab');
+    for(let i=0; i<tabs.length; i++) tabs[i].classList.remove('active');
+    if(tabName === 'mortgage') tabs[0].classList.add('active');
+    else tabs[1].classList.add('active');
+}
+function toggleOverpayment() {
+    var check = document.getElementById('overpayment-check');
+    var input = document.getElementById('overpayment-amount');
+    input.disabled = !check.checked;
+}
+function togglePayrise() {
+    var check = document.getElementById('payrise-check');
+    var input = document.getElementById('payrise-percent');
+    input.disabled = !check.checked;
+}
+
+function calculateMortgage() {
+    // Fetch input values
+    const principal = parseFloat(document.getElementById('mortgage-amount').value);
+    const annualRate = parseFloat(document.getElementById('mortgage-rate').value) / 100;
+    const years = parseInt(document.getElementById('mortgage-years').value);
+    const months = parseInt(document.getElementById('mortgage-months').value);
+    const periodMonths = years * 12 + months;
+    const overpayChecked = document.getElementById('overpayment-check').checked;
+    const payriseChecked = document.getElementById('payrise-check').checked;
+    let overpay = overpayChecked ? parseFloat(document.getElementById('overpayment-amount').value) : 0;
+    let payrise = payriseChecked ? parseFloat(document.getElementById('payrise-percent').value) : 0;
+
+    // Monthly interest rate
+    const monthlyRate = annualRate / 12;
+
+    // Calculate the base monthly payment
+    const monthlyPayment = (monthlyRate === 0)
+        ? (principal / periodMonths)
+        : (principal * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -periodMonths));
+
+    // Simulation: track balance, total paid, interest, logs, for each month
+    let balance = principal, totalPaid = 0, totalInterest = 0;
+    let log = [], chartData = [], labels = [];
+    let month = 0;
+    let currentOverpay = overpay;
+    let cumulativePayrise = 0;
+
+    // For graph & log, record every 3 months
+    while (balance > 0.01 && month < 1000 * 12) {
+        // Increase overpayment every year if payrise enabled
+        if (payriseChecked && month > 0 && month % 12 === 0) {
+            // Apply payrise to overpayment and accumulate
+            cumulativePayrise += currentOverpay * payrise / 100;
+            currentOverpay += currentOverpay * payrise / 100;
+        }
+        // Calculate interest for this month
+        let interest = balance * monthlyRate;
+        let payment = Math.min(monthlyPayment + (overpayChecked ? currentOverpay : 0) + cumulativePayrise, balance + interest);
+        let principalPaid = payment - interest;
+        if (principalPaid > balance) principalPaid = balance;
+
+        balance -= principalPaid;
+        totalPaid += payment;
+        totalInterest += interest;
+
+        // Record for chart
+        chartData.push(balance < 0 ? 0 : balance);
+        labels.push('Month ' + (month + 1));
+
+        // Record for log every 3 months or at the end
+        if (month % 3 === 0 || balance < 0.01) {
+            log.push(`Month ${month+1}: Balance £${balance.toFixed(2)}, Paid £${totalPaid.toFixed(2)}, Interest £${totalInterest.toFixed(2)}`);
+        }
+
+        month++;
+    }
+
+    // Output summary
+    let summary = `
+        <b>Total months to repay:</b> ${month} <br>
+        <b>Total years:</b> ${(month/12).toFixed(2)} <br>
+        <b>Total paid:</b> £${totalPaid.toLocaleString(undefined,{maximumFractionDigits:2})} <br>
+        <b>Total interest paid:</b> £${totalInterest.toLocaleString(undefined,{maximumFractionDigits:2})}
+    `;
+    document.getElementById('summary').innerHTML = summary;
+    document.getElementById('results-section').style.display = '';
+
+    // Output log
+    document.getElementById('log').innerHTML = log.join('<br>');
+
+    // Plot chart
+    if(window.mortgageChartObj) window.mortgageChartObj.destroy();
+    const ctx = document.getElementById('mortgage-chart').getContext('2d');
+    window.mortgageChartObj = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Outstanding Balance (£)',
+                data: chartData,
+                borderWidth: 3,
+                fill: false,
+                pointRadius: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { beginAtZero: true, title: { display:true, text:'Balance (£)' } },
+                x: { display: false }
+            }
+        }
+    });
+}
+toggleOverpayment();
+togglePayrise();
+</script>
+</body>
+</html>
