@@ -177,21 +177,20 @@ function calculateMortgage() {
     // Monthly interest rate
     const monthlyRate = annualRate / 12;
 
-    // Calculate the base monthly payment
+    // Initial payment for the very first month
+    let initialOverpay = overpayChecked ? overpay : 0;
     const monthlyPayment = (monthlyRate === 0)
         ? (principal / periodMonths)
         : (principal * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -periodMonths));
-    
-    // Show initial monthly payment
-    document.getElementById('monthly-payment').innerHTML =
-        `<b>Initial Monthly Repayment:</b> £${monthlyPayment.toLocaleString(undefined, {maximumFractionDigits:2})}`;
+    const initialTotalPayment = monthlyPayment + initialOverpay; // exclude payrise on month 1
 
-    // Simulation: track balance, total paid, interest, logs, for each month
+    // Variables for simulation
     let balance = principal, totalPaid = 0, totalInterest = 0;
     let log = [], chartData = [], labels = [];
     let month = 0;
-    let currentOverpay = overpay;
+    let currentOverpay = initialOverpay;
     let cumulativePayrise = 0;
+    let finalPayment = initialTotalPayment;
 
     // For graph & log, record every 3 months
     while (balance > 0.01 && month < 1000 * 12) {
@@ -201,7 +200,11 @@ function calculateMortgage() {
             currentOverpay += currentOverpay * payrise / 100;
         }
         let interest = balance * monthlyRate;
-        let payment = Math.min(monthlyPayment + (overpayChecked ? currentOverpay : 0) + cumulativePayrise, balance + interest);
+        let payment = Math.min(monthlyPayment + currentOverpay + cumulativePayrise, balance + interest);
+
+        // Track the largest payment (i.e. the last/cumulative payment with all rises)
+        if (payment > finalPayment) finalPayment = payment;
+
         let principalPaid = payment - interest;
         if (principalPaid > balance) principalPaid = balance;
 
@@ -218,6 +221,13 @@ function calculateMortgage() {
 
         month++;
     }
+
+    // Show payments and summary
+    let monthlyHtml = `
+        <b>Initial Monthly Repayment (inc. overpayment):</b> £${initialTotalPayment.toLocaleString(undefined, {maximumFractionDigits:2})}<br>
+        <b>Final Monthly Repayment (inc. overpayment and payrises):</b> £${finalPayment.toLocaleString(undefined, {maximumFractionDigits:2})}
+    `;
+    document.getElementById('monthly-payment').innerHTML = monthlyHtml;
 
     let summary = `
         <b>Total months to repay:</b> ${month} <br>
