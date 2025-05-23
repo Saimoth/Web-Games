@@ -114,11 +114,11 @@
     </div>
     <div class="form-group stacked-group">
         <div>
-            <input type="checkbox" id="payrise-check" onchange="togglePayrise()">
-            <label for="payrise-check" style="margin-right:8px;">Include Payrise?</label>
+            <input type="checkbox" id="inflation-check" onchange="toggleInflation()">
+            <label for="inflation-check" style="margin-right:8px;">Include Inflation?</label>
         </div>
         <div class="stacked-input-row">
-            <input type="number" id="payrise-percent" value="3" min="0" max="100" step="0.1" disabled>
+            <input type="number" id="inflation-percent" value="3" min="0" max="100" step="0.1" disabled>
             <span class="unit">% per year</span>
         </div>
     </div>
@@ -156,9 +156,9 @@ function toggleOverpayment() {
     var input = document.getElementById('overpayment-amount');
     input.disabled = !check.checked;
 }
-function togglePayrise() {
-    var check = document.getElementById('payrise-check');
-    var input = document.getElementById('payrise-percent');
+function toggleInflation() {
+    var check = document.getElementById('inflation-check');
+    var input = document.getElementById('inflation-percent');
     input.disabled = !check.checked;
 }
 
@@ -170,9 +170,9 @@ function calculateMortgage() {
     const months = parseInt(document.getElementById('mortgage-months').value);
     const periodMonths = years * 12 + months;
     const overpayChecked = document.getElementById('overpayment-check').checked;
-    const payriseChecked = document.getElementById('payrise-check').checked;
+    const inflationChecked = document.getElementById('inflation-check').checked;
     let overpay = overpayChecked ? parseFloat(document.getElementById('overpayment-amount').value) : 0;
-    let payrise = payriseChecked ? parseFloat(document.getElementById('payrise-percent').value) : 0;
+    let inflation = inflationChecked ? parseFloat(document.getElementById('inflation-percent').value) : 0;
 
     // Monthly interest rate
     const monthlyRate = annualRate / 12;
@@ -195,10 +195,10 @@ function calculateMortgage() {
 
     // For graph & log, record every 3 months
     while (balance > 0.01 && month < 1000 * 12) {
-        // Increase both monthly repayment and overpayment every 12 months if payrise enabled
-        if (payriseChecked && month > 0 && month % 12 === 0) {
-            currentMonthlyPayment += currentMonthlyPayment * (payrise / 100);
-            currentOverpay += currentOverpay * (payrise / 100);
+        // Increase both monthly repayment and overpayment every 12 months if inflation enabled
+        if (inflationChecked && month > 0 && month % 12 === 0) {
+            currentMonthlyPayment += currentMonthlyPayment * (inflation / 100);
+            currentOverpay += currentOverpay * (inflation / 100);
         }
 
         let payment = Math.min(currentMonthlyPayment + currentOverpay, balance + balance * monthlyRate);
@@ -227,7 +227,7 @@ function calculateMortgage() {
     // Show payments and summary
     let monthlyHtml = `
         <b>Initial Monthly Repayment (inc. overpayment):</b> £${initialTotalPayment.toLocaleString(undefined, {maximumFractionDigits:2})}<br>
-        <b>Final Monthly Repayment (inc. overpayment and payrises):</b> £${finalPayment.toLocaleString(undefined, {maximumFractionDigits:2})}
+        <b>Final Monthly Repayment (inc. overpayment and inflation):</b> £${finalPayment.toLocaleString(undefined, {maximumFractionDigits:2})}
     `;
     document.getElementById('monthly-payment').innerHTML = monthlyHtml;
 
@@ -295,7 +295,7 @@ function calculateMortgage() {
     });
 }
 toggleOverpayment();
-togglePayrise();
+toggleInflation();
 </script>
 </body>
 </html>
