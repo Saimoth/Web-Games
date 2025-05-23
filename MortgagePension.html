@@ -10,7 +10,6 @@
         .tab { flex:1; padding: 16px 0; text-align: center; font-size: 1.3em; border: 2px solid #0072c6; border-bottom: none; background: #e6f1fb; }
         .tab.active { background: #fff; font-weight: bold; color: #0072c6; }
         .tab-content { border: 2px solid #0072c6; border-top: none; padding: 22px; background: #fff; border-radius: 0 0 8px 8px; }
-
         .form-group {
             display: flex;
             align-items: center;
@@ -34,9 +33,8 @@
             border-radius: 6px;
             border: 1.5px solid #b0c8e0;
         }
-        .years-months {
-            width: 45px !important;
-        }
+        .years-months { width: 45px !important; }
+        .years { width: 55px !important; }
         .form-group input[type="checkbox"] { width: 20px; height: 20px; margin-right: 6px; }
         .unit {
             margin-left: 2px;
@@ -60,14 +58,15 @@
             padding: 14px 0; font-size: 1.15em; width: 100%;
             background: #0072c6; color: #fff; border: none; border-radius: 7px; font-weight: bold; margin-top: 10px;
         }
-        #results-section { margin-top: 30px; }
+        #results-section, #pension-results-section { margin-top: 30px; }
         #monthly-payment { font-size:1.13em; margin-bottom: 18px; }
-        #chart-container { width: 100%; max-width: 99vw; height: 250px; margin: 0 auto 30px auto; }
-        #log { background: #f7fafd; border: 1.5px solid #cce1f7; border-radius: 8px; max-height: 190px; overflow-y: auto; padding: 18px; font-size: 0.97em; }
+        #chart-container, #pension-chart-container { width: 100%; max-width: 99vw; height: 250px; margin: 0 auto 30px auto; }
+        #log, #pension-log { background: #f7fafd; border: 1.5px solid #cce1f7; border-radius: 8px; max-height: 190px; overflow-y: auto; padding: 18px; font-size: 0.97em; }
+        #pension-summary { font-size:1.12em; margin-bottom: 18px; }
         @media (max-width: 600px) {
             .tab, button { font-size: 1em; }
-            .tab-content, #log { padding: 10px; }
-            #chart-container { height: 170px; }
+            .tab-content, #log, #pension-log { padding: 10px; }
+            #chart-container, #pension-chart-container { height: 170px; }
             .form-group { flex-wrap: wrap; font-size: 1em;}
             .form-group label, .form-group .unit { min-width: unset; margin-bottom: 4px; }
             .stacked-input-row, .repayment-input-row { margin-left: 0; }
@@ -81,6 +80,7 @@
     <div class="tab" onclick="showTab('pension')">Pension</div>
 </div>
 
+<!-- Mortgage Tab -->
 <div class="tab-content" id="mortgage-tab">
     <h2 style="font-size:1.5em;">Mortgage Calculator</h2>
     <div class="form-group">
@@ -136,13 +136,65 @@
     </div>
 </div>
 
+<!-- Pension Tab -->
 <div class="tab-content" id="pension-tab" style="display:none;">
-    <h2 style="font-size:1.5em;">Pension Calculator</h2>
-    <p style="font-size:1.1em;">Pension calculator coming soon!</p>
+    <h2 style="font-size:1.5em;">Pension Estimator</h2>
+    <div class="form-group">
+        <label for="pension-current">Current Value:</label>
+        <input type="number" id="pension-current" value="0" min="0" step="100">
+        <span class="unit">pounds</span>
+    </div>
+    <div class="form-group">
+        <label for="pension-wage">Wage:</label>
+        <input type="number" id="pension-wage" value="50000" min="0" step="100">
+        <span class="unit">pounds/year</span>
+    </div>
+    <div class="form-group">
+        <label for="pension-wage-contri">Wage Contribution:</label>
+        <input type="number" id="pension-wage-contri" value="8" min="0" max="100" step="0.1">
+        <span class="unit">% of wage</span>
+    </div>
+    <div class="form-group">
+        <label for="pension-employer-contri">Employer Contribution:</label>
+        <input type="number" id="pension-employer-contri" value="8" min="0" max="100" step="0.1">
+        <span class="unit">% of wage</span>
+    </div>
+    <div class="form-group stacked-group">
+        <div>
+            <input type="checkbox" id="pension-wagerise-check" onchange="toggleWageRise()">
+            <label for="pension-wagerise-check" style="margin-right:8px;">Include Wage Rise?</label>
+        </div>
+        <div class="stacked-input-row">
+            <input type="number" id="pension-wagerise-percent" value="3" min="0" max="100" step="0.1" disabled>
+            <span class="unit">% per year</span>
+        </div>
+    </div>
+    <div class="form-group">
+        <label for="pension-growth">Average Annual Growth Rate:</label>
+        <input type="number" id="pension-growth" value="5" min="0" max="100" step="0.1">
+        <span class="unit">% per year</span>
+    </div>
+    <div class="form-group">
+        <label for="pension-term">Term Period:</label>
+        <input type="number" class="years" id="pension-term" value="20" min="1" max="70" step="1">
+        <span class="unit">years</span>
+    </div>
+    <button onclick="calculatePension()">Calculate</button>
+    <div id="pension-results-section" style="display:none;">
+        <div id="pension-summary"></div>
+        <div id="pension-chart-container">
+            <canvas id="pension-chart"></canvas>
+        </div>
+        <div>
+            <strong>Yearly Log:</strong>
+            <div id="pension-log"></div>
+        </div>
+    </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
+// --- TAB HANDLING ---
 function showTab(tabName) {
     document.getElementById('mortgage-tab').style.display = (tabName === 'mortgage') ? '' : 'none';
     document.getElementById('pension-tab').style.display = (tabName === 'pension') ? '' : 'none';
@@ -151,6 +203,7 @@ function showTab(tabName) {
     if(tabName === 'mortgage') tabs[0].classList.add('active');
     else tabs[1].classList.add('active');
 }
+// --- MORTGAGE ---
 function toggleOverpayment() {
     var check = document.getElementById('overpayment-check');
     var input = document.getElementById('overpayment-amount');
@@ -161,9 +214,8 @@ function toggleInflation() {
     var input = document.getElementById('inflation-percent');
     input.disabled = !check.checked;
 }
-
 function calculateMortgage() {
-    // Fetch input values
+    // Inputs
     const principal = parseFloat(document.getElementById('mortgage-amount').value);
     const annualRate = parseFloat(document.getElementById('mortgage-rate').value) / 100;
     const years = parseInt(document.getElementById('mortgage-years').value);
@@ -173,58 +225,43 @@ function calculateMortgage() {
     const inflationChecked = document.getElementById('inflation-check').checked;
     let overpay = overpayChecked ? parseFloat(document.getElementById('overpayment-amount').value) : 0;
     let inflation = inflationChecked ? parseFloat(document.getElementById('inflation-percent').value) : 0;
-
-    // Monthly interest rate
     const monthlyRate = annualRate / 12;
 
-    // Calculate the base monthly payment
     let baseMonthlyPayment = (monthlyRate === 0)
         ? (principal / periodMonths)
         : (principal * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -periodMonths));
 
     let currentMonthlyPayment = baseMonthlyPayment;
     let currentOverpay = overpayChecked ? overpay : 0;
-
     const initialTotalPayment = currentMonthlyPayment + currentOverpay; // initial payment, month 1
 
-    // Variables for simulation
     let balance = principal, totalPaid = 0, totalInterest = 0;
     let log = [], chartData = [], labels = [];
     let month = 0;
     let finalPayment = initialTotalPayment;
 
-    // For graph & log, record every 3 months
     while (balance > 0.01 && month < 1000 * 12) {
         // Increase both monthly repayment and overpayment every 12 months if inflation enabled
         if (inflationChecked && month > 0 && month % 12 === 0) {
             currentMonthlyPayment += currentMonthlyPayment * (inflation / 100);
             currentOverpay += currentOverpay * (inflation / 100);
         }
-
         let payment = Math.min(currentMonthlyPayment + currentOverpay, balance + balance * monthlyRate);
-
-        // Track the largest payment (the last/cumulative payment with all rises)
         if (payment > finalPayment) finalPayment = payment;
-
         let interest = balance * monthlyRate;
         let principalPaid = payment - interest;
         if (principalPaid > balance) principalPaid = balance;
-
         balance -= principalPaid;
         totalPaid += payment;
         totalInterest += interest;
-
         chartData.push(balance < 0 ? 0 : balance);
         labels.push('Month ' + (month + 1));
-
         if (month % 3 === 0 || balance < 0.01) {
             log.push(`Month ${month+1}: Balance £${balance.toFixed(2)}, Payment £${payment.toFixed(2)}, Paid £${totalPaid.toFixed(2)}, Interest £${totalInterest.toFixed(2)}`);
         }
-
         month++;
     }
 
-    // Show payments and summary
     let monthlyHtml = `
         <b>Initial Monthly Repayment (inc. overpayment):</b> £${initialTotalPayment.toLocaleString(undefined, {maximumFractionDigits:2})}<br>
         <b>Final Monthly Repayment (inc. overpayment and inflation):</b> £${finalPayment.toLocaleString(undefined, {maximumFractionDigits:2})}
@@ -241,10 +278,11 @@ function calculateMortgage() {
     document.getElementById('results-section').style.display = '';
     document.getElementById('log').innerHTML = log.join('<br>');
 
-    // Plot chart with YEARS on the x-axis (2 yearly ticks if more than 15 years)
+    // Graph X labels: only 10 labels (evenly spaced), grid every year
     if(window.mortgageChartObj) window.mortgageChartObj.destroy();
     const ctx = document.getElementById('mortgage-chart').getContext('2d');
     const totalYears = Math.ceil(periodMonths / 12);
+    const monthsPerLabel = Math.max(1, Math.round(periodMonths / 10));
     window.mortgageChartObj = new Chart(ctx, {
         type: 'line',
         data: {
@@ -267,7 +305,6 @@ function calculateMortgage() {
                     grid: {
                         drawOnChartArea: true,
                         color: function(context) {
-                            // Only draw grid line every 12th index (every year)
                             if (context.tick && context.tick.value % 12 === 0) {
                                 return '#bbb';
                             }
@@ -275,19 +312,22 @@ function calculateMortgage() {
                         }
                     },
                     ticks: {
-                        stepSize: 12, // Always mark grid/tick every 12 months
-                        callback: function(value, index, values) {
-                            // If loan is more than 15 years, show label every 2 years, else every year
-                            if (totalYears > 15) {
-                                if (index % 24 === 0) return (index / 12);
-                            } else {
-                                if (index % 12 === 0) return (index / 12);
-                            }
-                            return '';
-                        },
                         autoSkip: false,
                         maxRotation: 0,
-                        minRotation: 0
+                        minRotation: 0,
+                        callback: function(value, index) {
+                            // Show only 10 evenly spaced labels including start and end
+                            const totalMonths = periodMonths;
+                            const steps = 9;
+                            let positions = [];
+                            for (let i = 0; i <= steps; i++) {
+                                positions.push(Math.round(i * totalMonths / steps));
+                            }
+                            if (positions.includes(index)) {
+                                return (index / 12).toFixed(0);
+                            }
+                            return '';
+                        }
                     }
                 }
             }
@@ -296,6 +336,132 @@ function calculateMortgage() {
 }
 toggleOverpayment();
 toggleInflation();
+
+// --- PENSION ---
+function toggleWageRise() {
+    var check = document.getElementById('pension-wagerise-check');
+    var input = document.getElementById('pension-wagerise-percent');
+    input.disabled = !check.checked;
+}
+function calculatePension() {
+    let currentValue = parseFloat(document.getElementById('pension-current').value) || 0;
+    let wage = parseFloat(document.getElementById('pension-wage').value) || 0;
+    let wageContri = parseFloat(document.getElementById('pension-wage-contri').value) / 100;
+    let employerContri = parseFloat(document.getElementById('pension-employer-contri').value) / 100;
+    let includeWageRise = document.getElementById('pension-wagerise-check').checked;
+    let wageRise = includeWageRise ? (parseFloat(document.getElementById('pension-wagerise-percent').value) / 100) : 0;
+    let avgGrowth = parseFloat(document.getElementById('pension-growth').value) / 100;
+    let term = parseInt(document.getElementById('pension-term').value);
+
+    // Prepare for three growth rates
+    let rates = [
+        { name: "Worse", value: avgGrowth - 0.02 },
+        { name: "Expected", value: avgGrowth },
+        { name: "Better", value: avgGrowth + 0.02 }
+    ];
+    let logs = [[], [], []], values = [currentValue, currentValue, currentValue];
+    let series = [[], [], []];
+
+    let currWage = wage;
+
+    for (let year = 1; year <= term; year++) {
+        let annualContri = currWage * (wageContri + employerContri);
+        for (let i = 0; i < 3; i++) {
+            // Apply growth to current value before contribution
+            values[i] *= (1 + rates[i].value);
+            values[i] += annualContri;
+            series[i].push(values[i]);
+            logs[i].push(`Year ${year}: Value £${values[i].toLocaleString(undefined, {maximumFractionDigits:2})}, Contributed £${annualContri.toLocaleString(undefined, {maximumFractionDigits:2})}, Growth rate ${(rates[i].value*100).toFixed(2)}%`);
+        }
+        if (includeWageRise) currWage *= (1 + wageRise);
+    }
+
+    // Prepare summary
+    let summaryHtml = `
+      <b>After ${term} years you may have:</b><br>
+      <b>Worse (${((avgGrowth-0.02)*100).toFixed(2)}% growth):</b> £${values[0].toLocaleString(undefined, {maximumFractionDigits:2})}<br>
+      <b>Expected (${(avgGrowth*100).toFixed(2)}% growth):</b> £${values[1].toLocaleString(undefined, {maximumFractionDigits:2})}<br>
+      <b>Better (${((avgGrowth+0.02)*100).toFixed(2)}% growth):</b> £${values[2].toLocaleString(undefined, {maximumFractionDigits:2})}<br>
+    `;
+    document.getElementById('pension-summary').innerHTML = summaryHtml;
+    document.getElementById('pension-results-section').style.display = '';
+    // Yearly log (expected growth)
+    document.getElementById('pension-log').innerHTML = logs[1].join('<br>');
+
+    // Chart X labels: only 10 evenly spaced labels, grid every year
+    if(window.pensionChartObj) window.pensionChartObj.destroy();
+    const ctx = document.getElementById('pension-chart').getContext('2d');
+    const years = term;
+    const steps = 9; // for 10 labels
+    let labelPositions = [];
+    for (let i = 0; i <= steps; i++) {
+        labelPositions.push(Math.round(i * (years-1) / steps));
+    }
+    window.pensionChartObj = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: Array.from({length: years}, (_, i) => 'Year ' + (i+1)),
+            datasets: [
+                {
+                    label: 'Worse',
+                    data: series[0],
+                    borderWidth: 2,
+                    borderDash: [6,4],
+                    fill: false,
+                    pointRadius: 0
+                },
+                {
+                    label: 'Expected',
+                    data: series[1],
+                    borderWidth: 3,
+                    fill: false,
+                    pointRadius: 0
+                },
+                {
+                    label: 'Better',
+                    data: series[2],
+                    borderWidth: 2,
+                    borderDash: [6,4],
+                    fill: false,
+                    pointRadius: 0
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: true } },
+            scales: {
+                y: { beginAtZero: true, title: { display:true, text:'Pension Value (£)' } },
+                x: { 
+                    title: { display: true, text: 'Years' },
+                    grid: {
+                        drawOnChartArea: true,
+                        color: function(context) {
+                            // Draw grid line every year
+                            if (context.tick && context.tick.value % 1 === 0) {
+                                return '#bbb';
+                            }
+                            return 'transparent';
+                        }
+                    },
+                    ticks: {
+                        autoSkip: false,
+                        maxRotation: 0,
+                        minRotation: 0,
+                        callback: function(value, index) {
+                            // Only show label at 10 evenly spaced years
+                            if (labelPositions.includes(index)) {
+                                return (index+1);
+                            }
+                            return '';
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+toggleWageRise();
 </script>
 </body>
 </html>
