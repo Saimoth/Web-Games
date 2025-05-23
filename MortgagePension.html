@@ -177,34 +177,36 @@ function calculateMortgage() {
     // Monthly interest rate
     const monthlyRate = annualRate / 12;
 
-    // Initial payment for the very first month
-    let initialOverpay = overpayChecked ? overpay : 0;
-    const monthlyPayment = (monthlyRate === 0)
+    // Calculate the base monthly payment
+    let baseMonthlyPayment = (monthlyRate === 0)
         ? (principal / periodMonths)
         : (principal * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -periodMonths));
-    const initialTotalPayment = monthlyPayment + initialOverpay; // exclude payrise on month 1
+
+    let currentMonthlyPayment = baseMonthlyPayment;
+    let currentOverpay = overpayChecked ? overpay : 0;
+
+    const initialTotalPayment = currentMonthlyPayment + currentOverpay; // initial payment, month 1
 
     // Variables for simulation
     let balance = principal, totalPaid = 0, totalInterest = 0;
     let log = [], chartData = [], labels = [];
     let month = 0;
-    let currentOverpay = initialOverpay;
-    let cumulativePayrise = 0;
     let finalPayment = initialTotalPayment;
 
     // For graph & log, record every 3 months
     while (balance > 0.01 && month < 1000 * 12) {
-        // Increase overpayment every year if payrise enabled
+        // Increase both monthly repayment and overpayment every 12 months if payrise enabled
         if (payriseChecked && month > 0 && month % 12 === 0) {
-            cumulativePayrise += currentOverpay * payrise / 100;
-            currentOverpay += currentOverpay * payrise / 100;
+            currentMonthlyPayment += currentMonthlyPayment * (payrise / 100);
+            currentOverpay += currentOverpay * (payrise / 100);
         }
-        let interest = balance * monthlyRate;
-        let payment = Math.min(monthlyPayment + currentOverpay + cumulativePayrise, balance + interest);
 
-        // Track the largest payment (i.e. the last/cumulative payment with all rises)
+        let payment = Math.min(currentMonthlyPayment + currentOverpay, balance + balance * monthlyRate);
+
+        // Track the largest payment (the last/cumulative payment with all rises)
         if (payment > finalPayment) finalPayment = payment;
 
+        let interest = balance * monthlyRate;
         let principalPaid = payment - interest;
         if (principalPaid > balance) principalPaid = balance;
 
@@ -262,9 +264,20 @@ function calculateMortgage() {
                 y: { beginAtZero: true, title: { display:true, text:'Balance (£)' } },
                 x: { 
                     title: { display: true, text: 'Years' },
+                    grid: {
+                        drawOnChartArea: true,
+                        color: function(context) {
+                            // Only draw grid line every 12th index (every year)
+                            if (context.tick && context.tick.value % 12 === 0) {
+                                return '#bbb';
+                            }
+                            return 'transparent';
+                        }
+                    },
                     ticks: {
+                        stepSize: 12, // Always mark grid/tick every 12 months
                         callback: function(value, index, values) {
-                            // If loan is more than 15 years, show every 2 years, else every year
+                            // If loan is more than 15 years, show label every 2 years, else every year
                             if (totalYears > 15) {
                                 if (index % 24 === 0) return (index / 12);
                             } else {
