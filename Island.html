@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Treasure Island</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <style>
+    body {
+      font-family: 'Trebuchet MS', Arial, sans-serif;
+      background: #b3e6ff;
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    h1 {
+      margin: 1.2em 0 0.3em 0;
+      letter-spacing: 1px;
+      font-size: 2.2em;
+      color: #114e60;
+      text-shadow: 0 2px 0 #ffffff88;
+    }
+    #container {
+      position: relative;
+      width: 92vw;
+      max-width: 98vw;
+      height: 138vw;
+      max-height: 92vh;
+      margin: 0 auto 10px auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      touch-action: manipulation;
+      background: #b3e6ff;
+      border-radius: 3vw;
+      overflow: hidden;
+    }
+    #sea {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      left: 0; top: 0;
+      z-index: 0;
+      pointer-events: none;
+      background: #b3e6ff;
+    }
+    #islandGroup {
+  position: absolute;
+  width: 80%;
+  height: 80%;
+  left: 10%;
+  top: 10%;
+  z-index: 1;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#gameGrid {
+  position: absolute;
+  width: 80%;
+  height: 80%;
+  left: 10%;
+  top: 10%;
+  z-index: 3;
+  background: none;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(12, 1fr);
+  gap: 0;
+  /* Remove pointer-events and flex stuff! */
+}
+#gridOverlay {
+  position: absolute;
+  width: 80%;
+  height: 80%;
+  left: 10%;
+  top: 10%;
+  z-index: 4;
+  pointer-events: none;
+  opacity: 0.53;
+}
+    #islandGroup {
+      z-index: 1;
+      pointer-events: none;
+    }
+    #islandSVG {
+      width: 100%;
+      height: 100%;
+      display: block;
+      overflow: visible;
+    }
+    #gameGrid {
+      z-index: 3;
+      background: none;
+      box-sizing: border-box;
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      grid-template-rows: repeat(12, 1fr);
+      gap: 0;
+      pointer-events: auto;
+    }
+    .cell {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2em;
+      font-weight: 700;
+      color: #165b1a;
+      cursor: pointer;
+      transition: background 0.18s, transform 0.11s;
+      user-select: none;
+      background: none;
+      position: relative;
+      touch-action: manipulation;
+    }
+    .cell:active:not(.disabled) {
+      background: #d5f9ea;
+      transform: scale(0.96);
+    }
+    .cell.disabled {
+      color: #88630b !important;
+      background: #e1cb94 !important;
+      cursor: default;
+      pointer-events: none;
+    }
+    .cell.treasure {
+      background: #ffe159 !important;
+      color: #e67d22 !important;
+      font-size: 2.2em;
+      animation: pop 0.7s cubic-bezier(.5,2,.5,1) 1;
+    }
+    @keyframes pop {
+      0% { transform: scale(0.7);}
+      65% {transform: scale(1.13);}
+      100% {transform: scale(1);}
+    }
+    #gridOverlay {
+      z-index: 4;
+      pointer-events: none;
+      opacity: 0.53;
+      left: 10%;
+      top: 10%;
+    }
+    #playAgain {
+      margin-top: 18px;
+      padding: 0.75em 2.2em;
+      font-size: 1.12em;
+      font-family: inherit;
+      border-radius: 20px;
+      border: none;
+      background: linear-gradient(90deg, #2dd0f7 30%, #a7e996 100%);
+      color: #144a27;
+      box-shadow: 0 2px 8px #00000010;
+      cursor: pointer;
+      display: none;
+      font-weight: bold;
+      letter-spacing: 1px;
+      transition: background 0.17s;
+      z-index: 10;
+    }
+    #playAgain:active {
+      background: linear-gradient(90deg, #a7e996 10%, #2dd0f7 100%);
+    }
+    .particle {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 99;
+      mix-blend-mode: screen;
+    }
+    @media (max-width: 480px) {
+      #container {
+        width: 98vw;
+        height: 150vw;
+      }
+      #islandGroup, #gameGrid, #gridOverlay {
+        width: 89%;
+        height: 89%;
+        left: 5.5%;
+        top: 5.5%;
+      }
+      h1 { font-size: 1.3em;}
+    }
+  </style>
+</head>
+<body>
+  <h1>Treasure Island</h1>
+  <div id="container">
+    <div id="sea"></div>
+    <!-- Island SVG: exactly matches grid, 8:12 ratio -->
+    <div id="islandGroup">
+      <svg id="islandSVG" viewBox="0 0 8 12" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="sandGrad" x1="0.7" y1="0.6" x2="0.3" y2="1">
+            <stop offset="0%" stop-color="#ffe7b2"/>
+            <stop offset="100%" stop-color="#ffe3a0"/>
+          </linearGradient>
+        </defs>
+        <rect x="0" y="0" width="8" height="12" rx="1.1" ry="1.4"
+          fill="url(#sandGrad)"
+          stroke="#ddb772" stroke-width="0.13"
+        />
+      </svg>
+    </div>
+    <div id="gameGrid"></div>
+    <svg id="gridOverlay"></svg>
+  </div>
+  <button id="playAgain">Play Again</button>
+  <script>
+    const GRID_WIDTH = 8;
+    const GRID_HEIGHT = 12;
+    let treasure, gameOver;
+    const gameGrid = document.getElementById('gameGrid');
+    const btnEl = document.getElementById('playAgain');
+    const gridOverlay = document.getElementById('gridOverlay');
+    const container = document.getElementById('container');
+
+    function resizeSVGOverlay() {
+      const rect = gameGrid.getBoundingClientRect();
+      gridOverlay.setAttribute('width', rect.width);
+      gridOverlay.setAttribute('height', rect.height);
+      gridOverlay.innerHTML = '';
+      // Draw hashed lines
+      for (let i = 1; i < GRID_WIDTH; i++) {
+        let x = (rect.width / GRID_WIDTH) * i;
+        let vline = document.createElementNS('http://www.w3.org/2000/svg','line');
+        vline.setAttribute('x1', x); vline.setAttribute('x2', x);
+        vline.setAttribute('y1', 0); vline.setAttribute('y2', rect.height);
+        vline.setAttribute('stroke', '#887650');
+        vline.setAttribute('stroke-width', '2');
+        vline.setAttribute('stroke-dasharray', '9 7');
+        vline.setAttribute('opacity', '0.53');
+        gridOverlay.appendChild(vline);
+      }
+      for (let i = 1; i < GRID_HEIGHT; i++) {
+        let y = (rect.height / GRID_HEIGHT) * i;
+        let hline = document.createElementNS('http://www.w3.org/2000/svg','line');
+        hline.setAttribute('y1', y); hline.setAttribute('y2', y);
+        hline.setAttribute('x1', 0); hline.setAttribute('x2', rect.width);
+        hline.setAttribute('stroke', '#887650');
+        hline.setAttribute('stroke-width', '2');
+        hline.setAttribute('stroke-dasharray', '9 7');
+        hline.setAttribute('opacity', '0.53');
+        gridOverlay.appendChild(hline);
+      }
+    }
+
+    window.addEventListener('resize', () => setTimeout(resizeSVGOverlay, 200));
+
+    function initGame() {
+      treasure = {
+        x: Math.floor(Math.random() * GRID_WIDTH),
+        y: Math.floor(Math.random() * GRID_HEIGHT)
+      };
+      gameOver = false;
+      btnEl.style.display = 'none';
+      gameGrid.innerHTML = '';
+      for (let y = 0; y < GRID_HEIGHT; y++) {
+        for (let x = 0; x < GRID_WIDTH; x++) {
+          const cell = document.createElement('div');
+          cell.className = 'cell';
+          cell.dataset.x = x;
+          cell.dataset.y = y;
+          cell.addEventListener('click', onCellClick, { passive: true });
+          gameGrid.appendChild(cell);
+        }
+      }
+      setTimeout(resizeSVGOverlay, 180);
+    }
+
+    function onCellClick(e) {
+      if (gameOver) return;
+      const cell = e.currentTarget;
+      const x = +cell.dataset.x;
+      const y = +cell.dataset.y;
+      if (cell.classList.contains('disabled')) return;
+      if (x === treasure.x && y === treasure.y) {
+        cell.innerHTML = '🏴‍☠️';
+        cell.classList.add('disabled', 'treasure');
+        showFireworks(cell);
+        gameOver = true;
+        btnEl.style.display = 'inline-block';
+      } else {
+        const dx = Math.abs(x - treasure.x);
+        const dy = Math.abs(y - treasure.y);
+        cell.textContent = dx + dy;
+        cell.classList.add('disabled');
+        cell.style.color = "#934900";
+      }
+    }
+
+    function showFireworks(cell) {
+      const cellRect = cell.getBoundingClientRect();
+      const containerRect = container.getBoundingClientRect();
+      const cx = cellRect.left + cellRect.width/2 - containerRect.left;
+      const cy = cellRect.top + cellRect.height/2 - containerRect.top;
+      const colors = [
+        '#ffdc00','#ff5e19','#00cde8','#00e845','#ffe977',
+        '#f148d9','#ff217a','#ffd700','#40f74c','#ff7b2d',
+        '#ffffff','#c0a0ff'
+      ];
+      for (let i = 0; i < 44; i++) {
+        const particle = document.createElement('div');
+        particle.className = 'particle';
+        const size = 6 + Math.random() * 10;
+        particle.style.width = particle.style.height = size + 'px';
+        particle.style.background = colors[Math.floor(Math.random() * colors.length)];
+        container.appendChild(particle);
+        particle.style.left = (cx - size/2) + 'px';
+        particle.style.top  = (cy - size/2) + 'px';
+        const angle = Math.random() * 2 * Math.PI;
+        const dist  = 60 + Math.random() * 55;
+        const dx = Math.cos(angle) * dist;
+        const dy = Math.sin(angle) * dist;
+        particle.animate([
+          { transform: 'translate(0, 0) scale(1)', opacity: 1 },
+          { transform: `translate(${dx}px, ${dy}px) scale(0.4)`, opacity: 0 }
+        ], {
+          duration: 900 + Math.random() * 600,
+          easing: 'cubic-bezier(.42,1.42,.55,1)'
+        });
+        setTimeout(() => {
+          particle.remove();
+        }, 1700);
+      }
+    }
+
+    btnEl.addEventListener('click', () => {
+      initGame();
+      setTimeout(() => {
+        window.scrollTo(0,0);
+      }, 60);
+    });
+
+    document.addEventListener('DOMContentLoaded', initGame);
+  </script>
+</body>
+</html>
