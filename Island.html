@@ -58,6 +58,7 @@
   align-items: center;
   justify-content: center;
 }
+
 #gameGrid {
   position: absolute;
   width: 80%;
@@ -71,8 +72,9 @@
   grid-template-columns: repeat(8, 1fr);
   grid-template-rows: repeat(12, 1fr);
   gap: 0;
-  /* Remove pointer-events and flex stuff! */
+  /* pointer-events: auto by default */
 }
+
 #gridOverlay {
   position: absolute;
   width: 80%;
@@ -146,9 +148,13 @@
       top: 10%;
     }
     #playAgain {
-      margin-top: 18px;
-      padding: 0.75em 2.2em;
-      font-size: 1.12em;
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      margin: 0;
+      padding: 0.9em 2.6em;
+      font-size: 1.25em;
       font-family: inherit;
       border-radius: 20px;
       border: none;
@@ -160,7 +166,8 @@
       font-weight: bold;
       letter-spacing: 1px;
       transition: background 0.17s;
-      z-index: 10;
+      z-index: 99;
+      pointer-events: auto;
     }
     #playAgain:active {
       background: linear-gradient(90deg, #a7e996 10%, #2dd0f7 100%);
@@ -210,8 +217,8 @@
     </div>
     <div id="gameGrid"></div>
     <svg id="gridOverlay"></svg>
+    <button id="playAgain">Play Again</button>
   </div>
-  <button id="playAgain">Play Again</button>
   <script>
     const GRID_WIDTH = 8;
     const GRID_HEIGHT = 12;
@@ -260,6 +267,7 @@
       };
       gameOver = false;
       btnEl.style.display = 'none';
+      btnEl.style.pointerEvents = 'none';
       gameGrid.innerHTML = '';
       for (let y = 0; y < GRID_HEIGHT; y++) {
         for (let x = 0; x < GRID_WIDTH; x++) {
@@ -283,9 +291,13 @@
       if (x === treasure.x && y === treasure.y) {
         cell.innerHTML = '🏴‍☠️';
         cell.classList.add('disabled', 'treasure');
-        showFireworks(cell);
+        showFireworksOverGrid();
         gameOver = true;
-        btnEl.style.display = 'inline-block';
+        // Show Play Again after 3 seconds, centered on grid
+        setTimeout(() => {
+          btnEl.style.display = 'block';
+          btnEl.style.pointerEvents = 'auto';
+        }, 3000);
       } else {
         const dx = Math.abs(x - treasure.x);
         const dy = Math.abs(y - treasure.y);
@@ -295,11 +307,10 @@
       }
     }
 
-    function showFireworks(cell) {
-      const cellRect = cell.getBoundingClientRect();
+    // Show fireworks randomly over the whole grid area
+    function showFireworksOverGrid() {
+      const gridRect = gameGrid.getBoundingClientRect();
       const containerRect = container.getBoundingClientRect();
-      const cx = cellRect.left + cellRect.width/2 - containerRect.left;
-      const cy = cellRect.top + cellRect.height/2 - containerRect.top;
       const colors = [
         '#ffdc00','#ff5e19','#00cde8','#00e845','#ffe977',
         '#f148d9','#ff217a','#ffd700','#40f74c','#ff7b2d',
@@ -310,10 +321,15 @@
         particle.className = 'particle';
         const size = 6 + Math.random() * 10;
         particle.style.width = particle.style.height = size + 'px';
+        // random spot inside the grid
+        const px = Math.random() * gridRect.width + gridRect.left - containerRect.left;
+        const py = Math.random() * gridRect.height + gridRect.top - containerRect.top;
+        particle.style.left = (px - size / 2) + 'px';
+        particle.style.top = (py - size / 2) + 'px';
         particle.style.background = colors[Math.floor(Math.random() * colors.length)];
         container.appendChild(particle);
-        particle.style.left = (cx - size/2) + 'px';
-        particle.style.top  = (cy - size/2) + 'px';
+
+        // explode outwards in a random direction
         const angle = Math.random() * 2 * Math.PI;
         const dist  = 60 + Math.random() * 55;
         const dx = Math.cos(angle) * dist;
