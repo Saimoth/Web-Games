@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no" />
+  <title>Dual-Pulley Rope Game</title>
+  <style>
+    html,body{margin:0;height:100%;background:#ddd;touch-action:none;}
+    canvas{display:block;width:100%;height:100%;background:#ddd;}
+    @font-face{font-family:ui-rounded;src:local(".SFNSRounded");}
+  </style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<script>
+(function(){
+'use strict';
+
+/* ── canvas & fixed geometry ── */
+var canvas=document.getElementById('game');
+var ctx   =canvas.getContext('2d');
+
+var leftPulley ={x:0,y:0,r:18};
+var rightPulley={x:0,y:0,r:18};
+var leftHandle ={x:0,y:0};
+var rightHandle={x:0,y:0};
+var block      ={x:0,y:0,w:80,h:40,vy:0};
+var baseBlockY =0;
+
+/* ── hole sizes ── */
+var HOLE_R   =18;
+var HOLE_OFF =HOLE_R+4;
+var WIN_R    =HOLE_R+2;
+var BIG_R    =HOLE_R+14;
+var SMALL_R  =WIN_R;
+var GAP      =6;
+
+/* ── gameplay constants ── */
+var ALIGN_TOL       =3;
+var MAX_BIG         =12;   // big holes count
+var FAIL_LIMIT_SMALL=500;  // ← increased from 100 to 500
+
+/* ── game objects ── */
+var ball ={x:0,y:0,r:HOLE_R-2,state:'none'};      // none|inBlock|won|lost
+var goal ={x:0,y:0,r:WIN_R};
+var badHoles=[];
+
+/* ── touch bookkeeping ── */
+var leftTouchId=null,rightTouchId=null;
+var bounds={minY:0,maxY:0};
+var handleRad=26;
+
+/* ── physics constants ── */
+var GRAVITY     =1500;
+var LIFT_FACTOR =1.0;
+var SHIFT_FACTOR=0.45;
+var CENTER_SPD  =0.12;
+var ROPE_FOLLOW =1.0;
+var MAX_BOUNCE  =0.3;
+
+/* ── helpers ── */
+function clamp(v,min,max){return Math.max(min,Math.min(max,v));}
+function tooClose(x1,y1,r1,x2,y2,r2){
+  return Math.hypot(x1-x2,y1-y2) < r1+r2+GAP;
+}
+function randomXY(r){
+  var x=r+Math.random()*(canvas.width-2*r);
+  var yTop=goal.y+r+20;
+  var yRange=baseBlockY-r-20-yTop;
+  if(yRange<=0) return null;
+  var y=yTop+Math.random()*yRange;
+  return {x:x,y:y};
+}
+
+/* ── board generation ── */
+function placeHole(radius){
+  var p=randomXY(radius);
+  if(!p) return false;
+  if(tooClose(p.x,p.y,radius,goal.x,goal.y,goal.r)) return false;
+  for(var i=0;i<badHoles.length;i++){
+    var h=badHoles[i];
+    if(tooClose(p.x,p.y,radius,h.x,h.y,h.r)) return false;
+  }
+  badHoles.push({x:p.x,y:p.y,r:radius});
+  return true;
+}
+
+function buildBoard(){
+  badHoles.length=0;
+
+  /* 1) 12 big holes */
+  var big=0, attempts=0;
+  while(big<MAX_BIG && attempts<2000){
+    if(placeHole(BIG_R)) big++; else attempts++;
+  }
+
+  /* 2) pack small holes until 500 consecutive failures */
+  var fail=0;
+  while(fail<FAIL_LIMIT_SMALL){
+    if(placeHole(SMALL_R)) fail=0; else fail++;
+  }
+}
+
+/* ── resize / initial layout ── */
+function resize(){
+  canvas.width =window.innerWidth;
+  canvas.height=window.innerHeight;
+
+  var w=canvas.width,h=canvas.height;
+  leftPulley.x=w*0.18; leftPulley.y=50;
+  rightPulley.x=w*0.82; rightPulley.y=50;
+
+  bounds.minY=leftPulley.y+50;
+  bounds.maxY=h-80;
+
+  leftHandle.x=leftPulley.x;  rightHandle.x=rightPulley.x;
+  leftHandle.y=bounds.minY;   rightHandle.y=bounds.minY;
+
+  baseBlockY=h-120;
+  block.x=w/2; block.y=baseBlockY; block.vy=0;
+
+  goal.x=w/2;
+  goal.y=bounds.minY+block.h+HOLE_OFF+10;
+
+  buildBoard();
+}
+window.addEventListener('resize',resize,false);
+resize();
+
+/* ── touch handlers ── */
+canvas.addEventListener('touchstart',function(e){
+  var half=canvas.width/2;
+  for(var i=0;i<e.changedTouches.length;i++){
+    var t=e.changedTouches[i];
+    if(t.clientX<half && leftTouchId===null){
+      leftTouchId=t.identifier;
+      leftHandle.y=clamp(t.clientY,bounds.minY,bounds.maxY);
+    }else if(t.clientX>=half && rightTouchId===null){
+      rightTouchId=t.identifier;
+      rightHandle.y=clamp(t.clientY,bounds.minY,bounds.maxY);
+    }
+  }
+},false);
+
+canvas.addEventListener('touchmove',function(e){
+  e.preventDefault();
+  for(var i=0;i<e.changedTouches.length;i++){
+    var t=e.changedTouches[i];
+    if(t.identifier===leftTouchId){
+      leftHandle.y=clamp(t.clientY,bounds.minY,bounds.maxY);
+    }else if(t.identifier===rightTouchId){
+      rightHandle.y=clamp(t.clientY,bounds.minY,bounds.maxY);
+    }
+  }
+},false);
+
+canvas.addEventListener('touchend',lift,false);
+canvas.addEventListener('touchcancel',lift,false);
+function lift(e){
+  for(var i=0;i<e.changedTouches.length;i++){
+    var t=e.changedTouches[i];
+    if(t.identifier===leftTouchId)  leftTouchId=null;
+    if(t.identifier===rightTouchId) rightTouchId=null;
+  }
+}
+
+/* ── physics ── */
+var last=performance.now();
+function physics(dt){
+  var active=(leftTouchId!==null)||(rightTouchId!==null);
+  var neutral=bounds.minY;
+  var pullL=leftHandle.y-neutral;
+  var pullR=rightHandle.y-neutral;
+
+  if(active){
+    var avg=(pullL+pullR)/2;
+    block.y=clamp(baseBlockY-avg*LIFT_FACTOR,120,baseBlockY);
+    var diff=pullR-pullL;
+    var maxShift=canvas.width/2-block.w/2-30;
+    block.x=clamp(canvas.width/2+diff*SHIFT_FACTOR,
+                  canvas.width/2-maxShift,canvas.width/2+maxShift);
+    block.vy=0;
+  }else{
+    block.vy+=GRAVITY*dt;
+    block.y +=block.vy*dt;
+    block.x +=(canvas.width/2-block.x)*CENTER_SPD;
+
+    var avgPull=(baseBlockY-block.y)/LIFT_FACTOR;
+    var diffPull=(block.x-canvas.width/2)/SHIFT_FACTOR;
+    var dL=neutral+(avgPull-diffPull/2);
+    var dR=neutral+(avgPull+diffPull/2);
+    leftHandle.y +=(dL-leftHandle.y)*ROPE_FOLLOW;
+    rightHandle.y+=(dR-rightHandle.y)*ROPE_FOLLOW;
+
+    if(block.y>baseBlockY){block.y=baseBlockY;block.vy=-block.vy*MAX_BOUNCE;}
+  }
+
+  /* ball states */
+  if(ball.state==='none'){
+    if(!active && Math.abs(block.y-baseBlockY)<1) ball.state='inBlock';
+  }
+
+  if(ball.state==='inBlock'){
+    ball.x=block.x; ball.y=block.y-block.h/2+HOLE_OFF;
+
+    if(Math.abs(ball.x-goal.x)<=ALIGN_TOL &&
+       Math.abs(ball.y-goal.y)<=ALIGN_TOL) ball.state='won';
+
+    for(var i=0;i<badHoles.length;i++){
+      if(Math.hypot(ball.x-badHoles[i].x,ball.y-badHoles[i].y)
+         < badHoles[i].r-2){ ball.state='lost'; break; }
+    }
+  }
+
+  if(ball.state==='won'||ball.state==='lost'){
+    if(!active && Math.abs(block.y-baseBlockY)<1){
+      if(ball.state==='won') buildBoard(); // regenerate after each win
+      ball.state='none';
+    }
+  }
+}
+
+/* ── drawing ── */
+function drawHandle(x,y){
+  ctx.fillStyle='#f39c12';
+  ctx.beginPath();ctx.arc(x,y,handleRad,0,Math.PI*2);ctx.fill();
+}
+
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  ctx.lineWidth=6;ctx.lineCap='round';ctx.strokeStyle='#444';
+  ctx.beginPath();ctx.moveTo(leftHandle.x,leftHandle.y);
+  ctx.lineTo(leftPulley.x,leftPulley.y);ctx.lineTo(block.x,block.y);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(rightHandle.x,rightHandle.y);
+  ctx.lineTo(rightPulley.x,rightPulley.y);ctx.lineTo(block.x,block.y);ctx.stroke();
+
+  ctx.fillStyle='#888';
+  ctx.beginPath();
+  ctx.arc(leftPulley.x,leftPulley.y,leftPulley.r,0,Math.PI*2);
+  ctx.arc(rightPulley.x,rightPulley.y,rightPulley.r,0,Math.PI*2);ctx.fill();
+
+  ctx.fillStyle='#555';
+  badHoles.forEach(h=>{
+    ctx.beginPath();ctx.arc(h.x,h.y,h.r,0,Math.PI*2);ctx.fill();
+  });
+
+  ctx.fillStyle='#777';
+  ctx.beginPath();ctx.arc(goal.x,goal.y,goal.r,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#fff';
+  ctx.font='bold 14px ui-rounded,Arial';
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText('WIN',goal.x,goal.y);
+
+  drawHandle(leftHandle.x,leftHandle.y);
+  drawHandle(rightHandle.x,rightHandle.y);
+
+  ctx.fillStyle='#3498db';
+  ctx.fillRect(block.x-block.w/2,block.y-block.h/2,block.w,block.h);
+  ctx.fillStyle='#ddd';
+  ctx.beginPath();
+  ctx.arc(block.x,block.y-block.h/2+HOLE_OFF,HOLE_R,0,Math.PI*2);ctx.fill();
+
+  if(ball.state==='inBlock'){
+    ctx.fillStyle='#e74c3c';
+    ctx.beginPath();ctx.arc(ball.x,ball.y,ball.r,0,Math.PI*2);ctx.fill();
+  }
+
+  ctx.strokeStyle='#aaa';ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(0,baseBlockY+block.h/2);
+  ctx.lineTo(canvas.width,baseBlockY+block.h/2);ctx.stroke();
+
+  if(ball.state==='won'||ball.state==='lost'){
+    ctx.fillStyle='rgba(0,0,0,0.45)';
+    ctx.fillRect(0,canvas.height/2-60,canvas.width,120);
+    ctx.fillStyle='#fff';
+    ctx.font='bold 48px ui-rounded,Arial';
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(ball.state==='won'?'YOU WIN!':'TRY AGAIN',
+                 canvas.width/2,canvas.height/2);
+  }
+}
+
+/* ── game loop ── */
+function loop(t){
+  var dt=(t-last)/1000; last=t;
+  physics(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+loop(performance.now());
+
+})();</script>
+</body>
+</html>
