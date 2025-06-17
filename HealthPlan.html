@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Shift-Based Fitness & Meal Prep</title>
+<style>
+  body{font-family:Arial,Helvetica,sans-serif;margin:2em;max-width:760px;background:#f4f4f4}
+  h1,h2{color:#2c3e50;margin-top:0}
+  .section{background:#fff;padding:1em;margin:1.6em 0;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,.1)}
+  ul{padding-left:1.2em} li{margin:.35em 0}
+  .highlight{font-weight:bold;color:#2980b9}
+  small{color:#555}
+</style>
+</head>
+<body>
+<h1>Daily Fitness & Meal Plan</h1>
+<div id="output"></div>
+<div id="shoppingList" class="section"></div>
+
+<script>
+/* ========= SHIFT-PATTERN CONFIG ========= */
+const shiftPattern = ["D","D","N","N","O","O","D","D","O","O","O","O"];
+const cycleStart   = new Date("2025-06-09T00:00:00");
+const today        = new Date();
+const DAY_MS       = 86_400_000;
+const dayIndex     = off => (Math.floor((today-cycleStart)/DAY_MS)+off) % 12;
+const shiftType    = i => shiftPattern[i]==="D" ? "Day Shift" :
+                          shiftPattern[i]==="N" ? "Night Shift" : "Off";
+
+/* ========= CANONICAL NAMES / SYNONYMS ========= */
+const synonyms = {
+  /* produce → fruit / mixed veg */
+  banana:"fruit",apple:"fruit","mixed fruit":"fruit",grapes:"fruit",
+  tomato:"mixed vegetables","bell pepper":"mixed vegetables",spinach:"mixed vegetables",
+  lettuce:"mixed vegetables","salad greens":"mixed vegetables",
+  /* sauces */
+  "tomato passata":"tomato sauce",passata:"tomato sauce",
+  /* proteins */
+  "beef strips":"beef mince",chicken:"chicken breast","chicken fillet":"chicken breast",
+  "roast chicken":"chicken breast","turkey breast":"turkey mince",
+  /* nuts / seeds / beans */
+  "mixed nuts":"nuts","mixed seeds":"nuts","kidney beans":"beans"
+};
+
+/* ========= UNIT SHORTCUTS ========= */
+const g="g", pc="pc";
+
+/* ========= STANDARDISED 12-DAY MEAL PLANS ========= */
+const mealPlans = [
+/* DAY-1 */
+[{text:"Oats & PB fruit bowl",
+  ing:[{name:"oats",qty:60,unit:g},{name:"fruit",qty:1,unit:pc},{name:"peanut butter",qty:20,unit:g}]},
+ {text:"Chicken & veg wrap",
+  ing:[{name:"chicken breast",qty:150,unit:g},{name:"mixed vegetables",qty:75,unit:g},{name:"wrap",qty:1,unit:pc}]},
+ {text:"Greek yogurt + nuts",
+  ing:[{name:"greek yogurt",qty:150,unit:g},{name:"nuts",qty:30,unit:g}]},
+ {text:"Beef mince stir-fry + rice",
+  ing:[{name:"beef mince",qty:150,unit:g},{name:"mixed vegetables",qty:150,unit:g},{name:"rice",qty:60,unit:g}]}],
+/* DAY-2 */
+[{text:"Eggs on toast + veg",
+  ing:[{name:"eggs",qty:3,unit:pc},{name:"bread",qty:2,unit:pc},{name:"mixed vegetables",qty:75,unit:g}]},
+ {text:"Quinoa & tuna salad",
+  ing:[{name:"quinoa",qty:60,unit:g},{name:"tuna (canned)",qty:150,unit:g},{name:"mixed vegetables",qty:75,unit:g}]},
+ {text:"Protein bar", ing:[{name:"protein bar",qty:1,unit:pc}]},
+ {text:"Chilli + sweet potato",
+  ing:[{name:"beef mince",qty:150,unit:g},{name:"beans",qty:80,unit:g},
+       {name:"tomato sauce",qty:100,unit:g},{name:"sweet potato",qty:1,unit:pc}]}],
+/* DAY-3 */
+[{text:"Fruit-oat protein smoothie",
+  ing:[{name:"fruit",qty:1,unit:pc},{name:"oats",qty:60,unit:g},{name:"whey protein",qty:30,unit:g}]},
+ {text:"Ham sandwich + fruit",
+  ing:[{name:"bread",qty:2,unit:pc},{name:"ham",qty:80,unit:g},{name:"fruit",qty:1,unit:pc}]},
+ {text:"Boiled eggs + nuts",
+  ing:[{name:"eggs",qty:3,unit:pc},{name:"nuts",qty:30,unit:g}]},
+ {text:"Chicken curry + rice",
+  ing:[{name:"chicken breast",qty:150,unit:g},{name:"curry sauce",qty:120,unit:g},{name:"rice",qty:60,unit:g}]}],
+/* DAY-4 */
+[{text:"Porridge + fruit",
+  ing:[{name:"oats",qty:60,unit:g},{name:"fruit",qty:1,unit:pc},{name:"milk",qty:200,unit:g}]},
+ {text:"Turkey-avocado sandwich",
+  ing:[{name:"turkey mince",qty:150,unit:g},{name:"avocado",qty:0.5,unit:pc},{name:"bread",qty:2,unit:pc}]},
+ {text:"Greek yogurt + nuts",
+  ing:[{name:"greek yogurt",qty:150,unit:g},{name:"nuts",qty:30,unit:g}]},
+ {text:"Veg pasta bake",
+  ing:[{name:"pasta",qty:60,unit:g},{name:"mixed vegetables",qty:150,unit:g},{name:"cheese",qty:30,unit:g}]}],
+/* DAY-5 */
+[{text:"Scrambled eggs + veg",
+  ing:[{name:"eggs",qty:3,unit:pc},{name:"mixed vegetables",qty:75,unit:g}]},
+ {text:"Rice + chicken breast",
+  ing:[{name:"rice",qty:60,unit:g},{name:"chicken breast",qty:150,unit:g}]},
+ {text:"Cottage cheese + crackers",
+  ing:[{name:"cottage cheese",qty:120,unit:g},{name:"crackers",qty:4,unit:pc}]},
+ {text:"Stuffed peppers (quinoa)",
+  ing:[{name:"quinoa",qty:60,unit:g},{name:"mixed vegetables",qty:150,unit:g}]}],
+/* DAY-6 */
+[{text:"Cereal + protein shake",
+  ing:[{name:"cereal",qty:60,unit:g},{name:"milk",qty:200,unit:g},{name:"whey protein",qty:30,unit:g}]},
+ {text:"Hummus wrap + veg",
+  ing:[{name:"hummus",qty:50,unit:g},{name:"wrap",qty:1,unit:pc},{name:"mixed vegetables",qty:75,unit:g}]},
+ {text:"Fruit + peanut butter",
+  ing:[{name:"fruit",qty:1,unit:pc},{name:"peanut butter",qty:20,unit:g}]},
+ {text:"Tofu stir-fry + noodles",
+  ing:[{name:"tofu",qty:150,unit:g},{name:"mixed vegetables",qty:150,unit:g},{name:"noodles",qty:60,unit:g}]}],
+/* DAY-7 */
+[{text:"Omelette + ham & veg",
+  ing:[{name:"eggs",qty:3,unit:pc},{name:"ham",qty:80,unit:g},{name:"mixed vegetables",qty:75,unit:g}]},
+ {text:"Jacket potato + tuna",
+  ing:[{name:"potato",qty:1,unit:pc},{name:"tuna (canned)",qty:150,unit:g}]},
+ {text:"Protein smoothie",
+  ing:[{name:"whey protein",qty:30,unit:g},{name:"fruit",qty:1,unit:pc},{name:"milk",qty:200,unit:g}]},
+ {text:"Lamb mince stir-fry + veg",
+  ing:[{name:"lamb mince",qty:150,unit:g},{name:"mixed vegetables",qty:150,unit:g}]}],
+/* DAY-8 */
+[{text:"Boiled eggs + toast",
+  ing:[{name:"eggs",qty:3,unit:pc},{name:"bread",qty:2,unit:pc}]},
+ {text:"Chicken Caesar wrap",
+  ing:[{name:"chicken breast",qty:150,unit:g},{name:"wrap",qty:1,unit:pc},{name:"mixed vegetables",qty:75,unit:g},
+       {name:"caesar dressing",qty:20,unit:g}]},
+ {text:"Nuts + fruit",
+  ing:[{name:"nuts",qty:30,unit:g},{name:"fruit",qty:1,unit:pc}]},
+ {text:"Chickpea curry + rice",
+  ing:[{name:"chickpeas",qty:120,unit:g},{name:"curry sauce",qty:120,unit:g},{name:"rice",qty:60,unit:g}]}],
+/* DAY-9 */
+[{text:"Toast + PB + fruit",
+  ing:[{name:"bread",qty:2,unit:pc},{name:"peanut butter",qty:20,unit:g},{name:"fruit",qty:1,unit:pc}]},
+ {text:"Beef mince pasta",
+  ing:[{name:"pasta",qty:60,unit:g},{name:"beef mince",qty:150,unit:g},{name:"tomato sauce",qty:100,unit:g}]},
+ {text:"Protein bar", ing:[{name:"protein bar",qty:1,unit:pc}]},
+ {text:"Veg stir-fry + rice",
+  ing:[{name:"mixed vegetables",qty:150,unit:g},{name:"rice",qty:60,unit:g}]}],
+/* DAY-10 */
+[{text:"Greek yogurt + oats",
+  ing:[{name:"greek yogurt",qty:150,unit:g},{name:"oats",qty:60,unit:g}]},
+ {text:"Turkey burger + veg",
+  ing:[{name:"turkey mince",qty:150,unit:g},{name:"bun",qty:1,unit:pc},{name:"mixed vegetables",qty:75,unit:g}]},
+ {text:"Fruit + nuts",
+  ing:[{name:"fruit",qty:1,unit:pc},{name:"nuts",qty:30,unit:g}]},
+ {text:"Chicken fajitas",
+  ing:[{name:"chicken breast",qty:150,unit:g},{name:"mixed vegetables",qty:150,unit:g},
+       {name:"fajita seasoning",qty:10,unit:g}]}],
+/* DAY-11 */
+[{text:"Protein cereal + milk",
+  ing:[{name:"cereal",qty:60,unit:g},{name:"milk",qty:200,unit:g}]},
+ {text:"Cottage cheese + fruit",
+  ing:[{name:"cottage cheese",qty:120,unit:g},{name:"fruit",qty:1,unit:pc}]},
+ {text:"Roast chicken & potato",
+  ing:[{name:"chicken breast",qty:150,unit:g},{name:"potato",qty:1,unit:pc},{name:"mixed vegetables",qty:150,unit:g}]},
+ {text:"Protein shake + nuts",
+  ing:[{name:"whey protein",qty:30,unit:g},{name:"milk",qty:200,unit:g},{name:"nuts",qty:30,unit:g}]}],
+/* DAY-12 */
+[{text:"Fruit-yogurt-oats bowl",
+  ing:[{name:"fruit",qty:1,unit:pc},{name:"greek yogurt",qty:150,unit:g},{name:"oats",qty:60,unit:g}]},
+ {text:"Tuna pasta salad",
+  ing:[{name:"tuna (canned)",qty:150,unit:g},{name:"pasta",qty:60,unit:g},{name:"mixed vegetables",qty:75,unit:g}]},
+ {text:"Protein shake",
+  ing:[{name:"whey protein",qty:30,unit:g},{name:"milk",qty:200,unit:g}]},
+ {text:"Burger + sweet-potato fries",
+  ing:[{name:"beef mince",qty:150,unit:g},{name:"bun",qty:1,unit:pc},{name:"sweet potato",qty:1,unit:pc}]}]
+];
+
+/* ========= HELPER FUNCTIONS ========= */
+const fmt = arr =>
+  arr.map(({name,qty,unit}) => `${unit===pc ? qty+"×" : qty+unit} ${name}`).join(", ");
+const workoutOf = d => {
+  const i = d+1;
+  if([1,5,9].includes(i)) return "🏃‍♂️ 20–30 min steady run";
+  if([3,7,11].includes(i)) return `🏋️ Body-weight circuit:
+    <ul><li>Press-ups × 12-15</li><li>Tricep dips × 12</li>
+        <li>Sit-ups × 20</li><li>Dumbbell raises × 12</li>
+        <li>Repeat 2-3 rounds</li></ul>`;
+  return "Rest / mobility";
+};
+
+/* ========= RENDER TODAY & TOMORROW ========= */
+document.getElementById("output").innerHTML =
+  [0,1].map(o=>{
+    const idx = dayIndex(o);
+    return `<div class="section">
+      <h2>${o===0?"Today":"Tomorrow"} (${new Date(today.getTime()+DAY_MS*o).toDateString()})</h2>
+      <p><strong>Day ${idx+1} of cycle</strong> – <span class="highlight">${shiftType(idx)}</span></p>
+      <h3>🍽️ Meals</h3>
+      <ul>${mealPlans[idx].map(m=>`<li><strong>${m.text}</strong><br><small>${fmt(m.ing)}</small></li>`).join("")}</ul>
+      <h3>🏋️ Workout</h3><p>${workoutOf(idx)}</p>
+    </div>`;
+  }).join("");
+
+/* ========= BUILD 7-DAY SHOPPING LIST (with variants) ========= */
+const canon = n => synonyms[n.toLowerCase().trim()] || n.toLowerCase().trim();
+const bag = {};  // {name:{unit,total,variants:{'150g':3,'75g':2}}}
+
+for(let d=0; d<7; d++){
+  mealPlans[dayIndex(d)].forEach(({ing})=>{
+    ing.forEach(({name,qty,unit})=>{
+      const key = canon(name);
+      if(!bag[key]) bag[key] = {unit,total:0,variants:{}};
+      bag[key].total += qty;
+      const tag = `${qty}${unit}`;
+      bag[key].variants[tag] = (bag[key].variants[tag]||0) + 1;
+    });
+  });
+}
+
+const shoppingHTML = Object.entries(bag).sort((a,b)=>a[0].localeCompare(b[0]))
+  .map(([name,info])=>{
+     const totalStr = `${info.total}${info.unit}`;
+     const breakdown = Object.entries(info.variants)
+                       .map(([tag,c])=>`${c} × ${tag}`).join(", ");
+     return `<li>${name.charAt(0).toUpperCase()+name.slice(1)} – ${totalStr} (${breakdown})</li>`;
+  }).join("");
+
+document.getElementById("shoppingList").innerHTML =
+  `<h2>🛒 Shopping List (Next 7 Days)</h2><ul>${shoppingHTML}</ul>`;
+</script>
+</body>
+</html>
