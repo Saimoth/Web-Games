@@ -4,16 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport"
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Minute-Hand Trainer</title>
+  <title>Clock Trainer</title>
   <style>
     html, body {
-      margin: 0;
-      padding: 0;
-      height: 100vh;
-      touch-action: manipulation;
-      user-select: none;
-      font-family: sans-serif;
-      background: #fafafa;
+      margin: 0; padding: 0; height: 100vh;
+      touch-action: manipulation; user-select: none;
+      font-family: sans-serif; background: #fafafa;
       padding-top: env(safe-area-inset-top);
       padding-bottom: env(safe-area-inset-bottom);
     }
@@ -23,96 +19,95 @@
       justify-items: center;
       overflow: hidden;
     }
+    #difficulty {
+      position: absolute;
+      top: calc(env(safe-area-inset-top, 10px) + 20px);
+      left: 50%; transform: translateX(-50%);
+      display: flex; gap: 12px; z-index: 1000;
+    }
+    #difficulty button {
+      font-size: 1.2em; padding: 12px 24px;
+      cursor: pointer; border: 2px solid #007bff;
+      border-radius: 4px; background: #fff;
+      color: #007bff; transition: background .2s, color .2s;
+    }
+    #difficulty button.active {
+      background: #007bff; color: #fff;
+    }
     #prompt {
-      grid-row: 1;
-      align-self: end;
-      font-size: 2.5em;
-      text-align: center;
+      grid-row: 1; align-self: end;
+      font-size: 2.5em; text-align: center;
       margin: 0 20px 20px;
     }
     #clock-container {
-      grid-row: 2;
-      align-self: center;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 100%;
+      grid-row: 2; align-self: center;
+      display: flex; align-items: center;
+      justify-content: center; width: 100%;
     }
     #clock-face {
       position: relative;
-      width: 80vmin;
-      height: 80vmin;
-      max-width: 90vw;
-      max-height: 90vw;
-      border: 5px solid #333;
-      border-radius: 50%;
-      background: #fff;
-      touch-action: none;
+      width: 80vmin; height: 80vmin;
+      max-width: 90vw; max-height: 90vw;
+      border: 5px solid #333; border-radius: 50%;
+      background: #fff; touch-action: none;
     }
-
-    /* Widened hit-area: now 60px, centered via -30px */
     .hand {
-      position: absolute;
-      bottom: 50%;
-      left: 50%;
-      width: 60px;           /* ↑ easier to grab */
-      margin-left: -30px;     /* center the hit-area */
-      height: 40%;
-      transform-origin: bottom center;
-      cursor: pointer;
-      touch-action: none;
+      position: absolute; bottom: 50%; left: 50%;
+      width: 60px; margin-left: -30px;
+      height: 40%; transform-origin: bottom center;
+      cursor: pointer; touch-action: none;
     }
     .hand::after {
-      content: '';
-      position: absolute;
-      bottom: 0;
-      left: 50%;
-      transform: translateX(-50%);
-      background: #333;
-      width: 6px;
-      height: 100%;
+      content: ''; position: absolute; bottom: 0;
+      left: 50%; transform: translateX(-50%);
+      width: 6px; height: 100%; background: #333;
     }
-
+    .hour-hand {
+      position: absolute; bottom: 50%; left: 50%;
+      width: 60px; margin-left: -30px;
+      height: 30%; transform-origin: bottom center;
+      pointer-events: none; display: none;
+    }
+    .hour-hand::after {
+      content: ''; position: absolute; bottom: 0;
+      left: 50%; transform: translateX(-50%);
+      width: 6px; height: 100%; background: red;
+    }
     #center-dot {
-      position: absolute;
-      width: 14px;
-      height: 14px;
-      background: #333;
-      border-radius: 50%;
-      top: 50%;
-      left: 50%;
-      margin: -7px 0 0 -7px;
-      pointer-events: none;
-      z-index: 3;
+      position: absolute; width: 14px; height: 14px;
+      background: #333; border-radius: 50%;
+      top: 50%; left: 50%; margin: -7px 0 0 -7px;
+      pointer-events: none; z-index: 3;
     }
     .number {
-      position: absolute;
-      user-select: none;
-      pointer-events: none;
-      font-size: 1.2em;
+      position: absolute; user-select: none;
+      pointer-events: none; font-size: 1.2em;
     }
     #check-btn {
-      grid-row: 3;
-      align-self: start;
-      font-size: 1.8em;
-      padding: 20px 60px;
+      grid-row: 3; align-self: start;
+      font-size: 1.8em; padding: 20px 60px;
       margin: 20px 0 0;
     }
     #fireworks-canvas {
-      position: fixed;
-      top: 0; left: 0;
+      position: fixed; top: 0; left: 0;
       width: 100vw; height: 100vh;
-      pointer-events: none;
-      display: none;
+      pointer-events: none; display: none;
       z-index: 999;
     }
   </style>
 </head>
 <body>
+  <div id="difficulty">
+    <button id="easy-btn" class="active">Easy</button>
+    <button id="medium-btn">Medium</button>
+    <button id="hard-btn">Hard</button>
+  </div>
+
   <div id="prompt">Loading…</div>
 
   <div id="clock-container">
     <div id="clock-face">
+      <div id="hour-hand" class="hand hour-hand" data-angle="0"></div>
       <div id="minute-hand" class="hand" data-angle="0"></div>
       <div id="center-dot"></div>
     </div>
@@ -120,11 +115,10 @@
 
   <button id="check-btn">Check</button>
 
-  <!-- Notification sound -->
+  <!-- sound & fireworks -->
   <audio id="online"
          src="https://www.orangefreesounds.com/wp-content/uploads/2016/12/Short-ringtone-for-notification.mp3"
          preload="auto"></audio>
-
   <canvas id="fireworks-canvas"></canvas>
 
   <script>
@@ -140,49 +134,104 @@
     }
 
     const minuteLabels = {
-      0:  "O'Clock",   5:  "Five Past",    10: "Ten Past",
-      15: "Quarter Past", 20: "Twenty Past", 25: "Twenty-Five Past",
-      30: "Half Past", 35: "Twenty-Five To", 40: "Twenty To",
-      45: "Quarter To", 50: "Ten To",      55: "Five To"
+      0:  "O'Clock",    5:  "Five Past",    10: "Ten Past",
+      15: "Quarter Past",20: "Twenty Past", 25: "Twenty-Five Past",
+      30: "Half Past",  35: "Twenty-Five To",40: "Twenty To",
+      45: "Quarter To", 50: "Ten To",       55: "Five To"
     };
-    const minuteKeys = [0,5,10,15,20,25,30,35,40,45,50,55];
+    const hourNames = {
+      1:"One",2:"Two",3:"Three",4:"Four",
+      5:"Five",6:"Six",7:"Seven",8:"Eight",
+      9:"Nine",10:"Ten",11:"Eleven",12:"Twelve"
+    };
+
+    let minuteKeys = [0,5,10,15,20,25,30,35,40,45,50,55];
+    let targetM, targetH;
+
+    // Hard‐mode winding state
+    let spinCount = 0, prevTick = 0;
+
+    const promptEl   = document.getElementById('prompt');
+    const clockFace  = document.getElementById('clock-face');
+    const minuteHand = document.getElementById('minute-hand');
+    const hourHand   = document.getElementById('hour-hand');
+    const easyBtn    = document.getElementById('easy-btn');
+    const mediumBtn  = document.getElementById('medium-btn');
+    const hardBtn    = document.getElementById('hard-btn');
+    const audioBell  = document.getElementById('online');
+
+    function setHand(el, angle) {
+      el.dataset.angle = angle;
+      el.style.transform = `rotate(${angle}deg)`;
+    }
 
     function drawNumbers() {
-      const face = document.getElementById('clock-face');
+      const face = clockFace;
       face.querySelectorAll('.number').forEach(n => n.remove());
-      const r = face.clientWidth / 2;
-      const offset = r * 0.85;
-      for (let i = 1; i <= 12; i++) {
-        const ang = (i * 30) * Math.PI/180;
-        const x = r + offset * Math.sin(ang);
-        const y = r - offset * Math.cos(ang);
+      const r = face.clientWidth/2, offset = r*0.85;
+      for (let i=1;i<=12;i++){
+        const ang = i*30 * Math.PI/180;
+        const x = r + offset*Math.sin(ang),
+              y = r - offset*Math.cos(ang);
         const el = document.createElement('div');
         el.className = 'number';
         el.textContent = i;
-        el.style.left = x + 'px';
-        el.style.top  = y + 'px';
-        el.style.transform = 'translate(-50%, -50%)';
+        el.style.left = x+'px';
+        el.style.top  = y+'px';
+        el.style.transform = 'translate(-50%,-50%)';
         face.appendChild(el);
       }
     }
 
-    let targetM;
-    const promptEl   = document.getElementById('prompt');
-    const clockFace  = document.getElementById('clock-face');
-    const minuteHand = document.getElementById('minute-hand');
-    const audioBell  = document.getElementById('online');
-
-    function setHand(el, angle) {
-      el.dataset.angle   = angle;
-      el.style.transform = 'rotate(' + angle + 'deg)';
+    function setActive(btn) {
+      [easyBtn, mediumBtn, hardBtn].forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
     }
 
     function newQuestion() {
-      targetM = minuteKeys[Math.floor(Math.random() * minuteKeys.length)];
-      promptEl.textContent = minuteLabels[targetM];
+      const mode = easyBtn.classList.contains('active') ? 'easy'
+                 : mediumBtn.classList.contains('active') ? 'medium'
+                 : 'hard';
+
+      if (mode === 'hard') {
+        // only here reset winding
+        spinCount = 0;
+        prevTick  = 0;
+        setHand(hourHand, 0);
+      }
+
+      if (mode === 'easy') {
+        hourHand.style.display = 'none';
+        targetM = minuteKeys[Math.floor(Math.random()*minuteKeys.length)];
+        promptEl.textContent = minuteLabels[targetM];
+      } else {
+        // medium & hard both show hour-hand
+        hourHand.style.display = 'block';
+        targetH = Math.floor(Math.random()*12) + 1;
+        targetM = minuteKeys[Math.floor(Math.random()*minuteKeys.length)];
+
+        // build prompt
+        const lbl = minuteLabels[targetM];
+        let text;
+        if (targetM === 0)            text = `${hourNames[targetH]} O'Clock`;
+        else if (lbl.includes('To'))  text = `${lbl} ${hourNames[(targetH%12)+1]}`;
+        else                          text = `${lbl} ${hourNames[targetH]}`;
+
+        promptEl.textContent = text;
+
+        // Medium: immediately position hour-hand
+        if (mode === 'medium') {
+          const hourAngle = ((targetH%12)*30) + (targetM*0.5);
+          setHand(hourHand, hourAngle);
+        }
+        // Hard: leaves hour-hand at 0, user must wind
+      }
+
+      // reset minute-hand for all modes
       setHand(minuteHand, 0);
     }
 
+    // Drag logic
     let dragging = false;
     function startDrag(e) {
       if (e.target === minuteHand) {
@@ -192,14 +241,33 @@
     }
     function onDrag(e) {
       if (!dragging) return;
-      const p    = getPointer(e);
-      const rect = clockFace.getBoundingClientRect();
-      const cx   = rect.left + rect.width/2;
-      const cy   = rect.top  + rect.height/2;
-      const dx   = p.x - cx, dy = p.y - cy;
-      const raw  = Math.atan2(dx, -dy) * 180/Math.PI;
-      const snap = Math.round(raw / 30) * 30;
-      setHand(minuteHand, snap);
+      const p    = getPointer(e),
+            rect = clockFace.getBoundingClientRect(),
+            dx   = p.x - (rect.left + rect.width/2),
+            dy   = p.y - (rect.top  + rect.height/2),
+            raw  = Math.atan2(dx, -dy)*180/Math.PI;
+
+      if (hardBtn.classList.contains('active')) {
+        // compute tick [0–11]
+        let tick = Math.round(raw/30);
+        tick = ((tick%12)+12)%12;
+        // detect wrap
+        const diff = tick - prevTick;
+        if      (diff === -11) spinCount++;
+        else if (diff ===  11) spinCount--;
+        prevTick = tick;
+
+        // snap minute-hand
+        setHand(minuteHand, tick*30);
+        // hour-hand = spinCount*30 + tick*2.5
+        setHand(hourHand, spinCount*30 + tick*2.5);
+
+      } else {
+        // easy & medium: simple snap
+        const snap = Math.round(raw/30)*30;
+        setHand(minuteHand, snap);
+      }
+
       e.preventDefault();
     }
     function endDrag() { dragging = false; }
@@ -207,54 +275,23 @@
     clockFace.addEventListener('mousedown',  startDrag);
     clockFace.addEventListener('touchstart', startDrag);
     document.addEventListener('mousemove',  onDrag);
-    document.addEventListener('touchmove',  onDrag, { passive:false });
+    document.addEventListener('touchmove',  onDrag, {passive:false});
     document.addEventListener('mouseup',    endDrag);
     document.addEventListener('touchend',   endDrag);
 
-    const canvas = document.getElementById('fireworks-canvas');
-    const ctx    = canvas.getContext('2d');
-    function rand(min,max){ return min + Math.random()*(max-min); }
-    function randColor(){ return `hsl(${Math.random()*360},100%,50%)`; }
-
-    function launchFireworks() {
-      canvas.width  = window.innerWidth;
-      canvas.height = window.innerHeight;
-      canvas.style.display = 'block';
-      const rect = clockFace.getBoundingClientRect();
-      const sx = rect.left + rect.width/2;
-      const sy = rect.top  + rect.height/2;
-      const parts = [];
-      for (let i = 0; i < 80; i++){
-        parts.push({ x: sx, y: sy, vx: rand(-4,4), vy: rand(-7,-2), life: 1800, col: randColor() });
-      }
-      const start = performance.now();
-      function frame(now) {
-        const t = now - start;
-        ctx.clearRect(0,0,canvas.width,canvas.height);
-        parts.forEach(p => {
-          const f = t / p.life;
-          if (f > 1) return;
-          p.x += p.vx; p.y += p.vy; p.vy += 0.1;
-          ctx.globalAlpha = 1 - f;
-          ctx.fillStyle   = p.col;
-          ctx.beginPath();
-          ctx.arc(p.x,p.y,3,0,2*Math.PI);
-          ctx.fill();
-        });
-        if (t < 1800) requestAnimationFrame(frame);
-        else {
-          ctx.clearRect(0,0,canvas.width,canvas.height);
-          canvas.style.display = 'none';
-          newQuestion();
-        }
-      }
-      requestAnimationFrame(frame);
-    }
-
+    // Check answer
     document.getElementById('check-btn').addEventListener('click', () => {
-      const mAng    = parseFloat(minuteHand.dataset.angle) || 0;
-      const expectA = targetM * 6;
-      if (angleDiff(mAng, expectA) < 1) {
+      const mAng   = parseFloat(minuteHand.dataset.angle) || 0;
+      const okMin  = angleDiff(mAng, targetM*6) < 1;
+
+      let okHour = true;
+      if (hardBtn.classList.contains('active')) {
+        const hAng     = parseFloat(hourHand.dataset.angle) || 0;
+        const expHour  = ((targetH%12)*30) + (targetM*0.5);
+        okHour = angleDiff(hAng, expHour) < 1;
+      }
+
+      if (okMin && okHour) {
         audioBell.currentTime = 0;
         audioBell.play().catch(() => {});
         launchFireworks();
@@ -263,15 +300,53 @@
       }
     });
 
+    // Mode toggles
+    easyBtn .addEventListener('click', ()=>{ minuteKeys=[0,5,10,15,20,25,30,35,40,45,50,55]; setActive(easyBtn);  newQuestion(); });
+    mediumBtn.addEventListener('click', ()=>{ minuteKeys=[0,5,10,15,20,25,30,35,40,45,50,55]; setActive(mediumBtn);newQuestion(); });
+    hardBtn .addEventListener('click', ()=>{ minuteKeys=[0,5,10,15,20,25,30,35,40,45,50,55]; setActive(hardBtn);  newQuestion(); });
+
+    // Fireworks
+    const canvas = document.getElementById('fireworks-canvas');
+    const ctx    = canvas.getContext('2d');
+    function rand(min,max){ return min + Math.random()*(max-min) }
+    function randColor(){ return `hsl(${Math.random()*360},100%,50%)` }
+    function launchFireworks() {
+      canvas.width = innerWidth; canvas.height = innerHeight;
+      canvas.style.display = 'block';
+      const rect = clockFace.getBoundingClientRect();
+      const sx = rect.left + rect.width/2, sy = rect.top + rect.height/2;
+      const parts = Array.from({length:80}, ()=>({
+        x:sx,y:sy, vx:rand(-4,4), vy:rand(-7,-2), life:1800, col:randColor()
+      }));
+      const start = performance.now();
+      function frame(now) {
+        const t = now - start;
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+        parts.forEach(p => {
+          const f = t/p.life;
+          if (f>1) return;
+          p.x += p.vx; p.y += p.vy; p.vy += 0.1;
+          ctx.globalAlpha = 1-f;
+          ctx.fillStyle = p.col;
+          ctx.beginPath();
+          ctx.arc(p.x,p.y,3,0,2*Math.PI);
+          ctx.fill();
+        });
+        if (t<1800) requestAnimationFrame(frame);
+        else { canvas.style.display='none'; newQuestion(); }
+      }
+      requestAnimationFrame(frame);
+    }
+
+    // Init
     window.addEventListener('load', () => {
       drawNumbers();
       newQuestion();
     });
     window.addEventListener('resize', () => {
       drawNumbers();
-      if (canvas.style.display === 'block') {
-        canvas.width  = window.innerWidth;
-        canvas.height = window.innerHeight;
+      if (canvas.style.display==='block') {
+        canvas.width=innerWidth; canvas.height=innerHeight;
       }
     });
   </script>
