@@ -49,12 +49,14 @@
       background: #fff;
       touch-action: none;
     }
+
+    /* Widened hit-area: now 60px, centered via -30px */
     .hand {
       position: absolute;
       bottom: 50%;
       left: 50%;
-      width: 30px;
-      margin-left: -15px;
+      width: 60px;           /* ↑ easier to grab */
+      margin-left: -30px;     /* center the hit-area */
       height: 40%;
       transform-origin: bottom center;
       cursor: pointer;
@@ -70,6 +72,7 @@
       width: 6px;
       height: 100%;
     }
+
     #center-dot {
       position: absolute;
       width: 14px;
@@ -117,7 +120,7 @@
 
   <button id="check-btn">Check</button>
 
-  <!-- Your notification sound -->
+  <!-- Notification sound -->
   <audio id="online"
          src="https://www.orangefreesounds.com/wp-content/uploads/2016/12/Short-ringtone-for-notification.mp3"
          preload="auto"></audio>
@@ -125,7 +128,6 @@
   <canvas id="fireworks-canvas"></canvas>
 
   <script>
-    // —— Helpers ——  
     function getPointer(e) {
       if (e.touches && e.touches[0]) {
         return { x: e.touches[0].clientX, y: e.touches[0].clientY };
@@ -137,7 +139,6 @@
       return Math.abs(d);
     }
 
-    // —— Labels ——  
     const minuteLabels = {
       0:  "O'Clock",   5:  "Five Past",    10: "Ten Past",
       15: "Quarter Past", 20: "Twenty Past", 25: "Twenty-Five Past",
@@ -146,7 +147,6 @@
     };
     const minuteKeys = [0,5,10,15,20,25,30,35,40,45,50,55];
 
-    // —— Draw numbers ——  
     function drawNumbers() {
       const face = document.getElementById('clock-face');
       face.querySelectorAll('.number').forEach(n => n.remove());
@@ -166,7 +166,6 @@
       }
     }
 
-    // —— State & UI refs ——  
     let targetM;
     const promptEl   = document.getElementById('prompt');
     const clockFace  = document.getElementById('clock-face');
@@ -184,7 +183,6 @@
       setHand(minuteHand, 0);
     }
 
-    // —— Drag & snap ——  
     let dragging = false;
     function startDrag(e) {
       if (e.target === minuteHand) {
@@ -213,7 +211,6 @@
     document.addEventListener('mouseup',    endDrag);
     document.addEventListener('touchend',   endDrag);
 
-    // —— Fireworks ——  
     const canvas = document.getElementById('fireworks-canvas');
     const ctx    = canvas.getContext('2d');
     function rand(min,max){ return min + Math.random()*(max-min); }
@@ -228,11 +225,7 @@
       const sy = rect.top  + rect.height/2;
       const parts = [];
       for (let i = 0; i < 80; i++){
-        parts.push({
-          x: sx, y: sy,
-          vx: rand(-4,4), vy: rand(-7,-2),
-          life: 1800, col: randColor()
-        });
+        parts.push({ x: sx, y: sy, vx: rand(-4,4), vy: rand(-7,-2), life: 1800, col: randColor() });
       }
       const start = performance.now();
       function frame(now) {
@@ -245,7 +238,7 @@
           ctx.globalAlpha = 1 - f;
           ctx.fillStyle   = p.col;
           ctx.beginPath();
-          ctx.arc(p.x, p.y, 3, 0, 2*Math.PI);
+          ctx.arc(p.x,p.y,3,0,2*Math.PI);
           ctx.fill();
         });
         if (t < 1800) requestAnimationFrame(frame);
@@ -258,20 +251,18 @@
       requestAnimationFrame(frame);
     }
 
-    // —— Check minute & play sound ——  
     document.getElementById('check-btn').addEventListener('click', () => {
       const mAng    = parseFloat(minuteHand.dataset.angle) || 0;
       const expectA = targetM * 6;
       if (angleDiff(mAng, expectA) < 1) {
         audioBell.currentTime = 0;
-        audioBell.play().catch(()=>{});  // play your notification tone
+        audioBell.play().catch(() => {});
         launchFireworks();
       } else {
         alert("Not quite—try again!");
       }
     });
 
-    // —— Init on load/resize ——  
     window.addEventListener('load', () => {
       drawNumbers();
       newQuestion();
