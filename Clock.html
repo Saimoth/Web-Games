@@ -6,7 +6,6 @@
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Minute-Hand Trainer</title>
   <style>
-    /* reset & safe-area */
     html, body {
       margin: 0;
       padding: 0;
@@ -18,25 +17,19 @@
       padding-top: env(safe-area-inset-top);
       padding-bottom: env(safe-area-inset-bottom);
     }
-
-    /* grid with bigger gaps: 2fr clock 2fr */
     body {
       display: grid;
       grid-template-rows: 2fr auto 2fr;
       justify-items: center;
       overflow: hidden;
     }
-
-    /* prompt in row-1, bottom aligned */
     #prompt {
       grid-row: 1;
       align-self: end;
       font-size: 2.5em;
       text-align: center;
-      margin: 0 20px 20px; /* extra bottom margin */
+      margin: 0 20px 20px;
     }
-
-    /* clock sits in row-2 */
     #clock-container {
       grid-row: 2;
       align-self: center;
@@ -95,17 +88,13 @@
       pointer-events: none;
       font-size: 1.2em;
     }
-
-    /* button in row-3, top aligned with extra margin */
     #check-btn {
       grid-row: 3;
       align-self: start;
       font-size: 1.8em;
       padding: 20px 60px;
-      margin: 20px 0 0; /* extra top margin */
+      margin: 20px 0 0;
     }
-
-    /* fireworks canvas */
     #fireworks-canvas {
       position: fixed;
       top: 0; left: 0;
@@ -128,6 +117,11 @@
 
   <button id="check-btn">Check</button>
 
+  <!-- Your notification sound -->
+  <audio id="online"
+         src="https://www.orangefreesounds.com/wp-content/uploads/2016/12/Short-ringtone-for-notification.mp3"
+         preload="auto"></audio>
+
   <canvas id="fireworks-canvas"></canvas>
 
   <script>
@@ -145,10 +139,10 @@
 
     // —— Labels ——  
     const minuteLabels = {
-      0:  "O'Clock", 5:  "Five Past",    10: "Ten Past",
+      0:  "O'Clock",   5:  "Five Past",    10: "Ten Past",
       15: "Quarter Past", 20: "Twenty Past", 25: "Twenty-Five Past",
       30: "Half Past", 35: "Twenty-Five To", 40: "Twenty To",
-      45: "Quarter To", 50: "Ten To",     55: "Five To"
+      45: "Quarter To", 50: "Ten To",      55: "Five To"
     };
     const minuteKeys = [0,5,10,15,20,25,30,35,40,45,50,55];
 
@@ -177,6 +171,8 @@
     const promptEl   = document.getElementById('prompt');
     const clockFace  = document.getElementById('clock-face');
     const minuteHand = document.getElementById('minute-hand');
+    const audioBell  = document.getElementById('online');
+
     function setHand(el, angle) {
       el.dataset.angle   = angle;
       el.style.transform = 'rotate(' + angle + 'deg)';
@@ -231,10 +227,12 @@
       const sx = rect.left + rect.width/2;
       const sy = rect.top  + rect.height/2;
       const parts = [];
-      for (let i=0; i<80; i++){
-        parts.push({ x:sx, y:sy,
-                     vx:rand(-4,4), vy:rand(-7,-2),
-                     life:1800, col:randColor() });
+      for (let i = 0; i < 80; i++){
+        parts.push({
+          x: sx, y: sy,
+          vx: rand(-4,4), vy: rand(-7,-2),
+          life: 1800, col: randColor()
+        });
       }
       const start = performance.now();
       function frame(now) {
@@ -260,18 +258,20 @@
       requestAnimationFrame(frame);
     }
 
-    // —— Check only minute ——  
+    // —— Check minute & play sound ——  
     document.getElementById('check-btn').addEventListener('click', () => {
       const mAng    = parseFloat(minuteHand.dataset.angle) || 0;
       const expectA = targetM * 6;
       if (angleDiff(mAng, expectA) < 1) {
+        audioBell.currentTime = 0;
+        audioBell.play().catch(()=>{});  // play your notification tone
         launchFireworks();
       } else {
         alert("Not quite—try again!");
       }
     });
 
-    // —— Init ——  
+    // —— Init on load/resize ——  
     window.addEventListener('load', () => {
       drawNumbers();
       newQuestion();
