@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Maze Runner – Ant Chase (Dynamic CPU Speed)</title>
+  <style>
+    html, body { margin:0; padding:0; overflow:hidden; background:#222; }
+    canvas { display:block; touch-action:none; }
+  </style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<script>
+(function(){
+  const canvas = document.getElementById('game'),
+        ctx    = canvas.getContext('2d');
+  let cw, ch, centerX, centerY;
+
+  const COLS = 16, ROWS = 16,
+        cellSize = 80,
+        mazeW = COLS * cellSize,
+        mazeH = ROWS * cellSize;
+
+  let maze, buffer, bctx;
+  let px, py, angle = 0, offsetX = 0, offsetY = 0;
+  let startTime, finishX, finishY;
+
+  const speed = 150;  // player speed
+
+  const cpu = {
+    px: 0, py: 0,
+    angle: 0,
+    mode: 'direct',
+    path: [],
+    pathIndex: 1
+  };
+
+  let exploding = false,
+      explosionStart = 0,
+      explosionSpeed = 800,
+      playerStarted = false;
+
+  let joyStart = null, vx = 0, vy = 0, canMove = false;
+  const deadZone = 20;
+
+  function Cell(){
+    this.walls = { top:true, right:true, bottom:true, left:true };
+    this.visited = false;
+  }
+
+  function genMaze(){
+    maze = Array.from({length:ROWS}, ()=>Array.from({length:COLS}, ()=>new Cell()));
+    const stack = [[0,0]];
+    maze[0][0].visited = true;
+    while(stack.length){
+      const [cx,cy] = stack[stack.length-1], dirs = [];
+      if(cy>0      && !maze[cy-1][cx].visited) dirs.push([0,-1,'top','bottom']);
+      if(cx<COLS-1 && !maze[cy][cx+1].visited) dirs.push([1,0,'right','left']);
+      if(cy<ROWS-1 && !maze[cy+1][cx].visited) dirs.push([0,1,'bottom','top']);
+      if(cx>0      && !maze[cy][cx-1].visited) dirs.push([-1,0,'left','right']);
+      if(dirs.length){
+        const [dx,dy,wall,opp] = dirs[Math.floor(Math.random()*dirs.length)],
+              nx = cx+dx, ny = cy+dy;
+        maze[cy][cx].walls[wall] = false;
+        maze[ny][nx].walls[opp]  = false;
+        maze[ny][nx].visited     = true;
+        stack.push([nx,ny]);
+      } else {
+        stack.pop();
+      }
+    }
+    // find farthest for finish
+    const distF = Array.from({length:ROWS}, ()=>Array(COLS).fill(-1));
+    const qF = [[0,0]]; distF[0][0] = 0;
+    let maxD = 0; finishX = 0; finishY = 0;
+    while(qF.length){
+      const [x,y] = qF.shift(), d = distF[y][x];
+      if(!maze[y][x].walls.top    && distF[y-1][x]<0){ distF[y-1][x]=d+1; qF.push([x,y-1]); }
+      if(!maze[y][x].walls.right  && distF[y][x+1]<0){ distF[y][x+1]=d+1; qF.push([x+1,y]); }
+      if(!maze[y][x].walls.bottom && distF[y+1][x]<0){ distF[y+1][x]=d+1; qF.push([x,y+1]); }
+      if(!maze[y][x].walls.left   && distF[y][x-1]<0){ distF[y][x-1]=d+1; qF.push([x-1,y]); }
+      if(d > maxD){ maxD = d; finishX = x; finishY = y; }
+    }
+  }
+
+  function drawBuffer(){
+    buffer = document.createElement('canvas');
+    buffer.width = mazeW;
+    buffer.height= mazeH;
+    bctx = buffer.getContext('2d');
+    bctx.fillStyle = '#fff';
+    bctx.fillRect(0,0,mazeW,mazeH);
+    bctx.strokeStyle = '#000';
+    bctx.lineWidth   = 2;
+    for(let y=0; y<ROWS; y++){
+      for(let x=0; x<COLS; x++){
+        const c = maze[y][x], sx = x*cellSize, sy = y*cellSize;
+        if(c.walls.top){
+          bctx.beginPath(); bctx.moveTo(sx,sy); bctx.lineTo(sx+cellSize,sy); bctx.stroke();
+        }
+        if(c.walls.right){
+          bctx.beginPath(); bctx.moveTo(sx+cellSize,sy); bctx.lineTo(sx+cellSize,sy+cellSize); bctx.stroke();
+        }
+        if(c.walls.bottom){
+          bctx.beginPath(); bctx.moveTo(sx,sy+cellSize); bctx.lineTo(sx+cellSize,sy+cellSize); bctx.stroke();
+        }
+        if(c.walls.left){
+          bctx.beginPath(); bctx.moveTo(sx,sy); bctx.lineTo(sx,sy+cellSize); bctx.stroke();
+        }
+      }
+    }
+    bctx.fillStyle = '#0f0';
+    bctx.fillRect(
+      finishX*cellSize,
+      finishY*cellSize,
+      cellSize,
+      cellSize
+    );
+  }
+
+  function cellCoords(x,y){
+    return [Math.floor(x/cellSize), Math.floor(y/cellSize)];
+  }
+
+  function findPath(sx,sy,tx,ty){
+    const prev = Array.from({length:ROWS}, ()=>Array(COLS).fill(null));
+    const q = [[sx,sy]];
+    const vis = Array.from({length:ROWS}, ()=>Array(COLS).fill(false));
+    vis[sy][sx] = true;
+    while(q.length){
+      const [x,y] = q.shift();
+      if(x===tx && y===ty) break;
+      [['top',0,-1],['right',1,0],['bottom',0,1],['left',-1,0]].forEach(([w,dx,dy])=>{
+        if(!maze[y][x].walls[w]){
+          const nx=x+dx, ny=y+dy;
+          if(!vis[ny][nx]){
+            vis[ny][nx]=true;
+            prev[ny][nx]=[x,y];
+            q.push([nx,ny]);
+          }
+        }
+      });
+    }
+    const path = []; let cur=[tx,ty];
+    while(cur){
+      path.push(cur);
+      cur=prev[cur[1]][cur[0]];
+    }
+    return path.reverse();
+  }
+
+  function hitsWall(ox,oy,nx,ny){
+    const [cx,cy]=cellCoords(ox,oy), [ncx,ncy]=cellCoords(nx,ny);
+    if(ncx!==cx){
+      const dx=ncx-cx;
+      if(dx>0&&maze[cy][cx].walls.right) return true;
+      if(dx<0&&maze[cy][cx].walls.left ) return true;
+    }
+    if(ncy!==cy){
+      const dy=ncy-cy;
+      if(dy>0&&maze[cy][cx].walls.bottom) return true;
+      if(dy<0&&maze[cy][cx].walls.top   ) return true;
+    }
+    return false;
+  }
+
+  function drawAntEntity(x,y,ang,time,walking,color){
+    const r=6;
+    ctx.save();
+    ctx.translate(x,y);
+    ctx.rotate(ang);
+    ctx.fillStyle=color;
+    ctx.strokeStyle=color;
+    ctx.lineWidth=2;
+    [-12,0,12].forEach(px=>{
+      ctx.beginPath();
+      ctx.arc(px,0,r,0,2*Math.PI);
+      ctx.fill();
+    });
+    const offs=[-Math.PI/6,0,Math.PI/6];
+    offs.forEach((off,i)=>{
+      const phase=walking?Math.sin(time*0.01+i)*0.3:0;
+      let th=Math.PI/2+off+phase;
+      ctx.beginPath();ctx.moveTo(0,0);
+      ctx.lineTo(Math.cos(th)*20,Math.sin(th)*20);ctx.stroke();
+      th=-Math.PI/2-off+phase;
+      ctx.beginPath();ctx.moveTo(0,0);
+      ctx.lineTo(Math.cos(th)*20,Math.sin(th)*20);ctx.stroke();
+    });
+    ctx.restore();
+  }
+
+  function initGame(){
+    genMaze();
+    drawBuffer();
+    // spawn player at distance 2
+    const dist2=Array.from({length:ROWS},()=>Array(COLS).fill(-1));
+    const q2=[[0,0]]; dist2[0][0]=0;
+    const dirs=[['right',1,0],['bottom',0,1],['left',-1,0],['top',0,-1]];
+    let spawn=null, idx=0;
+    while(idx<q2.length&&!spawn){
+      const [x,y]=q2[idx++],d=dist2[y][x];
+      if(d===2){spawn=[x,y];break;}
+      dirs.forEach(([w,dx,dy])=>{
+        if(!maze[y][x].walls[w]){
+          const nx=x+dx,ny=y+dy;
+          if(nx>=0&&nx<COLS&&ny>=0&&ny<ROWS&&dist2[ny][nx]<0){
+            dist2[ny][nx]=d+1;q2.push([nx,ny]);
+          }
+        }
+      });
+    }
+    if(!spawn) spawn=[1,0];
+    const [sx,sy]=spawn;
+    px=(sx+0.5)*cellSize; py=(sy+0.5)*cellSize;
+    offsetX=centerX-px; offsetY=centerY-py;
+
+    cpu.px=0.5*cellSize; cpu.py=0.5*cellSize;
+    cpu.mode='direct'; cpu.path=[]; cpu.pathIndex=1;
+
+    startTime=Date.now();
+    exploding=false; playerStarted=false;
+    vx=vy=0; joyStart=null; canMove=false;
+  }
+
+  function resize(){
+    cw=innerWidth; ch=innerHeight;
+    canvas.width=cw; canvas.height=ch;
+    centerX=cw/2; centerY=ch/2;
+    offsetX=centerX-px; offsetY=centerY-py;
+  }
+
+  let last=Date.now();
+  function loop(){
+    const now=Date.now(), dt=(now-last)/1000;
+    last=now;
+
+    if(exploding){
+      const eT=(now-explosionStart)/1000, r=eT*explosionSpeed;
+      ctx.clearRect(0,0,cw,ch);
+      ctx.fillStyle='rgba(255,0,0,0.5)';
+      ctx.beginPath();
+      ctx.arc(centerX,centerY,r,0,2*Math.PI);
+      ctx.fill();
+      if(r>Math.hypot(cw,ch)) initGame();
+      requestAnimationFrame(loop);
+      return;
+    }
+
+    // player move
+    if(vx||vy){
+      const mag=Math.hypot(vx,vy), nx=vx/mag, ny=vy/mag;
+      const dx=nx*speed*dt, dy=ny*speed*dt;
+      if(hitsWall(px,py,px+dx,py)||hitsWall(px,py,px,py+dy)){
+        exploding=true; explosionStart=now;
+      } else {
+        px+=dx; py+=dy;
+        offsetX=centerX-px; offsetY=centerY-py;
+      }
+    }
+
+    // dynamic CPU speed
+    const [pcx,pcy]=cellCoords(px,py),
+          [ccx,ccy]=cellCoords(cpu.px,cpu.py),
+          cellDist = Math.hypot(ccx-pcx, ccy-pcy);
+    const cpuSpeed = cellDist>2 ? speed * 2.0 : speed;  // bonus 2× if >2 squares
+
+    // CPU chase
+    if(playerStarted && !exploding){
+      if(cpu.mode==='direct'){
+        const dx0=px-cpu.px, dy0=py-cpu.py, dist=Math.hypot(dx0,dy0);
+        if(dist>1){
+          const vxC=dx0/dist, vyC=dy0/dist;
+          const dxC=vxC*cpuSpeed*dt, dyC=vyC*cpuSpeed*dt;
+          if(hitsWall(cpu.px,cpu.py,cpu.px+dxC,cpu.py) ||
+             hitsWall(cpu.px,cpu.py,cpu.px,cpu.py+dyC)){
+            const [scx,scy]=cellCoords(cpu.px,cpu.py),
+                  [tcx,tcy]=cellCoords(px,py);
+            cpu.path      = findPath(scx,scy,tcx,tcy);
+            cpu.pathIndex = 1;
+            cpu.mode      = 'path';
+          } else {
+            cpu.px += dxC; cpu.py += dyC;
+            cpu.angle = Math.atan2(vyC, vxC);
+          }
+        }
+      }
+      if(cpu.mode==='path' && cpu.path.length>1){
+        const [cx,cy] = cpu.path[cpu.pathIndex],
+              tx = cx*cellSize + cellSize/2,
+              ty = cy*cellSize + cellSize/2,
+              dx1 = tx - cpu.px, dy1 = ty - cpu.py,
+              d1  = Math.hypot(dx1,dy1);
+        if(d1 < cpuSpeed * dt){
+          cpu.px = tx; cpu.py = ty;
+          cpu.pathIndex++;
+          if(cpu.pathIndex >= cpu.path.length) cpu.mode='direct';
+        } else {
+          const vxC = dx1/d1, vyC = dy1/d1;
+          cpu.px += vxC * cpuSpeed * dt;
+          cpu.py += vyC * cpuSpeed * dt;
+          cpu.angle = Math.atan2(vyC, vxC);
+        }
+      }
+    }
+
+    // catch at 25px
+    if(!exploding){
+      const dxp = cpu.px - px, dyp = cpu.py - py;
+      if(Math.hypot(dxp,dyp) < 25){
+        exploding = true;
+        explosionStart = now;
+      }
+    }
+
+    // render
+    ctx.clearRect(0,0,cw,ch);
+    ctx.drawImage(buffer, offsetX, offsetY);
+    drawAntEntity(centerX, centerY, angle, now, vx!==0||vy!==0, '#000');
+    const cpuX = centerX + (cpu.px - px),
+          cpuY = centerY + (cpu.py - py);
+    drawAntEntity(cpuX, cpuY, cpu.angle, now, playerStarted && !exploding, '#f33');
+
+    const [pCX,pCY] = cellCoords(px,py);
+    if(pCX===finishX && pCY===finishY){
+      const tsec = ((now - startTime)/1000).toFixed(2);
+      vx = vy = 0;
+      setTimeout(()=>{ if(confirm(`Well done! ${tsec}s\nPlay again?`)) initGame(); },10);
+    }
+
+    requestAnimationFrame(loop);
+  }
+
+  canvas.addEventListener('touchstart', e=>{
+    const t = e.changedTouches[0];
+    joyStart = { id:t.identifier, x:t.clientX, y:t.clientY };
+    canMove = true; playerStarted = true; vx = vy = 0;
+  }, { passive:false });
+
+  canvas.addEventListener('touchmove', e=>{
+    if(!joyStart || !canMove) return;
+    for(let t of e.changedTouches){
+      if(t.identifier === joyStart.id){
+        const dx = t.clientX - joyStart.x,
+              dy = t.clientY - joyStart.y;
+        if(Math.hypot(dx,dy) > deadZone){
+          vx = dx; vy = dy; angle = Math.atan2(dy, dx);
+        } else {
+          vx = vy = 0;
+        }
+      }
+    }
+    e.preventDefault();
+  }, { passive:false });
+
+  canvas.addEventListener('touchend', e=>{
+    for(let t of e.changedTouches){
+      if(joyStart && t.identifier === joyStart.id){
+        joyStart = null; vx = vy = 0; canMove = false;
+      }
+    }
+  });
+
+  window.addEventListener('resize', resize);
+  document.addEventListener('DOMContentLoaded', ()=>{
+    resize(); initGame(); loop();
+  });
+})();
+</script>
+</body>
+</html>
