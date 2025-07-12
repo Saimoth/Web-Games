@@ -209,10 +209,29 @@
   </div>
 
 <script>
-  (function(){
-    // Prevent pinch/gesture zoom
-    document.addEventListener('gesturestart', e=>e.preventDefault());
+  // 1) Disable pinch zoom across all browsers
+  document.addEventListener('gesturestart', e => e.preventDefault());
 
+  // 2) Block double-tap zoom but still let spells fire immediately
+  let lastTap = 0;
+  document.addEventListener('touchend', function(e){
+    const spell = e.target.closest('.spell');
+    if (spell) {
+      // stop zoom, then manually trigger the click so you can spam
+      e.preventDefault();
+      spell.click();
+      return;
+    }
+    const now = Date.now();
+    if (now - lastTap < 300) {
+      // double-tap outside a spell → prevent zoom
+      e.preventDefault();
+    }
+    lastTap = now;
+  }, { passive: false });
+
+  // --- the rest is your game logic unchanged ---
+  (function(){
     const maxHP=100, baseHeal=30,
           mitDur=5000, hotDur=8000;
     const spellsCfg={
@@ -286,7 +305,7 @@
         buff1Timer=setTimeout(b1,22000);
       },13000);
 
-      // Buff2 dynamic: start 23s, shrink by 1s each cycle (min 5s)
+      // Buff2 dynamic: start 23s, shrink until 5s
       buff2Wait=23000;
       function b2(){
         let idx=pickClean();
@@ -336,8 +355,8 @@
       let t=nowMs();
       targetsEl.forEach((el,i)=>{
         let hb=el.querySelector('.buff-hot');
-        hb.style.width=t<targets[i].hotEnd
-          ?((targets[i].hotEnd-t)/hotDur*100)+'%' : '0';
+        hb.style.width = t<targets[i].hotEnd
+          ? ((targets[i].hotEnd-t)/hotDur*100)+'%' : '0';
         el.querySelector('.mitigation-indicator').style.display=
           t<targets[i].mitEnd?'block':'none';
         el.querySelector('.double-damage-indicator').style.display=
@@ -367,7 +386,7 @@
       }
       el.classList.add('disabled');
 
-      // Animate only outline in the last second
+      // Outline animation in last second
       setTimeout(()=>{
         let anim=document.createElement('div');
         anim.className='cd-anim';
