@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" style="touch-action: none; overscroll-behavior: none; user-select: none;">
 <head>
   <meta charset="UTF-8">
-  <!-- Disable scaling/zooming -->
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <!-- Fully lock down zooming -->
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no">
   <title>Mobile Healing Demo</title>
   <style>
-    /* Prevent scrolling/panning and text selection */
     html, body {
       margin: 0; padding: 0;
       height: 100%; width: 100%;
@@ -15,12 +15,11 @@
       user-select: none;
       -webkit-user-select: none;
       -ms-user-select: none;
-      -moz-user-select: none;
       font-family: sans-serif;
       background: #111; color: #fff;
       position: relative;
     }
-    /* Instruction overlay */
+    /* Instruction & Game Over overlays */
     #instruction-overlay,
     #gameover-overlay {
       position: absolute; top: 0; left: 0;
@@ -28,22 +27,21 @@
       background: rgba(0,0,0,0.85);
       display: flex; align-items: center; justify-content: center;
       flex-direction: column; text-align: center;
-      padding: 20px; box-sizing: border-box;
-      z-index: 1000;
+      padding: 20px; box-sizing: border-box; z-index: 1000;
     }
     #instruction-overlay p {
       font-size: 20px; line-height: 1.4; margin-bottom: 20px;
     }
-    #instruction-overlay button,
-    #gameover-overlay button {
+    #gameover-overlay p {
+      font-size: 24px; margin-bottom: 20px;
+    }
+    button {
       padding: 12px 24px;
       font-size: 18px;
       border: none; border-radius: 6px;
       background: #0a84ff; color: #fff;
       cursor: pointer;
-    }
-    #gameover-overlay p {
-      font-size: 24px; margin-bottom: 20px;
+      user-select: none;
     }
 
     /* Targets */
@@ -129,9 +127,7 @@
     .spells.locked .spell {
       opacity:0.4!important; pointer-events:none!important;
     }
-    .spell-label {
-      font-size:10px; text-align:center; line-height:1.1;
-    }
+    .spell-label { font-size:10px; text-align:center; line-height:1.1; }
     .overlay {
       position:absolute; top:0; left:0; width:100%; height:100%;
       background:rgba(0,0,0,0.7); color:#fff;
@@ -142,19 +138,19 @@
 </head>
 <body>
 
-  <!-- Initial Instruction Screen -->
+  <!-- First-time instructions -->
   <div id="instruction-overlay">
     <p>
       Welcome to the Healer’s Challenge!<br>
       Monitor each target’s health and keep them alive.<br>
-      A red indicator marks elevated damage—apply Mitigation to reduce it.<br>
+      A red indicator marks periods of intensified damage—use Mitigation wisely.<br>
       Alternate between Heal-over-Time, single-target heals, and area-of-effect heals.<br>
       Prevent any target from falling!
     </p>
     <button id="start-button">Play</button>
   </div>
 
-  <!-- Game Over Screen -->
+  <!-- Game Over screen -->
   <div id="gameover-overlay" style="display:none">
     <p id="gameover-text">Game Over<br>You lasted 0 s</p>
     <button id="playagain-button">Play Again</button>
@@ -208,39 +204,39 @@
       spell3:{cast:2000},
       spell4:{cd:15000,last:-1e9}
     };
-
     let targets, selected, globalCD, startTime, gameOver;
     let uiInt, ddInt;
 
-    const instrOv = document.getElementById('instruction-overlay');
-    const goOv    = document.getElementById('gameover-overlay');
-    const goText  = document.getElementById('gameover-text');
-    const startBtn= document.getElementById('start-button');
-    const againBtn= document.getElementById('playagain-button');
-    const targetsEl= document.querySelectorAll('.target');
-    const spellEl = {
-      spell1:document.getElementById('spell1'),
-      spell2:document.getElementById('spell2'),
-      spell3:document.getElementById('spell3'),
-      spell4:document.getElementById('spell4')
-    };
-    const spellsContainer = document.querySelector('.spells');
-    const castBar = document.querySelector('.cast-bar');
-    const castProg= document.querySelector('.cast-progress');
+    const instrOv = document.getElementById('instruction-overlay'),
+          goOv    = document.getElementById('gameover-overlay'),
+          goText  = document.getElementById('gameover-text'),
+          startBtn= document.getElementById('start-button'),
+          againBtn= document.getElementById('playagain-button'),
+          targetsEl= document.querySelectorAll('.target'),
+          spellEl = {
+            spell1:document.getElementById('spell1'),
+            spell2:document.getElementById('spell2'),
+            spell3:document.getElementById('spell3'),
+            spell4:document.getElementById('spell4')
+          },
+          spellsContainer=document.querySelector('.spells'),
+          castBar=document.querySelector('.cast-bar'),
+          castProg=document.querySelector('.cast-progress');
 
     const now=()=>Date.now(),
           clamp=(v,m,M)=>Math.max(m,Math.min(M,v)),
           rand=(a,b)=>Math.random()*(b-a)+a;
 
-    // Event bindings
     targetsEl.forEach((el,i)=>{
       el.addEventListener('click',()=>{ if(!gameOver) selectTarget(i); });
     });
     startBtn.addEventListener('click',()=>{
-      instrOv.style.display='none'; startGame();
+      instrOv.style.display='none';
+      startGame();
     });
     againBtn.addEventListener('click',()=>{
-      goOv.style.display='none'; startGame();
+      goOv.style.display='none';
+      startGame();
     });
 
     function selectTarget(i){
@@ -267,8 +263,8 @@
       uiInt = setInterval(updateIndicators,100);
       ddInt = setInterval(()=>{
         if(gameOver) return;
-        let idx = Math.floor(Math.random()*4);
-        targets[idx].ddEnd = now() + 10000;
+        let idx=Math.floor(Math.random()*4);
+        targets[idx].ddEnd = now()+10000;
       },15000);
     }
 
@@ -342,7 +338,7 @@
       let t=now(), sp=spellsCfg[id];
       if(t<globalCD||t-sp.last<sp.cd||(id!=='spell4'&&selected===null)) return;
       sp.last=t; globalCD=t+1000;
-      startCooldown(id, sp.cd);
+      startCooldown(id,sp.cd);
       spellsContainer.classList.add('locked');
       setTimeout(()=>spellsContainer.classList.remove('locked'),1000);
       effect();
@@ -367,55 +363,59 @@
       },dur);
     }
 
-    // Spell 1
-    spellEl.spell1.addEventListener('click',()=>{
-      tryInstant('spell1',()=>{
-        targets[selected].mitEnd=now()+mitDur;
-      });
+    // Spell bindings
+    spellEl.spell1.addEventListener('click',()=> {
+      tryInstant('spell1',()=> targets[selected].mitEnd=now()+mitDur );
     });
-    // Spell 2: HoT heals half base each tick
-    spellEl.spell2.addEventListener('click',()=>{
+    spellEl.spell2.addEventListener('click',()=> {
       tryInstant('spell2',()=>{
-        let idx=selected, halfHeal=Math.round(baseHeal/2);
+        let idx=selected, h=Math.round(baseHeal/2), ticks=hotDur/2000;
         targets[idx].hotEnd=now()+hotDur;
-        let ticks=hotDur/2000, iv=setInterval(()=>{
-          if(--ticks<0){ clearInterval(iv); return; }
+        let iv=setInterval(()=>{
+          if(--ticks<0){clearInterval(iv);return;}
           if(targets[idx].hp>0){
-            targets[idx].hp=clamp(targets[idx].hp+halfHeal,0,maxHP);
-            updateHP(idx);
-            showFloating(idx,halfHeal,'heal');
+            targets[idx].hp=clamp(targets[idx].hp+h,0,maxHP);
+            updateHP(idx); showFloating(idx,h,'heal');
           }
         },2000);
       });
     });
-    // Spell 3
-    spellEl.spell3.addEventListener('click',()=>{
-      doCast('spell3', spellsCfg.spell3.cast, idx=>{
-        let heal=baseHeal*rand(0.9,1.1), isCrit=false;
-        if(Math.random()<0.25){ heal*=2; isCrit=true; }
+    spellEl.spell3.addEventListener('click',()=> {
+      doCast('spell3',spellsCfg.spell3.cast,idx=>{
+        let heal=baseHeal*rand(0.9,1.1), crit=false;
+        if(Math.random()<0.25){heal*=2;crit=true;}
         heal=Math.round(heal);
         if(targets[idx].hp>0){
           targets[idx].hp=clamp(targets[idx].hp+heal,0,maxHP);
-          updateHP(idx);
-          showFloating(idx,heal,'heal',isCrit);
+          updateHP(idx); showFloating(idx,heal,'heal',crit);
         }
       });
     });
-    // Spell 4
-    spellEl.spell4.addEventListener('click',()=>{
+    spellEl.spell4.addEventListener('click',()=> {
       tryInstant('spell4',()=>{
         targets.forEach((tar,i)=>{
           if(tar.hp<=0) return;
-          let heal=(baseHeal/2)*rand(0.9,1.1), isCrit=false;
-          if(Math.random()<0.25){ heal*=2; isCrit=true; }
+          let heal=(baseHeal/2)*rand(0.9,1.1), crit=false;
+          if(Math.random()<0.25){heal*=2;crit=true;}
           heal=Math.round(heal);
           tar.hp=clamp(tar.hp+heal,0,maxHP);
-          updateHP(i);
-          showFloating(i,heal,'heal',isCrit);
+          updateHP(i); showFloating(i,heal,'heal',crit);
         });
       });
     });
 
+    // Prevent double-tap zoom & gestures
+    let lastTouchEnd = 0;
+    document.addEventListener('touchend', function(e) {
+      let now = Date.now();
+      if (now - lastTouchEnd <= 300) {
+        e.preventDefault();
+      }
+      lastTouchEnd = now;
+    }, false);
+    document.addEventListener('gesturestart', function(e) {
+      e.preventDefault();
+    });
   })();
   </script>
 </body>
