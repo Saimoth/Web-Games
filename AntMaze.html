@@ -264,7 +264,7 @@
     const [pcx,pcy]=cellCoords(px,py),
           [ccx,ccy]=cellCoords(cpu.px,cpu.py),
           cellDist = Math.hypot(ccx-pcx, ccy-pcy);
-    const cpuSpeed = cellDist>2 ? speed * 2.0 : speed;  // bonus 2× if >2 squares
+    const cpuSpeed = cellDist>2 ? speed * 2.0 : speed * 0.9;  // bonus 2× if >2 squares
 
     // CPU chase
     if(playerStarted && !exploding){
