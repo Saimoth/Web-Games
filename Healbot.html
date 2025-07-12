@@ -22,20 +22,16 @@
       background: rgba(0,0,0,0.85);
       display: flex; align-items: center; justify-content: center;
       flex-direction: column; text-align: center;
-      padding: 20px; box-sizing: border-box;
-      z-index: 1000;
+      padding: 20px; box-sizing: border-box; z-index: 1000;
     }
     #instruction-overlay p { font-size: 20px; line-height: 1.4; margin-bottom: 20px; }
     #gameover-overlay p    { font-size: 24px; margin-bottom: 20px; }
     button {
-      padding: 12px 24px;
-      font-size: 18px;
+      padding: 12px 24px; font-size: 18px;
       border: none; border-radius: 6px;
       background: #0a84ff; color: #fff;
-      cursor: pointer;
-      user-select: none;
+      cursor: pointer; user-select: none;
     }
-
     /* Targets */
     .targets {
       display: flex; justify-content: space-around;
@@ -43,119 +39,100 @@
     }
     .target {
       width: 60px; height: 60px;
-      border: 3px solid #444;
-      background: #222;
-      position: relative;
-      display: flex; align-items: flex-end;
+      border: 3px solid #444; background: #222;
+      position: relative; display: flex; align-items: flex-end;
       cursor: pointer; overflow: visible;
     }
     .target.selected { border-color: gold; }
     .health-bar { width:100%; height:10px; background:#333; }
     .health-bar-fill { width:100%; height:100%; background:#0f0; }
-
     .buff-hot {
-      position: absolute; left: 0; top: 4px;
-      width: 0; height: 4px; background: #0f0;
+      position: absolute; left:0; top:4px;
+      width:0; height:4px; background:#0f0;
     }
     .double-damage-indicator {
-      position: absolute; top: -12px; left: 50%;
+      position: absolute; top:-12px; left:50%;
       transform: translateX(-50%);
-      width: 16px; height: 16px; border-radius: 50%;
-      background: rgba(255,0,0,0.8); border: 2px solid #f00;
-      display: none;
+      width:16px; height:16px; border-radius:50%;
+      background:rgba(255,0,0,0.8); border:2px solid #f00;
+      display:none;
     }
     .mitigation-indicator {
-      position: absolute; top: -14px; left: 50%;
+      position: absolute; top:-14px; left:50%;
       transform: translateX(-50%);
-      width: 20px; height: 20px; border-radius: 50%;
-      border: 2px solid #888; display: none;
-      pointer-events: none;
+      width:20px; height:20px; border-radius:50%;
+      border:2px solid #888; display:none;
+      pointer-events:none;
     }
-
     /* Floating text */
     .floating-text {
-      position: absolute; font-weight: bold;
-      pointer-events: none;
+      position: absolute; font-weight: bold; pointer-events: none;
     }
     .floating-text.heal {
-      top: -20px; left: 50%; transform: translateX(-50%);
-      color: #0f0; font-size: 14px;
-      animation: fadeUp 2s forwards;
+      top:-20px; left:50%; transform:translateX(-50%);
+      color:#0f0; font-size:14px; animation:fadeUp 2s forwards;
     }
     .floating-text.dmg {
-      bottom: -20px; left: 50%; transform: translateX(-50%);
-      color: #f00; font-size: 14px;
-      animation: fadeDown 2s forwards;
+      bottom:-20px; left:50%; transform:translateX(-50%);
+      color:#f00; font-size:14px; animation:fadeDown 2s forwards;
     }
-    .floating-text.crit { font-size: 24px !important; }
+    .floating-text.crit { font-size:24px!important; }
     @keyframes fadeUp   { to { opacity:0; transform:translateX(-50%) translateY(-20px); } }
     @keyframes fadeDown { to { opacity:0; transform:translateX(-50%) translateY(20px); } }
-
     /* Cast bar */
     .cast-bar {
-      position: absolute; bottom: 100px; left: 10px; right: 10px;
-      height: 8px; background: #333; display: none;
+      position:absolute; bottom:100px; left:10px; right:10px;
+      height:8px; background:#333; display:none;
     }
-    .cast-bar.active { display: block; }
-    .cast-progress { height: 100%; width: 0; background: #00f; }
-
+    .cast-bar.active { display:block; }
+    .cast-progress { height:100%; width:0; background:#00f; }
     /* Spells */
     .spells {
-      position: absolute; bottom: 10px; left: 0; right: 0;
-      display: flex; justify-content: space-around;
-      padding: 0 10px;
+      position:absolute; bottom:10px; left:0; right:0;
+      display:flex; justify-content:space-around; padding:0 10px;
     }
     .spell-wrapper {
-      display: flex; flex-direction: column; align-items: center;
+      display:flex; flex-direction:column; align-items:center;
     }
     .spell {
-      width: 60px; height: 60px;
-      border: 2px solid #888; border-radius: 8px;
-      background: #333; font-size: 24px;
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer; position: relative;
+      width:60px; height:60px;
+      border:2px solid #888; border-radius:8px;
+      background:#333; font-size:24px;
+      display:flex; align-items:center; justify-content:center;
+      cursor:pointer; position:relative;
     }
-    .spell.disabled { opacity: 0.4; pointer-events: none; }
+    .spell.disabled { opacity:0.4; pointer-events:none; }
     .spells.locked .spell {
-      opacity: 0.4 !important; pointer-events: none !important;
+      opacity:0.4!important; pointer-events:none!important;
     }
     .spell-label {
-      margin-top: 4px;
-      font-size: 12px;
-      text-align: center;
-      line-height: 1.2;
-      color: #fff;
-      user-select: none;
+      margin-top:4px; font-size:12px;
+      text-align:center; line-height:1.2; color:#fff;
+      user-select:none;
     }
     .overlay {
-      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.7); color: #fff;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 18px;
+      position:absolute; top:0; left:0; width:100%; height:100%;
+      background:rgba(0,0,0,0.7); color:#fff;
+      display:flex; align-items:center; justify-content:center;
+      font-size:18px;
     }
   </style>
 </head>
 <body>
-
-  <!-- Instruction screen -->
   <div id="instruction-overlay">
     <p>
       Welcome to the Healer’s Challenge!<br>
       Monitor each target’s health and keep them alive.<br>
       A red dot means intensified damage—use Mitigation wisely.<br>
-      Alternate between Heal-over-Time, single-target heals, and area-heals.<br>
+      Alternate between HoT, single-target heals, and AoE heals.<br>
       Prevent any target from falling!
     </p>
     <button id="start-button">Play</button>
   </div>
-
-  <!-- Game Over screen -->
   <div id="gameover-overlay" style="display:none">
     <p id="gameover-text">Game Over<br>You lasted 0 s</p>
     <button id="playagain-button">Play Again</button>
   </div>
-
-  <!-- Targets -->
   <div class="targets">
     <div class="target" data-index="0">
       <div class="mitigation-indicator"></div>
@@ -182,11 +159,7 @@
       <div class="health-bar"><div class="health-bar-fill"></div></div>
     </div>
   </div>
-
-  <!-- Cast Bar -->
   <div class="cast-bar"><div class="cast-progress"></div></div>
-
-  <!-- Spells -->
   <div class="spells">
     <div class="spell-wrapper">
       <div class="spell" id="spell1">🛡</div>
@@ -207,237 +180,239 @@
   </div>
 
 <script>
-(function(){
-  const maxHP = 100, baseHeal = 30;
-  const mitDur = 5000, hotDur = 8000;
-  const spellsCfg = {
-    spell1:{cd:15000,last:0},
-    spell2:{cd:8000 ,last:0},
-    spell3:{cast:2000},
-    spell4:{cd:15000,last:0}
-  };
+  (function(){
+    // Prevent pinch/gesture zoom
+    document.addEventListener('gesturestart', e=>e.preventDefault());
 
-  let targets, selected, globalCD, startTime, gameOver;
-  let uiInt, buff1Timer, buff2Timer, buff2Wait;
-
-  const instrOv  = document.getElementById('instruction-overlay');
-  const goOv     = document.getElementById('gameover-overlay');
-  const goText   = document.getElementById('gameover-text');
-  const startBtn = document.getElementById('start-button');
-  const againBtn = document.getElementById('playagain-button');
-  const targetsEl= document.querySelectorAll('.target');
-  const spellEls = {
-    spell1: document.getElementById('spell1'),
-    spell2: document.getElementById('spell2'),
-    spell3: document.getElementById('spell3'),
-    spell4: document.getElementById('spell4')
-  };
-  const spellsContainer = document.querySelector('.spells');
-  const castBar         = document.querySelector('.cast-bar');
-  const castProg        = document.querySelector('.cast-progress');
-
-  const now   = ()=>Date.now();
-  const clamp = (v,m,M)=>Math.max(m,Math.min(M,v));
-  const rand  = (a,b)=>Math.random()*(b-a)+a;
-
-  targetsEl.forEach((el,i)=>{
-    el.addEventListener('click', ()=>{ if(!gameOver) selectTarget(i); });
-  });
-  startBtn.addEventListener('click', ()=>{ instrOv.style.display='none'; startGame(); });
-  againBtn.addEventListener('click', ()=>{ goOv.style.display='none'; startGame(); });
-
-  function selectTarget(i){
-    targetsEl.forEach(x=>x.classList.remove('selected'));
-    targetsEl[i].classList.add('selected');
-    selected = i;
-  }
-
-  function startGame(){
-    targets = Array(4).fill().map(_=>({
-      hp: maxHP,
-      mitEnd: 0,
-      hotEnd: 0,
-      doubleEnd1: 0,
-      doubleEnd2: 0
-    }));
-    selected = 0; globalCD = 0; startTime = now(); gameOver = false;
-    selectTarget(0);
-
-    targetsEl.forEach((el,i)=>{
-      updateHP(i);
-      el.querySelector('.buff-hot').style.width = '0';
-      el.querySelector('.mitigation-indicator').style.display = 'none';
-      el.querySelector('.double-damage-indicator').style.display = 'none';
-    });
-    spellsContainer.classList.remove('locked');
-
-    for(let i=0;i<4;i++) scheduleDamage(i);
-    uiInt = setInterval(updateIndicators,100);
-
-    buff1Timer = setTimeout(function buff1Cycle(){
-      let idx = pickClean();
-      targets[idx].doubleEnd1 = now() + 9000;
-      buff1Timer = setTimeout(buff1Cycle, 22000);
-    }, 13000);
-
-    buff2Wait = 23000;
-    function buff2Cycle(){
-      let idx = pickClean();
-      targets[idx].doubleEnd2 = now() + 5000;
-      buff2Wait = Math.max(buff2Wait - 1000, 5000);
-      buff2Timer = setTimeout(buff2Cycle, buff2Wait);
-    }
-    buff2Timer = setTimeout(buff2Cycle, buff2Wait);
-  }
-
-  function endGame(){
-    gameOver = true;
-    clearInterval(uiInt);
-    clearTimeout(buff1Timer);
-    clearTimeout(buff2Timer);
-    spellsContainer.classList.add('locked');
-    let dur = ((now()-startTime)/1000).toFixed(1);
-    goText.innerHTML = `Game Over<br>You lasted ${dur} s`;
-    goOv.style.display = 'flex';
-  }
-
-  function pickClean(){
-    let idx;
-    do { idx = Math.floor(Math.random()*targets.length); }
-    while(now() < targets[idx].doubleEnd1 || now() < targets[idx].doubleEnd2);
-    return idx;
-  }
-
-  function scheduleDamage(i){
-    setTimeout(()=>{
-      if(gameOver) return;
-      let t = now(), dmg = rand(2,5)*rand(0.9,1.1);
-      if(Math.random()<0.25) dmg *= 2;
-      let buffed = t < targets[i].doubleEnd1 || t < targets[i].doubleEnd2;
-      if(buffed) dmg *= 2;
-      if(t < targets[i].mitEnd) dmg *= 0.25;
-      dmg = Math.round(dmg);
-
-      targets[i].hp = clamp(targets[i].hp - dmg, 0, maxHP);
-      updateHP(i);
-      showFloating(i, dmg, 'dmg', dmg > 5*1.9);
-
-      if(targets[i].hp===0) endGame();
-      else scheduleDamage(i);
-    }, rand(950,1050));
-  }
-
-  function updateIndicators(){
-    let t = now();
-    targetsEl.forEach((el,i)=>{
-      let hb = el.querySelector('.buff-hot');
-      hb.style.width = t < targets[i].hotEnd
-        ? ((targets[i].hotEnd - t)/hotDur*100)+'%' : '0';
-      el.querySelector('.mitigation-indicator').style.display =
-        t < targets[i].mitEnd ? 'block' : 'none';
-      el.querySelector('.double-damage-indicator').style.display =
-        (t < targets[i].doubleEnd1 || t < targets[i].doubleEnd2)
-          ? 'block' : 'none';
-    });
-  }
-
-  function updateHP(i){
-    let f = targetsEl[i].querySelector('.health-bar-fill');
-    f.style.width = (targets[i].hp/maxHP*100)+'%';
-    f.style.background = targets[i].hp>0 ? '#0f0' : '#800';
-  }
-
-  function showFloating(i,amt,type,crit=false){
-    let el = targetsEl[i], ft = document.createElement('div');
-    ft.className = 'floating-text '+(type==='heal'?'heal':'dmg')+(crit?' crit':'');
-    ft.textContent = (type==='heal'?'+':'-')+Math.abs(amt);
-    el.appendChild(ft);
-    setTimeout(()=>el.removeChild(ft),2000);
-  }
-
-  function startCooldown(id,ms){
-    let el = spellEls[id], ov = el.querySelector('.overlay');
-    if(!ov){
-      ov = document.createElement('div');
-      ov.className = 'overlay';
-      el.appendChild(ov);
-    }
-    el.classList.add('disabled');
-    let s = Math.ceil(ms/1000), iv = setInterval(()=>{
-      ov.textContent = --s;
-      if(s <= 0){
-        clearInterval(iv);
-        el.classList.remove('disabled');
-        ov.remove();
+    // Conditional double-tap prevention: only stop zoom when NOT tapping a spell
+    let lastTouch = 0;
+    document.addEventListener('touchend', e=>{
+      const now = Date.now();
+      if(now - lastTouch < 300 && !e.target.closest('.spell')) {
+        e.preventDefault();
       }
-    },1000);
-  }
+      lastTouch = now;
+    }, false);
 
-  function tryInstant(id,effect){
-    if(gameOver) return;
-    let t = now(), sp = spellsCfg[id];
-    if(t<globalCD||t-sp.last<sp.cd||(id!=='spell4'&&selected===null)) return;
-    sp.last = t; globalCD = t + 1000;
-    startCooldown(id, sp.cd);
-    spellsContainer.classList.add('locked');
-    setTimeout(()=>spellsContainer.classList.remove('locked'),1000);
-    effect();
-  }
+    // Game logic...
+    const maxHP = 100, baseHeal = 30;
+    const mitDur = 5000, hotDur = 8000;
+    const spellsCfg = {
+      spell1:{cd:15000,last:0},
+      spell2:{cd:8000 ,last:0},
+      spell3:{cast:2000},
+      spell4:{cd:15000,last:0}
+    };
+    let targets, selected, globalCD, startTime, gameOver;
+    let uiInt, buff1Timer, buff2Timer, buff2Wait;
 
-  function doCast(id, dur, effect){
-    if(gameOver||selected===null) return;
-    let idx = selected;
-    spellsContainer.classList.add('locked');
-    spellEls[id].classList.add('disabled');
-    castBar.classList.add('active');
-    let st = now(), iv = setInterval(()=>{
-      castProg.style.width = clamp((now()-st)/dur,0,1)*100+'%';
-    },50);
-    setTimeout(()=>{
-      clearInterval(iv);
-      castBar.classList.remove('active');
-      castProg.style.width='0';
-      spellEls[id].classList.remove('disabled');
+    const instrOv = document.getElementById('instruction-overlay');
+    const goOv    = document.getElementById('gameover-overlay');
+    const goText  = document.getElementById('gameover-text');
+    const startBtn= document.getElementById('start-button');
+    const againBtn= document.getElementById('playagain-button');
+    const targetsEl = document.querySelectorAll('.target');
+    const spellEls = {
+      spell1: document.getElementById('spell1'),
+      spell2: document.getElementById('spell2'),
+      spell3: document.getElementById('spell3'),
+      spell4: document.getElementById('spell4')
+    };
+    const spellsContainer = document.querySelector('.spells');
+    const castBar = document.querySelector('.cast-bar');
+    const castProg= document.querySelector('.cast-progress');
+
+    const nowMs = ()=>Date.now();
+    const clamp = (v,m,M)=>Math.max(m,Math.min(M,v));
+    const rand = (a,b)=>Math.random()*(b-a)+a;
+
+    targetsEl.forEach((el,i)=>{
+      el.addEventListener('click',()=>{ if(!gameOver) selectTarget(i); });
+    });
+    startBtn.addEventListener('click', ()=>{ instrOv.style.display='none'; startGame(); });
+    againBtn.addEventListener('click', ()=>{ goOv.style.display='none'; startGame(); });
+
+    function selectTarget(i){
+      targetsEl.forEach(x=>x.classList.remove('selected'));
+      targetsEl[i].classList.add('selected');
+      selected = i;
+    }
+
+    function startGame(){
+      targets = Array(4).fill().map(_=>({
+        hp:maxHP, mitEnd:0, hotEnd:0,
+        doubleEnd1:0, doubleEnd2:0
+      }));
+      selected=0; globalCD=0; startTime=nowMs(); gameOver=false;
+      selectTarget(0);
+      targetsEl.forEach((el,i)=>{
+        updateHP(i);
+        el.querySelector('.buff-hot').style.width='0';
+        el.querySelector('.mitigation-indicator').style.display='none';
+        el.querySelector('.double-damage-indicator').style.display='none';
+      });
       spellsContainer.classList.remove('locked');
-      effect(idx);
-    }, dur);
-  }
+      for(let i=0;i<4;i++) scheduleDamage(i);
+      uiInt = setInterval(updateIndicators,100);
 
-  // Spell handlers
-  spellEls.spell1.addEventListener('click',()=> tryInstant('spell1',()=> targets[selected].mitEnd = now()+mitDur ));
-  spellEls.spell2.addEventListener('click',()=> tryInstant('spell2',()=>{
-    let idx=selected, half=Math.round(baseHeal/2), ticks=hotDur/2000;
-    targets[idx].hotEnd=now()+hotDur;
-    let iv=setInterval(()=>{
-      if(--ticks<0){clearInterval(iv);return;}
-      if(targets[idx].hp>0){
-        targets[idx].hp=clamp(targets[idx].hp+half,0,maxHP);
-        updateHP(idx); showFloating(idx,half,'heal');
+      // Buff1: wait13s, 9s on, cycle22s
+      buff1Timer = setTimeout(function b1(){
+        let idx=pickClean(); targets[idx].doubleEnd1=nowMs()+9000;
+        buff1Timer = setTimeout(b1,22000);
+      },13000);
+
+      // Buff2 dynamic: start23s, lasts5s, wait-1s each time to min5s
+      buff2Wait=23000;
+      function b2(){
+        let idx=pickClean(); targets[idx].doubleEnd2=nowMs()+5000;
+        buff2Wait=Math.max(buff2Wait-1000,5000);
+        buff2Timer = setTimeout(b2,buff2Wait);
       }
-    },2000);
-  }));
-  spellEls.spell3.addEventListener('click',()=> doCast('spell3', spellsCfg.spell3.cast, idx=>{
-    let heal=baseHeal*rand(0.9,1.1), crit=false;
-    if(Math.random()<0.25){heal*=2;crit=true;}
-    heal=Math.round(heal);
-    if(targets[idx].hp>0){
-      targets[idx].hp=clamp(targets[idx].hp+heal,0,maxHP);
-      updateHP(idx); showFloating(idx,heal,'heal',crit);
+      buff2Timer = setTimeout(b2,buff2Wait);
     }
-  }));
-  spellEls.spell4.addEventListener('click',()=> tryInstant('spell4',()=>{
-    targets.forEach((tar,i)=>{
-      if(tar.hp<=0) return;
-      let heal=(baseHeal/2)*rand(0.9,1.1), crit=false;
-      if(Math.random()<0.25){heal*=2;crit=true;}
+
+    function endGame(){
+      gameOver=true;
+      clearInterval(uiInt);
+      clearTimeout(buff1Timer);
+      clearTimeout(buff2Timer);
+      spellsContainer.classList.add('locked');
+      let dur=((nowMs()-startTime)/1000).toFixed(1);
+      goText.innerHTML=`Game Over<br>You lasted ${dur} s`;
+      goOv.style.display='flex';
+    }
+
+    function pickClean(){
+      let idx;
+      do{ idx=Math.floor(Math.random()*targets.length); }
+      while(nowMs()<targets[idx].doubleEnd1||nowMs()<targets[idx].doubleEnd2);
+      return idx;
+    }
+
+    function scheduleDamage(i){
+      setTimeout(()=>{
+        if(gameOver) return;
+        let t=nowMs(), dmg=rand(2,5)*rand(0.9,1.1);
+        if(Math.random()<0.25) dmg*=2;
+        if(t<targets[i].doubleEnd1||t<targets[i].doubleEnd2) dmg*=2;
+        if(t<targets[i].mitEnd) dmg*=0.25;
+        dmg=Math.round(dmg);
+        targets[i].hp=clamp(targets[i].hp-dmg,0,maxHP);
+        updateHP(i);
+        showFloating(i,dmg,'dmg',dmg>5*1.9);
+        if(targets[i].hp===0) endGame();
+        else scheduleDamage(i);
+      },rand(950,1050));
+    }
+
+    function updateIndicators(){
+      let t=nowMs();
+      targetsEl.forEach((el,i)=>{
+        let hb=el.querySelector('.buff-hot');
+        hb.style.width = t<targets[i].hotEnd
+          ? ((targets[i].hotEnd-t)/hotDur*100)+'%' : '0';
+        el.querySelector('.mitigation-indicator').style.display =
+          t<targets[i].mitEnd?'block':'none';
+        el.querySelector('.double-damage-indicator').style.display =
+          (t<targets[i].doubleEnd1||t<targets[i].doubleEnd2)?'block':'none';
+      });
+    }
+
+    function updateHP(i){
+      let f=targetsEl[i].querySelector('.health-bar-fill');
+      f.style.width=(targets[i].hp/maxHP*100)+'%';
+      f.style.background=targets[i].hp>0?'#0f0':'#800';
+    }
+
+    function showFloating(i,amt,type,crit=false){
+      let el=targetsEl[i], ft=document.createElement('div');
+      ft.className='floating-text '+(type==='heal'?'heal':'dmg')+(crit?' crit':'');
+      ft.textContent=(type==='heal'?'+':'-')+Math.abs(amt);
+      el.appendChild(ft);
+      setTimeout(()=>el.removeChild(ft),2000);
+    }
+
+    function startCooldown(id,ms){
+      let el=spellEls[id], ov=el.querySelector('.overlay');
+      if(!ov){
+        ov=document.createElement('div');
+        ov.className='overlay';
+        el.appendChild(ov);
+      }
+      el.classList.add('disabled');
+      let s=Math.ceil(ms/1000), iv=setInterval(()=>{
+        ov.textContent=--s;
+        if(s<=0){
+          clearInterval(iv);
+          el.classList.remove('disabled');
+          ov.remove();
+        }
+      },1000);
+    }
+
+    function tryInstant(id,effect){
+      if(gameOver) return;
+      let t=nowMs(), sp=spellsCfg[id];
+      if(t<globalCD||t-sp.last<sp.cd||(id!=='spell4'&&selected===null)) return;
+      sp.last=t; globalCD=t+1000;
+      startCooldown(id,sp.cd);
+      spellsContainer.classList.add('locked');
+      setTimeout(()=>spellsContainer.classList.remove('locked'),1000);
+      effect();
+    }
+
+    function doCast(id,dur,effect){
+      if(gameOver||selected===null) return;
+      let idx=selected;
+      spellsContainer.classList.add('locked');
+      spellEls[id].classList.add('disabled');
+      castBar.classList.add('active');
+      let st=nowMs(), iv=setInterval(()=>{
+        castProg.style.width=clamp((nowMs()-st)/dur,0,1)*100+'%';
+      },50);
+      setTimeout(()=>{
+        clearInterval(iv);
+        castBar.classList.remove('active');
+        castProg.style.width='0';
+        spellEls[id].classList.remove('disabled');
+        spellsContainer.classList.remove('locked');
+        effect(idx);
+      },dur);
+    }
+
+    // Spell handlers
+    spellEls.spell1.addEventListener('click',()=>tryInstant('spell1',()=>targets[selected].mitEnd=nowMs()+mitDur));
+    spellEls.spell2.addEventListener('click',()=>tryInstant('spell2',()=>{
+      let idx=selected, half=Math.round(baseHeal/2), ticks=hotDur/2000;
+      targets[idx].hotEnd=nowMs()+hotDur;
+      let iv=setInterval(()=>{
+        if(--ticks<0){clearInterval(iv);return;}
+        if(targets[idx].hp>0){
+          targets[idx].hp=clamp(targets[idx].hp+half,0,maxHP);
+          updateHP(idx); showFloating(idx,half,'heal');
+        }
+      },2000);
+    }));
+    spellEls.spell3.addEventListener('click',()=>doCast('spell3',spellsCfg.spell3.cast,idx=>{
+      let heal=baseHeal*rand(0.9,1.1),c=false;
+      if(Math.random()<0.25){heal*=2;c=true;}
       heal=Math.round(heal);
-      tar.hp=clamp(tar.hp+heal,0,maxHP);
-      updateHP(i); showFloating(i,heal,'heal',crit);
-    });
-  }));
-
-})();
+      if(targets[idx].hp>0){
+        targets[idx].hp=clamp(targets[idx].hp+heal,0,maxHP);
+        updateHP(idx); showFloating(idx,heal,'heal',c);
+      }
+    }));
+    spellEls.spell4.addEventListener('click',()=>tryInstant('spell4',()=>{
+      targets.forEach((tar,i)=>{
+        if(tar.hp<=0) return;
+        let heal=(baseHeal/2)*rand(0.9,1.1),c=false;
+        if(Math.random()<0.25){heal*=2;c=true;}
+        heal=Math.round(heal);
+        tar.hp=clamp(tar.hp+heal,0,maxHP);
+        updateHP(i); showFloating(i,heal,'heal',c);
+      });
+    }));
+  })();
 </script>
-
 </body>
 </html>
