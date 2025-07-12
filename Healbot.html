@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport"
         content="width=device-width,initial-scale=1,maximum-scale=1,minimum-scale=1,user-scalable=no">
-  <title>Mobile Healing Demo</title>
+  <title>Healer’s Challenge</title>
   <style>
     html, body {
       margin: 0; padding: 0;
@@ -25,12 +25,8 @@
       padding: 20px; box-sizing: border-box;
       z-index: 1000;
     }
-    #instruction-overlay p {
-      font-size: 20px; line-height: 1.4; margin-bottom: 20px;
-    }
-    #gameover-overlay p {
-      font-size: 24px; margin-bottom: 20px;
-    }
+    #instruction-overlay p { font-size: 20px; line-height: 1.4; margin-bottom: 20px; }
+    #gameover-overlay p    { font-size: 24px; margin-bottom: 20px; }
     button {
       padding: 12px 24px;
       font-size: 18px;
@@ -257,7 +253,6 @@
   }
 
   function startGame(){
-    // reset state
     targets = Array(4).fill().map(_=>({
       hp: maxHP,
       mitEnd: 0,
@@ -265,10 +260,7 @@
       doubleEnd1: 0,
       doubleEnd2: 0
     }));
-    selected = 0;
-    globalCD = 0;
-    startTime = now();
-    gameOver = false;
+    selected = 0; globalCD = 0; startTime = now(); gameOver = false;
     selectTarget(0);
 
     targetsEl.forEach((el,i)=>{
@@ -279,27 +271,21 @@
     });
     spellsContainer.classList.remove('locked');
 
-    // damage loops
     for(let i=0;i<4;i++) scheduleDamage(i);
-
-    // UI refresh
     uiInt = setInterval(updateIndicators,100);
 
-    // Buff1: wait 13s, lasts 9s, cycle 22s
     buff1Timer = setTimeout(function buff1Cycle(){
       let idx = pickClean();
       targets[idx].doubleEnd1 = now() + 9000;
       buff1Timer = setTimeout(buff1Cycle, 22000);
     }, 13000);
 
-    // Buff2: dynamic wait (start 23s)
     buff2Wait = 23000;
     function buff2Cycle(){
       let idx = pickClean();
       targets[idx].doubleEnd2 = now() + 5000;
       buff2Wait = Math.max(buff2Wait - 1000, 5000);
-      // next: wait buff2Wait, then duration 5s implicitly in doubleEnd2
-      buff2Timer = setTimeout(buff2Cycle, buff2Wait + 5000);
+      buff2Timer = setTimeout(buff2Cycle, buff2Wait);
     }
     buff2Timer = setTimeout(buff2Cycle, buff2Wait);
   }
@@ -317,17 +303,15 @@
 
   function pickClean(){
     let idx;
-    do {
-      idx = Math.floor(Math.random()*targets.length);
-    } while(now() < targets[idx].doubleEnd1 || now() < targets[idx].doubleEnd2);
+    do { idx = Math.floor(Math.random()*targets.length); }
+    while(now() < targets[idx].doubleEnd1 || now() < targets[idx].doubleEnd2);
     return idx;
   }
 
   function scheduleDamage(i){
     setTimeout(()=>{
       if(gameOver) return;
-      let t = now();
-      let dmg = rand(2,5)*rand(0.9,1.1);
+      let t = now(), dmg = rand(2,5)*rand(0.9,1.1);
       if(Math.random()<0.25) dmg *= 2;
       let buffed = t < targets[i].doubleEnd1 || t < targets[i].doubleEnd2;
       if(buffed) dmg *= 2;
@@ -379,15 +363,12 @@
       el.appendChild(ov);
     }
     el.classList.add('disabled');
-    let s = Math.ceil(ms/1000);
-    ov.textContent = s;
-    let iv = setInterval(()=>{
-      if(--s<=0){
+    let s = Math.ceil(ms/1000), iv = setInterval(()=>{
+      ov.textContent = --s;
+      if(s <= 0){
         clearInterval(iv);
         el.classList.remove('disabled');
         ov.remove();
-      } else {
-        ov.textContent = s;
       }
     },1000);
   }
@@ -422,51 +403,41 @@
     }, dur);
   }
 
-  // Spell bindings
-  spellEls.spell1.addEventListener('click',()=>{
-    tryInstant('spell1',()=> targets[selected].mitEnd = now() + mitDur );
-  });
-  spellEls.spell2.addEventListener('click',()=>{
-    tryInstant('spell2',()=>{
-      let idx = selected, half = Math.round(baseHeal/2), ticks = hotDur/2000;
-      targets[idx].hotEnd = now() + hotDur;
-      let iv = setInterval(()=>{
-        if(--ticks<0){ clearInterval(iv); return; }
-        if(targets[idx].hp>0){
-          targets[idx].hp = clamp(targets[idx].hp + half, 0, maxHP);
-          updateHP(idx);
-          showFloating(idx, half, 'heal');
-        }
-      }, 2000);
-    });
-  });
-  spellEls.spell3.addEventListener('click',()=>{
-    doCast('spell3', spellsCfg.spell3.cast, idx=>{
-      let heal = baseHeal * rand(0.9,1.1), isCrit = false;
-      if(Math.random()<0.25){ heal*=2; isCrit=true; }
-      heal = Math.round(heal);
+  // Spell handlers
+  spellEls.spell1.addEventListener('click',()=> tryInstant('spell1',()=> targets[selected].mitEnd = now()+mitDur ));
+  spellEls.spell2.addEventListener('click',()=> tryInstant('spell2',()=>{
+    let idx=selected, half=Math.round(baseHeal/2), ticks=hotDur/2000;
+    targets[idx].hotEnd=now()+hotDur;
+    let iv=setInterval(()=>{
+      if(--ticks<0){clearInterval(iv);return;}
       if(targets[idx].hp>0){
-        targets[idx].hp = clamp(targets[idx].hp+heal,0,maxHP);
-        updateHP(idx);
-        showFloating(idx, heal, 'heal', isCrit);
+        targets[idx].hp=clamp(targets[idx].hp+half,0,maxHP);
+        updateHP(idx); showFloating(idx,half,'heal');
       }
+    },2000);
+  }));
+  spellEls.spell3.addEventListener('click',()=> doCast('spell3', spellsCfg.spell3.cast, idx=>{
+    let heal=baseHeal*rand(0.9,1.1), crit=false;
+    if(Math.random()<0.25){heal*=2;crit=true;}
+    heal=Math.round(heal);
+    if(targets[idx].hp>0){
+      targets[idx].hp=clamp(targets[idx].hp+heal,0,maxHP);
+      updateHP(idx); showFloating(idx,heal,'heal',crit);
+    }
+  }));
+  spellEls.spell4.addEventListener('click',()=> tryInstant('spell4',()=>{
+    targets.forEach((tar,i)=>{
+      if(tar.hp<=0) return;
+      let heal=(baseHeal/2)*rand(0.9,1.1), crit=false;
+      if(Math.random()<0.25){heal*=2;crit=true;}
+      heal=Math.round(heal);
+      tar.hp=clamp(tar.hp+heal,0,maxHP);
+      updateHP(i); showFloating(i,heal,'heal',crit);
     });
-  });
-  spellEls.spell4.addEventListener('click',()=>{
-    tryInstant('spell4',()=>{
-      targets.forEach((tar,i)=>{
-        if(tar.hp<=0) return;
-        let heal = (baseHeal/2)*rand(0.9,1.1), isCrit=false;
-        if(Math.random()<0.25){ heal*=2; isCrit=true; }
-        heal = Math.round(heal);
-        tar.hp = clamp(tar.hp+heal,0,maxHP);
-        updateHP(i);
-        showFloating(i, heal, 'heal', isCrit);
-      });
-    });
-  });
+  }));
 
 })();
 </script>
+
 </body>
 </html>
