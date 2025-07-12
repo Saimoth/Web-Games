@@ -66,6 +66,14 @@
       border:2px solid #888; display:none;
       pointer-events:none;
     }
+    /* face emoticon */
+    .face {
+      position:absolute;
+      top:50%; left:50%;
+      transform:translate(-50%,-50%);
+      font-size:24px;
+      pointer-events:none;
+    }
 
     /* floating text */
     .floating-text {
@@ -166,24 +174,28 @@
       <div class="double-damage-indicator"></div>
       <div class="buff-hot"></div>
       <div class="health-bar"><div class="health-bar-fill"></div></div>
+      <div class="face">😀</div>
     </div>
     <div class="target" data-index="1">
       <div class="mitigation-indicator"></div>
       <div class="double-damage-indicator"></div>
       <div class="buff-hot"></div>
       <div class="health-bar"><div class="health-bar-fill"></div></div>
+      <div class="face">😀</div>
     </div>
     <div class="target" data-index="2">
       <div class="mitigation-indicator"></div>
       <div class="double-damage-indicator"></div>
       <div class="buff-hot"></div>
       <div class="health-bar"><div class="health-bar-fill"></div></div>
+      <div class="face">😀</div>
     </div>
     <div class="target" data-index="3">
       <div class="mitigation-indicator"></div>
       <div class="double-damage-indicator"></div>
       <div class="buff-hot"></div>
       <div class="health-bar"><div class="health-bar-fill"></div></div>
+      <div class="face">😀</div>
     </div>
   </div>
 
@@ -209,34 +221,30 @@
   </div>
 
 <script>
-  // 1) Disable pinch zoom across all browsers
-  document.addEventListener('gesturestart', e => e.preventDefault());
-
-  // 2) Block double-tap zoom but still let spells fire immediately
-  let lastTap = 0;
-  document.addEventListener('touchend', function(e){
+  // Prevent pinch-zoom
+  document.addEventListener('gesturestart', e=>e.preventDefault());
+  // Prevent double-tap zoom but allow spells to fire
+  let lastTap=0;
+  document.addEventListener('touchend', e=>{
     const spell = e.target.closest('.spell');
-    if (spell) {
-      // stop zoom, then manually trigger the click so you can spam
+    if(spell){
       e.preventDefault();
       spell.click();
       return;
     }
-    const now = Date.now();
-    if (now - lastTap < 300) {
-      // double-tap outside a spell → prevent zoom
+    const now=Date.now();
+    if(now - lastTap < 300){
       e.preventDefault();
     }
     lastTap = now;
-  }, { passive: false });
+  }, {passive:false});
 
-  // --- the rest is your game logic unchanged ---
   (function(){
     const maxHP=100, baseHeal=30,
           mitDur=5000, hotDur=8000;
     const spellsCfg={
       spell1:{cd:15000,last:0},
-      spell2:{cd:8000 ,last:0},
+      spell2:{cd:8000,last:0},
       spell3:{cast:2000},
       spell4:{cd:15000,last:0}
     };
@@ -365,9 +373,19 @@
     }
 
     function updateHP(i){
+      let hp=targets[i].hp;
+      // update health bar
       let f=targetsEl[i].querySelector('.health-bar-fill');
-      f.style.width=(targets[i].hp/maxHP*100)+'%';
-      f.style.background=targets[i].hp>0?'#0f0':'#800';
+      f.style.width=(hp/maxHP*100)+'%';
+      f.style.background=hp>0?'#0f0':'#800';
+      // update face
+      let faceEl=targetsEl[i].querySelector('.face'),
+          face='😀';
+      if(hp===0)        face='☠️';
+      else if(hp<=25)   face='😡';
+      else if(hp<=50)   face='🙁';
+      else if(hp<=75)   face='🙂';
+      faceEl.textContent=face;
     }
 
     function showFloating(i,amt,type,crit=false){
@@ -385,15 +403,13 @@
         el.appendChild(ov);
       }
       el.classList.add('disabled');
-
-      // Outline animation in last second
+      // outline animation in last second
       setTimeout(()=>{
         let anim=document.createElement('div');
         anim.className='cd-anim';
         el.appendChild(anim);
         setTimeout(()=>el.removeChild(anim),1000);
       }, ms - 1000);
-
       let s=Math.ceil(ms/1000), iv=setInterval(()=>{
         ov.textContent=--s;
         if(s<=0){
