@@ -15,7 +15,7 @@
       background:#111; color:#fff;
       position:relative;
     }
-    /* instruction & gameover overlays */
+    /* overlays */
     #instruction-overlay, #gameover-overlay {
       position:absolute; top:0; left:0;
       width:100%; height:100%;
@@ -33,7 +33,6 @@
       background:#0a84ff; color:#fff;
       cursor:pointer; user-select:none;
     }
-
     /* targets */
     .targets {
       display:flex; justify-content:space-around;
@@ -66,15 +65,11 @@
       border:2px solid #888; display:none;
       pointer-events:none;
     }
-    /* face emoticon */
     .face {
-      position:absolute;
-      top:50%; left:50%;
+      position:absolute; top:50%; left:50%;
       transform:translate(-50%,-50%);
-      font-size:24px;
-      pointer-events:none;
+      font-size:24px; pointer-events:none;
     }
-
     /* floating text */
     .floating-text {
       position:absolute; font-weight:bold; pointer-events:none;
@@ -90,7 +85,6 @@
     .floating-text.crit { font-size:24px!important; }
     @keyframes fadeUp   { to { opacity:0; transform:translateX(-50%) translateY(-20px); } }
     @keyframes fadeDown { to { opacity:0; transform:translateX(-50%) translateY(20px); } }
-
     /* cast bar */
     .cast-bar {
       position:absolute; bottom:100px; left:10px; right:10px;
@@ -98,7 +92,6 @@
     }
     .cast-bar.active { display:block; }
     .cast-progress { height:100%; width:0; background:#00f; }
-
     /* spells */
     .spells {
       position:absolute; bottom:10px; left:0; right:0;
@@ -129,24 +122,16 @@
       display:flex; align-items:center; justify-content:center;
       font-size:18px;
     }
-
-    /* cooldown finish animation – white outline only */
+    /* cooldown finish animation */
     .cd-anim {
       position:absolute; left:50%; transform:translateX(-50%);
-      top:-120px;
-      width:30px; height:30px;
-      border:2px solid #fff;
-      background:transparent;
-      pointer-events:none;
-      animation:cdFinishAnim 1s forwards;
+      top:-120px; width:30px; height:30px;
+      border:2px solid #fff; background:transparent;
+      pointer-events:none; animation:cdFinishAnim 1s forwards;
     }
     @keyframes cdFinishAnim {
-      from {
-        top:-120px; width:30px; height:30px; opacity:1;
-      }
-      to {
-        top:0;       width:60px; height:60px; opacity:0;
-      }
+      from { top:-120px; width:30px; height:30px; opacity:1; }
+      to   { top:0;     width:60px; height:60px; opacity:0; }
     }
   </style>
 </head>
@@ -210,7 +195,7 @@
       <div class="spell" id="spell2">🌱</div>
       <div class="spell-label">HoT</div>
     </div>
-    <!-- swapped: AoE before Cast -->
+    <!-- AoE before Cast -->
     <div class="spell-wrapper">
       <div class="spell" id="spell4">💞</div>
       <div class="spell-label">AoE</div>
@@ -222,29 +207,27 @@
   </div>
 
 <script>
-  // Prevent pinch-zoom
-  document.addEventListener('gesturestart', e=>e.preventDefault());
-  // Prevent double-tap zoom but allow spells to fire
-  let lastTap=0;
-  document.addEventListener('touchend', e=>{
+  // disable pinch
+  document.addEventListener('gesturestart', e => e.preventDefault());
+  // block double-tap zoom but allow spells
+  let lastTap = 0;
+  document.addEventListener('touchend', e => {
     const spell = e.target.closest('.spell');
-    if(spell){
+    if (spell) {
       e.preventDefault();
       spell.click();
       return;
     }
-    const now=Date.now();
-    if(now - lastTap < 300){
-      e.preventDefault();
-    }
+    const now = Date.now();
+    if (now - lastTap < 300) e.preventDefault();
     lastTap = now;
-  }, {passive:false});
+  }, { passive: false });
 
   (function(){
-    const maxHP=100, baseHeal=30,
-          mitDur=5000, hotDur=8000;
-    // reduced cast time by 0.5s (1500ms)
-    const spellsCfg={
+    const maxHP = 100, baseHeal = 30;
+    const mitDur = 5000, hotDur = 8000;
+    // cast reduced by 0.5s
+    const spellsCfg = {
       spell1:{cd:15000,last:0},
       spell2:{cd:8000,last:0},
       spell3:{cast:1500},
@@ -252,48 +235,48 @@
     };
 
     let targets, selected, globalCD, startTime, gameOver;
-    let uiInt, buff1Timer, buff2Timer, buff2Wait;
+    let uiInt, buff1Timer, buff2Timer, buff3Timer, buff2Wait, buff3Prev;
 
-    const instrOv=document.getElementById('instruction-overlay'),
-          goOv=document.getElementById('gameover-overlay'),
-          goText=document.getElementById('gameover-text'),
-          startBtn=document.getElementById('start-button'),
-          againBtn=document.getElementById('playagain-button'),
-          targetsEl=document.querySelectorAll('.target'),
-          spellEls={
-            spell1:document.getElementById('spell1'),
-            spell2:document.getElementById('spell2'),
-            spell3:document.getElementById('spell3'),
-            spell4:document.getElementById('spell4')
+    const instrOv = document.getElementById('instruction-overlay'),
+          goOv    = document.getElementById('gameover-overlay'),
+          goText  = document.getElementById('gameover-text'),
+          startBtn= document.getElementById('start-button'),
+          againBtn= document.getElementById('playagain-button'),
+          targetsEl = document.querySelectorAll('.target'),
+          spellEls  = {
+            spell1: document.getElementById('spell1'),
+            spell2: document.getElementById('spell2'),
+            spell3: document.getElementById('spell3'),
+            spell4: document.getElementById('spell4')
           },
-          spellsContainer=document.querySelector('.spells'),
-          castBar=document.querySelector('.cast-bar'),
-          castProg=document.querySelector('.cast-progress');
+          spellsContainer = document.querySelector('.spells'),
+          castBar  = document.querySelector('.cast-bar'),
+          castProg = document.querySelector('.cast-progress');
 
-    const nowMs=()=>Date.now(),
-          clamp=(v,m,M)=>Math.max(m,Math.min(M,v)),
-          rand=(a,b)=>Math.random()*(b-a)+a;
+    const nowMs = ()=>Date.now(),
+          clamp = (v,m,M)=>Math.max(m,Math.min(M,v)),
+          rand = (a,b)=>Math.random()*(b-a)+a;
 
     targetsEl.forEach((el,i)=>
-      el.addEventListener('click',()=>{ if(!gameOver) selectTarget(i); })
+      el.addEventListener('click', ()=>{ if(!gameOver) selectTarget(i); })
     );
-    startBtn.addEventListener('click',()=>{
-      instrOv.style.display='none'; startGame();
-    });
-    againBtn.addEventListener('click',()=>{
-      goOv.style.display='none'; startGame();
-    });
+    startBtn.addEventListener('click', ()=>{ instrOv.style.display='none'; startGame(); });
+    againBtn.addEventListener('click', ()=>{ goOv.style.display='none'; startGame(); });
 
     function selectTarget(i){
       targetsEl.forEach(x=>x.classList.remove('selected'));
       targetsEl[i].classList.add('selected');
-      selected=i;
+      selected = i;
     }
 
     function startGame(){
-      targets=Array(4).fill().map(_=>({
-        hp:maxHP, mitEnd:0, hotEnd:0,
-        doubleEnd1:0, doubleEnd2:0
+      targets = Array(4).fill().map(_=>({
+        hp:maxHP,
+        mitEnd:0,
+        hotEnd:0,
+        doubleEnd1:0,
+        doubleEnd2:0,
+        doubleEnd3:0
       }));
       selected=0; globalCD=0; startTime=nowMs(); gameOver=false;
       selectTarget(0);
@@ -306,174 +289,197 @@
       spellsContainer.classList.remove('locked');
 
       for(let i=0;i<4;i++) scheduleDamage(i);
-      uiInt=setInterval(updateIndicators,100);
+      uiInt = setInterval(updateIndicators, 100);
 
-      // Buff1: 13s off, 9s on, cycle 22s
-      buff1Timer=setTimeout(function b1(){
-        let idx=pickClean();
-        targets[idx].doubleEnd1=nowMs()+9000;
-        buff1Timer=setTimeout(b1,22000);
-      },13000);
+      // Buff1
+      buff1Timer = setTimeout(function b1(){
+        let idx = pickClean();
+        targets[idx].doubleEnd1 = nowMs() + 9000;
+        buff1Timer = setTimeout(b1, 22000);
+      }, 13000);
 
-      // Buff2 dynamic: start 23s, shrink until 5s
-      buff2Wait=23000;
+      // Buff2
+      buff2Wait = 23000;
       function b2(){
-        let idx=pickClean();
-        targets[idx].doubleEnd2=nowMs()+5000;
-        buff2Wait=Math.max(buff2Wait-1000,5000);
-        buff2Timer=setTimeout(b2,buff2Wait);
+        let idx = pickClean();
+        targets[idx].doubleEnd2 = nowMs() + 5000;
+        buff2Wait = Math.max(buff2Wait - 1000, 5000);
+        buff2Timer = setTimeout(b2, buff2Wait);
       }
-      buff2Timer=setTimeout(b2,buff2Wait);
+      buff2Timer = setTimeout(b2, buff2Wait);
+
+      // Buff3: starts after 60s, then every 3s switches target
+      buff3Prev = -1;
+      buff3Timer = setTimeout(function startB3(){
+        function cycleB3(){
+          let idx;
+          do { idx = Math.floor(Math.random()*targets.length); }
+          while(idx === buff3Prev);
+          buff3Prev = idx;
+          targets[idx].doubleEnd3 = nowMs() + 3000;
+          buff3Timer = setTimeout(cycleB3, 3000);
+        }
+        cycleB3();
+      }, 60000);
     }
 
     function endGame(){
-      gameOver=true;
+      gameOver = true;
       clearInterval(uiInt);
       clearTimeout(buff1Timer);
       clearTimeout(buff2Timer);
+      clearTimeout(buff3Timer);
       spellsContainer.classList.add('locked');
-      let dur=((nowMs()-startTime)/1000).toFixed(1);
-      goText.innerHTML=`Game Over<br>You lasted ${dur} s`;
-      goOv.style.display='flex';
+      const dur = ((nowMs() - startTime)/1000).toFixed(1);
+      goText.innerHTML = `Game Over<br>You lasted ${dur} s`;
+      goOv.style.display = 'flex';
     }
 
     function pickClean(){
       let idx;
-      do{ idx=Math.floor(Math.random()*targets.length); }
-      while(nowMs()<targets[idx].doubleEnd1||nowMs()<targets[idx].doubleEnd2);
+      do { idx = Math.floor(Math.random()*targets.length); }
+      while(
+        nowMs() < targets[idx].doubleEnd1 ||
+        nowMs() < targets[idx].doubleEnd2 ||
+        nowMs() < targets[idx].doubleEnd3
+      );
       return idx;
     }
 
     function scheduleDamage(i){
       setTimeout(()=>{
         if(gameOver) return;
-        let t=nowMs(), dmg=rand(2,5)*rand(0.9,1.1);
-        if(Math.random()<0.25) dmg*=2;
-        if(t<targets[i].doubleEnd1||t<targets[i].doubleEnd2) dmg*=2;
-        if(t<targets[i].mitEnd) dmg*=0.25;
-        dmg=Math.round(dmg);
+        const t = nowMs();
+        let dmg = rand(2,5) * rand(0.9,1.1);
+        if(Math.random()<0.25) dmg *= 2;
+        const buffed = (
+          t < targets[i].doubleEnd1 ||
+          t < targets[i].doubleEnd2 ||
+          t < targets[i].doubleEnd3
+        );
+        if(buffed) dmg *= 2;
+        if(t < targets[i].mitEnd) dmg *= 0.25;
+        dmg = Math.round(dmg);
 
-        targets[i].hp=clamp(targets[i].hp-dmg,0,maxHP);
+        targets[i].hp = clamp(targets[i].hp - dmg, 0, maxHP);
         updateHP(i);
-        showFloating(i,dmg,'dmg',dmg>5*1.9);
+        showFloating(i, dmg, 'dmg', dmg > 9);
+
         if(targets[i].hp===0) endGame();
         else scheduleDamage(i);
-      },rand(950,1050));
+      }, rand(950,1050));
     }
 
     function updateIndicators(){
-      let t=nowMs();
+      const t = nowMs();
       targetsEl.forEach((el,i)=>{
-        let hb=el.querySelector('.buff-hot');
-        hb.style.width = t<targets[i].hotEnd
-          ? ((targets[i].hotEnd-t)/hotDur*100)+'%' : '0';
-        el.querySelector('.mitigation-indicator').style.display=
-          t<targets[i].mitEnd?'block':'none';
-        el.querySelector('.double-damage-indicator').style.display=
-          (t<targets[i].doubleEnd1||t<targets[i].doubleEnd2)?'block':'none';
+        const hb = el.querySelector('.buff-hot');
+        hb.style.width = t < targets[i].hotEnd
+          ? `${(targets[i].hotEnd - t)/hotDur*100}%`
+          : '0';
+        el.querySelector('.mitigation-indicator').style.display =
+          t < targets[i].mitEnd ? 'block' : 'none';
+        el.querySelector('.double-damage-indicator').style.display =
+          (t < targets[i].doubleEnd1 ||
+           t < targets[i].doubleEnd2 ||
+           t < targets[i].doubleEnd3)
+          ? 'block' : 'none';
       });
     }
 
     function updateHP(i){
-      let hp=targets[i].hp;
-      // update health bar
-      let f=targetsEl[i].querySelector('.health-bar-fill');
-      f.style.width=(hp/maxHP*100)+'%';
-      f.style.background=hp>0?'#0f0':'#800';
-      // update face
-      let faceEl=targetsEl[i].querySelector('.face'),
-          face='😀';
-      if(hp===0)        face='☠️';
-      else if(hp<=25)   face='😡';
-      else if(hp<=50)   face='🙁';
-      else if(hp<=75)   face='🙂';
-      faceEl.textContent=face;
+      const hp = targets[i].hp;
+      const fill = targetsEl[i].querySelector('.health-bar-fill');
+      fill.style.width = `${hp/maxHP*100}%`;
+      fill.style.background = hp>0 ? '#0f0' : '#800';
+      const faceEl = targetsEl[i].querySelector('.face');
+      let face = '😀';
+      if(hp===0)       face='☠️';
+      else if(hp<=25)  face='😡';
+      else if(hp<=50)  face='🙁';
+      else if(hp<=75)  face='🙂';
+      faceEl.textContent = face;
     }
 
     function showFloating(i,amt,type,crit=false){
-      let el=targetsEl[i], ft=document.createElement('div');
-      ft.className='floating-text '+(type==='heal'?'heal':'dmg')+(crit?' crit':'');
-      ft.textContent=(type==='heal'?'+':'-')+Math.abs(amt);
+      const el = targetsEl[i];
+      const ft = document.createElement('div');
+      ft.className = 'floating-text ' + (type==='heal'?'heal':'dmg') + (crit?' crit':'');
+      ft.textContent = (type==='heal'?'+':'-') + Math.abs(amt);
       el.appendChild(ft);
       setTimeout(()=>el.removeChild(ft),2000);
     }
 
     function startCooldown(id,ms){
-      let el=spellEls[id], ov=el.querySelector('.overlay');
+      const el = spellEls[id];
+      let ov = el.querySelector('.overlay');
       if(!ov){
-        ov=document.createElement('div'); ov.className='overlay';
+        ov = document.createElement('div');
+        ov.className = 'overlay';
         el.appendChild(ov);
       }
       el.classList.add('disabled');
-
-      // Outline animation in last second
+      // animate last second
       setTimeout(()=>{
-        let anim=document.createElement('div');
-        anim.className='cd-anim';
+        const anim = document.createElement('div');
+        anim.className = 'cd-anim';
         el.appendChild(anim);
         setTimeout(()=>el.removeChild(anim),1000);
       }, ms - 1000);
-
-      let s=Math.ceil(ms/1000), iv=setInterval(()=>{
-        ov.textContent=--s;
+      let s = Math.ceil(ms/1000);
+      const iv = setInterval(()=>{
+        ov.textContent = --s;
         if(s<=0){
           clearInterval(iv);
           el.classList.remove('disabled');
           ov.remove();
         }
-      },1000);
+      }, 1000);
     }
 
     function tryInstant(id,effect){
       if(gameOver) return;
-      let t=nowMs(), sp=spellsCfg[id];
-      if(t<globalCD||t-sp.last<sp.cd||(id!=='spell4'&&selected===null)) return;
-      sp.last=t; globalCD=t+1000;
-      startCooldown(id,sp.cd);
+      const t = nowMs(), sp = spellsCfg[id];
+      if(t < globalCD || t - sp.last < sp.cd || (id!=='spell4' && selected===null)) return;
+      sp.last = t;
+      globalCD = t + 1000;
+      startCooldown(id, sp.cd);
       spellsContainer.classList.add('locked');
       setTimeout(()=>spellsContainer.classList.remove('locked'),1000);
       effect();
     }
 
     function doCast(id,dur,effect){
-      if(gameOver||selected===null) return;
-      let idx=selected;
+      if(gameOver || selected===null) return;
+      const idx = selected;
       spellsContainer.classList.add('locked');
       spellEls[id].classList.add('disabled');
       castBar.classList.add('active');
-      let st=nowMs(), iv=setInterval(()=>{
-        castProg.style.width=clamp((nowMs()-st)/dur,0,1)*100+'%';
+      const st = nowMs();
+      const iv = setInterval(()=>{
+        castProg.style.width = clamp((nowMs()-st)/dur,0,1)*100 + '%';
       },50);
       setTimeout(()=>{
         clearInterval(iv);
         castBar.classList.remove('active');
-        castProg.style.width='0';
+        castProg.style.width = '0';
         spellEls[id].classList.remove('disabled');
         spellsContainer.classList.remove('locked');
         effect(idx);
-      },dur);
+      }, dur);
     }
 
     spellEls.spell1.addEventListener('click',()=>tryInstant('spell1',()=>targets[selected].mitEnd=nowMs()+mitDur));
     spellEls.spell2.addEventListener('click',()=>tryInstant('spell2',()=>{
-      let idx=selected, half=Math.round(baseHeal/2), ticks=hotDur/2000;
+      const idx=selected, half=Math.round(baseHeal/2), ticks=hotDur/2000;
       targets[idx].hotEnd=nowMs()+hotDur;
-      let iv=setInterval(()=>{
+      const iv=setInterval(()=>{
         if(--ticks<0){clearInterval(iv);return;}
         if(targets[idx].hp>0){
           targets[idx].hp=clamp(targets[idx].hp+half,0,maxHP);
           updateHP(idx); showFloating(idx,half,'heal');
         }
       },2000);
-    }));
-    spellEls.spell3.addEventListener('click',()=>doCast('spell3',spellsCfg.spell3.cast,idx=>{
-      let heal=baseHeal*rand(0.9,1.1), crit=false;
-      if(Math.random()<0.25){heal*=2;crit=true;}
-      heal=Math.round(heal);
-      if(targets[idx].hp>0){
-        targets[idx].hp=clamp(targets[idx].hp+heal,0,maxHP);
-        updateHP(idx); showFloating(idx,heal,'heal',crit);
-      }
     }));
     spellEls.spell4.addEventListener('click',()=>tryInstant('spell4',()=>{
       targets.forEach((tar,i)=>{
@@ -484,6 +490,15 @@
         tar.hp=clamp(tar.hp+heal,0,maxHP);
         updateHP(i); showFloating(i,heal,'heal',crit);
       });
+    }));
+    spellEls.spell3.addEventListener('click',()=>doCast('spell3',spellsCfg.spell3.cast,idx=>{
+      let heal=baseHeal*rand(0.9,1.1), crit=false;
+      if(Math.random()<0.25){heal*=2;crit=true;}
+      heal=Math.round(heal);
+      if(targets[idx].hp>0){
+        targets[idx].hp=clamp(targets[idx].hp+heal,0,maxHP);
+        updateHP(idx); showFloating(idx,heal,'heal',crit);
+      }
     }));
   })();
 </script>
