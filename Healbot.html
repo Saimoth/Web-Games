@@ -226,7 +226,6 @@
   (function(){
     const maxHP = 100, baseHeal = 30;
     const mitDur = 5000, hotDur = 8000;
-    // cast reduced by 0.5s
     const spellsCfg = {
       spell1:{cd:15000,last:0},
       spell2:{cd:8000,last:0},
@@ -271,20 +270,20 @@
 
     function startGame(){
       targets = Array(4).fill().map(_=>({
-        hp:maxHP,
-        mitEnd:0,
-        hotEnd:0,
-        doubleEnd1:0,
-        doubleEnd2:0,
-        doubleEnd3:0
+        hp: maxHP,
+        mitEnd: 0,
+        hotEnd: 0,
+        doubleEnd1: 0,
+        doubleEnd2: 0,
+        doubleEnd3: 0
       }));
-      selected=0; globalCD=0; startTime=nowMs(); gameOver=false;
+      selected = 0; globalCD = 0; startTime = nowMs(); gameOver = false;
       selectTarget(0);
       targetsEl.forEach((el,i)=>{
         updateHP(i);
-        el.querySelector('.buff-hot').style.width='0';
-        el.querySelector('.mitigation-indicator').style.display='none';
-        el.querySelector('.double-damage-indicator').style.display='none';
+        el.querySelector('.buff-hot').style.width = '0';
+        el.querySelector('.mitigation-indicator').style.display = 'none';
+        el.querySelector('.double-damage-indicator').style.display = 'none';
       });
       spellsContainer.classList.remove('locked');
 
@@ -308,7 +307,7 @@
       }
       buff2Timer = setTimeout(b2, buff2Wait);
 
-      // Buff3: starts after 60s, then every 3s switches target
+      // Buff3: starts after 60s, then every 3s
       buff3Prev = -1;
       buff3Timer = setTimeout(function startB3(){
         function cycleB3(){
@@ -365,7 +364,7 @@
         updateHP(i);
         showFloating(i, dmg, 'dmg', dmg > 9);
 
-        if(targets[i].hp===0) endGame();
+        if(targets[i].hp === 0) endGame();
         else scheduleDamage(i);
       }, rand(950,1050));
     }
@@ -394,23 +393,23 @@
       fill.style.background = hp>0 ? '#0f0' : '#800';
       const faceEl = targetsEl[i].querySelector('.face');
       let face = '😀';
-      if(hp===0)       face='☠️';
-      else if(hp<=25)  face='😡';
-      else if(hp<=50)  face='🙁';
-      else if(hp<=75)  face='🙂';
+      if(hp === 0)       face = '☠️';
+      else if(hp <= 25)  face = '😡';
+      else if(hp <= 50)  face = '🙁';
+      else if(hp <= 75)  face = '🙂';
       faceEl.textContent = face;
     }
 
-    function showFloating(i,amt,type,crit=false){
+    function showFloating(i, amt, type, crit=false){
       const el = targetsEl[i];
       const ft = document.createElement('div');
       ft.className = 'floating-text ' + (type==='heal'?'heal':'dmg') + (crit?' crit':'');
       ft.textContent = (type==='heal'?'+':'-') + Math.abs(amt);
       el.appendChild(ft);
-      setTimeout(()=>el.removeChild(ft),2000);
+      setTimeout(()=> el.removeChild(ft), 2000);
     }
 
-    function startCooldown(id,ms){
+    function startCooldown(id, ms){
       const el = spellEls[id];
       let ov = el.querySelector('.overlay');
       if(!ov){
@@ -419,17 +418,16 @@
         el.appendChild(ov);
       }
       el.classList.add('disabled');
-      // animate last second
       setTimeout(()=>{
         const anim = document.createElement('div');
         anim.className = 'cd-anim';
         el.appendChild(anim);
-        setTimeout(()=>el.removeChild(anim),1000);
+        setTimeout(()=> el.removeChild(anim), 1000);
       }, ms - 1000);
       let s = Math.ceil(ms/1000);
       const iv = setInterval(()=>{
         ov.textContent = --s;
-        if(s<=0){
+        if(s <= 0){
           clearInterval(iv);
           el.classList.remove('disabled');
           ov.remove();
@@ -437,7 +435,7 @@
       }, 1000);
     }
 
-    function tryInstant(id,effect){
+    function tryInstant(id, effect){
       if(gameOver) return;
       const t = nowMs(), sp = spellsCfg[id];
       if(t < globalCD || t - sp.last < sp.cd || (id!=='spell4' && selected===null)) return;
@@ -445,11 +443,11 @@
       globalCD = t + 1000;
       startCooldown(id, sp.cd);
       spellsContainer.classList.add('locked');
-      setTimeout(()=>spellsContainer.classList.remove('locked'),1000);
+      setTimeout(()=> spellsContainer.classList.remove('locked'), 1000);
       effect();
     }
 
-    function doCast(id,dur,effect){
+    function doCast(id, dur, effect){
       if(gameOver || selected===null) return;
       const idx = selected;
       spellsContainer.classList.add('locked');
@@ -458,7 +456,7 @@
       const st = nowMs();
       const iv = setInterval(()=>{
         castProg.style.width = clamp((nowMs()-st)/dur,0,1)*100 + '%';
-      },50);
+      }, 50);
       setTimeout(()=>{
         clearInterval(iv);
         castBar.classList.remove('active');
@@ -469,37 +467,53 @@
       }, dur);
     }
 
-    spellEls.spell1.addEventListener('click',()=>tryInstant('spell1',()=>targets[selected].mitEnd=nowMs()+mitDur));
-    spellEls.spell2.addEventListener('click',()=>tryInstant('spell2',()=>{
-      const idx=selected, half=Math.round(baseHeal/2), ticks=hotDur/2000;
-      targets[idx].hotEnd=nowMs()+hotDur;
-      const iv=setInterval(()=>{
-        if(--ticks<0){clearInterval(iv);return;}
-        if(targets[idx].hp>0){
-          targets[idx].hp=clamp(targets[idx].hp+half,0,maxHP);
-          updateHP(idx); showFloating(idx,half,'heal');
+    spellEls.spell1.addEventListener('click', ()=>
+      tryInstant('spell1', ()=>
+        targets[selected].mitEnd = nowMs() + mitDur
+      )
+    );
+    spellEls.spell2.addEventListener('click', ()=>
+      tryInstant('spell2', ()=>{
+        const idx = selected;
+        const half = Math.round(baseHeal/2);
+        let ticks = hotDur / 2000;       // ← use let here
+        targets[idx].hotEnd = nowMs() + hotDur;
+        const iv = setInterval(()=>{
+          if (--ticks < 0) { clearInterval(iv); return; }
+          if (targets[idx].hp > 0) {
+            targets[idx].hp = clamp(targets[idx].hp + half, 0, maxHP);
+            updateHP(idx);
+            showFloating(idx, half, 'heal');
+          }
+        }, 2000);
+      })
+    );
+    spellEls.spell4.addEventListener('click', ()=>
+      tryInstant('spell4', ()=>{
+        targets.forEach((tar,i)=>{
+          if (tar.hp <= 0) return;
+          let heal = (baseHeal/2) * rand(0.9,1.1), crit = false;
+          if (Math.random() < 0.25) { heal *= 2; crit = true; }
+          heal = Math.round(heal);
+          tar.hp = clamp(tar.hp + heal, 0, maxHP);
+          updateHP(i);
+          showFloating(i, heal, 'heal', crit);
+        });
+      })
+    );
+    spellEls.spell3.addEventListener('click', ()=>
+      doCast('spell3', spellsCfg.spell3.cast, idx=>{
+        let heal = baseHeal * rand(0.9,1.1), crit=false;
+        if (Math.random() < 0.25) { heal *= 2; crit = true; }
+        heal = Math.round(heal);
+        if (targets[idx].hp > 0) {
+          targets[idx].hp = clamp(targets[idx].hp + heal, 0, maxHP);
+          updateHP(idx);
+          showFloating(idx, heal, 'heal', crit);
         }
-      },2000);
-    }));
-    spellEls.spell4.addEventListener('click',()=>tryInstant('spell4',()=>{
-      targets.forEach((tar,i)=>{
-        if(tar.hp<=0) return;
-        let heal=(baseHeal/2)*rand(0.9,1.1), crit=false;
-        if(Math.random()<0.25){heal*=2;crit=true;}
-        heal=Math.round(heal);
-        tar.hp=clamp(tar.hp+heal,0,maxHP);
-        updateHP(i); showFloating(i,heal,'heal',crit);
-      });
-    }));
-    spellEls.spell3.addEventListener('click',()=>doCast('spell3',spellsCfg.spell3.cast,idx=>{
-      let heal=baseHeal*rand(0.9,1.1), crit=false;
-      if(Math.random()<0.25){heal*=2;crit=true;}
-      heal=Math.round(heal);
-      if(targets[idx].hp>0){
-        targets[idx].hp=clamp(targets[idx].hp+heal,0,maxHP);
-        updateHP(idx); showFloating(idx,heal,'heal',crit);
-      }
-    }));
+      })
+    );
+
   })();
 </script>
 </body>
