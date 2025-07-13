@@ -210,13 +210,14 @@
       <div class="spell" id="spell2">🌱</div>
       <div class="spell-label">HoT</div>
     </div>
-    <div class="spell-wrapper">
-      <div class="spell" id="spell3">✚</div>
-      <div class="spell-label">Cast</div>
-    </div>
+    <!-- swapped: AoE before Cast -->
     <div class="spell-wrapper">
       <div class="spell" id="spell4">💞</div>
       <div class="spell-label">AoE</div>
+    </div>
+    <div class="spell-wrapper">
+      <div class="spell" id="spell3">✚</div>
+      <div class="spell-label">Cast</div>
     </div>
   </div>
 
@@ -242,10 +243,11 @@
   (function(){
     const maxHP=100, baseHeal=30,
           mitDur=5000, hotDur=8000;
+    // reduced cast time by 0.5s (1500ms)
     const spellsCfg={
       spell1:{cd:15000,last:0},
       spell2:{cd:8000,last:0},
-      spell3:{cast:2000},
+      spell3:{cast:1500},
       spell4:{cd:15000,last:0}
     };
 
@@ -403,13 +405,15 @@
         el.appendChild(ov);
       }
       el.classList.add('disabled');
-      // outline animation in last second
+
+      // Outline animation in last second
       setTimeout(()=>{
         let anim=document.createElement('div');
         anim.className='cd-anim';
         el.appendChild(anim);
         setTimeout(()=>el.removeChild(anim),1000);
       }, ms - 1000);
+
       let s=Math.ceil(ms/1000), iv=setInterval(()=>{
         ov.textContent=--s;
         if(s<=0){
