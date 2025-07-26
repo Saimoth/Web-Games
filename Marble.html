@@ -3,29 +3,31 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <title>Marble Run</title>
+  <title>p5 Collisions &amp; Smoothed Lines</title>
   <style>
     html, body {
       margin:0;
       padding:0;
       overflow:hidden;
       background:#000;
-      overscroll-behavior: none;       /* disable pull-to-refresh on mobile */
+      overscroll-behavior: none;
     }
-    #ui {
+    #ui-left, #ui-right {
       position:fixed;
-      top:0; left:0;
-      width:100%;
+      top:0;
       height:48px;
       background:rgba(0,0,0,0.6);
       display:flex;
       gap:8px;
+      align-items:center;
       padding:6px 8px;
       box-sizing:border-box;
       z-index:1000;
       user-select:none;
     }
-    #ui button {
+    #ui-left { left:0; }
+    #ui-right { right:0; }
+    #ui-left button, #ui-right button {
       padding:6px 12px;
       font-size:16px;
       font-family:system-ui,sans-serif;
@@ -34,7 +36,7 @@
       border:1px solid #555;
       border-radius:6px;
     }
-    #ui button.active {
+    #ui-left button.active, #ui-right button.active {
       background:#4a90e2;
       color:#fff;
       border-color:#4a90e2;
@@ -44,7 +46,7 @@
       top:0; left:0;
       z-index:0;
       display:block;
-      touch-action:none;               /* disable default touch gestures */
+      touch-action:none;
     }
     #fallback {
       color:#fff;
@@ -55,10 +57,13 @@
   </style>
 </head>
 <body>
-  <div id="ui">
-    <button id="btnBall">Ball</button>
-    <button id="btnLine" class="active">Line</button>
-    <button id="btnBack">Back</button>
+  <div id="ui-left">
+    <button id="btnBall" class="active">Ball</button>
+    <button id="btnBackLeft">Back</button>
+  </div>
+  <div id="ui-right">
+    <button id="btnLine">Line</button>
+    <button id="btnBackRight">Back</button>
   </div>
 
   <script src="./P5.js"></script>
@@ -73,9 +78,9 @@
     const MIN_SEGMENT_DIST      = 5;
     const UI_HEIGHT             = 48;
     const GRAVITY               = 0.3;
-    const RESTITUTION_BALL_BALL = 0.85;  
+    const RESTITUTION_BALL_BALL = 0.85;
     const RESTITUTION_BALL_LINE = 0.35;
-    const AIR_DAMPING           = 0.995; // applied once per frame
+    const AIR_DAMPING           = 0.999;  // changed from 0.995 to 0.999
     const NORMAL_STOP_THRESHOLD = 0.2;
     const MAX_SUBSTEP_MOVE      = 6;
 
@@ -256,18 +261,10 @@
     }
 
     /* ========== Input ========== */
-    function touchStarted(){
-      return handlePointerStart(getPointer());
-    }
-    function touchMoved(){
-      return handlePointerDrag(getPointer());
-    }
-    function touchEnded(){
-      endLine();
-      return false;
-    }
+    function touchStarted(){ return handlePointerStart(getPointer()); }
+    function touchMoved(){ return handlePointerDrag(getPointer()); }
+    function touchEnded(){ endLine(); return false; }
     function mousePressed(){
-      // skip mouse if touch happened
       if(touches && touches.length>0) return;
       handlePointerStart({ x:mouseX, y:mouseY });
     }
@@ -276,9 +273,7 @@
         handlePointerDrag({ x:mouseX, y:mouseY });
       }
     }
-    function mouseReleased(){
-      if(mode==='line') endLine();
-    }
+    function mouseReleased(){ if(mode==='line') endLine(); }
 
     function handlePointerStart({x,y}){
       if(y<=UI_HEIGHT) return false;
@@ -304,9 +299,7 @@
     }
 
     function startLine(x,y){ currentLine=new LineLL(x,y); }
-    function extendLine(x,y){
-      currentLine.addPoint(x,y);
-    }
+    function extendLine(x,y){ currentLine.addPoint(x,y); }
     function endLine(){
       if(currentLine&&currentLine.length>1){
         lines.push(currentLine);
@@ -323,7 +316,8 @@
     function setupButtons(){
       const bBall=document.getElementById('btnBall'),
             bLine=document.getElementById('btnLine'),
-            bBack=document.getElementById('btnBack');
+            bBackL=document.getElementById('btnBackLeft'),
+            bBackR=document.getElementById('btnBackRight');
       const setMode=m=>{
         mode=m;
         bBall.classList.toggle('active',m==='ball');
@@ -335,7 +329,10 @@
       };
       bind(bBall, ()=>setMode('ball'));
       bind(bLine, ()=>setMode('line'));
-      bind(bBack, ()=>{
+      bind(bBackL, ()=>{
+        if(balls.length>0) balls.pop();
+      });
+      bind(bBackR, ()=>{
         if(lines.length>0) lines.pop();
         rebuildSegments();
       });
@@ -349,30 +346,29 @@
       const steps=Math.max(1,Math.ceil((maxSpeed*dtFactor)/MAX_SUBSTEP_MOVE));
       const dt=dtFactor/steps;
 
-      // integrate sub-steps
       for(let s=0;s<steps;s++){
         balls.forEach(b=>b.integrate(dt));
       }
 
-      // ball-ball collisions (forward & reverse)
+      // ball-ball forward & reverse
       const qt1=new Quadtree(new Rect(width/2,height/2,width/2,height/2),4);
       balls.forEach((b,i)=>qt1.insert({x:b.pos.x,y:b.pos.y,i}));
       balls.forEach((b1,i)=> {
-        const range=new Rect(b1.pos.x,b1.pos.y,b1.r*2,b1.r*2);
-        qt1.query(range).forEach(p=>{ if(p.i>i) resolveBallBall(b1, balls[p.i]); });
+        const r=new Rect(b1.pos.x,b1.pos.y,b1.r*2,b1.r*2);
+        qt1.query(r).forEach(p=>{ if(p.i>i) resolveBallBall(b1,balls[p.i]); });
       });
       const qt2=new Quadtree(new Rect(width/2,height/2,width/2,height/2),4);
       balls.forEach((b,i)=>qt2.insert({x:b.pos.x,y:b.pos.y,i}));
       for(let i=balls.length-1;i>=0;i--){
         const b2=balls[i];
-        const range=new Rect(b2.pos.x,b2.pos.y,b2.r*2,b2.r*2);
-        qt2.query(range).forEach(p=>{ if(p.i<i) resolveBallBall(balls[p.i], b2); });
+        const r=new Rect(b2.pos.x,b2.pos.y,b2.r*2,b2.r*2);
+        qt2.query(r).forEach(p=>{ if(p.i<i) resolveBallBall(balls[p.i],b2); });
       }
 
       // ball-line collisions
       balls.forEach(b=>resolveBallLines(b));
 
-      // apply air damping once per frame
+      // air damping once per frame
       balls.forEach(b=>b.vel.mult(AIR_DAMPING));
 
       // sleep test
