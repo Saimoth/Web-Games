@@ -94,8 +94,12 @@
     let SMOOTH_HISTORY = 10;
     const BALL_RADIUS  = 12;
 
+    // rainbow hues: red, orange, yellow, green, blue, purple
+    const BALL_HUES = [0, 30, 60, 120, 240, 300];
+    let ballColorIndex = 0;
+
     /* ========== Globals & Modes ========== */
-    let mode = 'line',  // ensure Line mode selected on load
+    let mode = 'line',
         lines = [], lineSegments = [], currentLine = null,
         balls = [], cnv;
 
@@ -205,33 +209,39 @@
       }
     }
 
-    /* ========== Ball (no per-substep damping) ========== */
+    /* ========== Ball (rainbow order) ========== */
     class Ball {
       constructor(x,y){
-        this.pos=createVector(x,y);
-        this.vel=createVector(random(-1,1),random(-2,-1));
-        this.r=BALL_RADIUS;
-        this.c=color(random(360),80,100);
-        this.mass=this.r*this.r;
-        this.sleeping=false; this.sleepCount=0;
+        this.pos = createVector(x,y);
+        this.vel = createVector(random(-1,1), random(-2,-1));
+        this.r   = BALL_RADIUS;
+        // pick next rainbow hue
+        const hue = BALL_HUES[ballColorIndex];
+        ballColorIndex = (ballColorIndex + 1) % BALL_HUES.length;
+        this.c   = color(hue, 80, 100);
+        this.mass= this.r*this.r;
+        this.sleeping=false;
+        this.sleepCount=0;
       }
       integrate(dt){
         if(this.sleeping) return;
-        this.vel.y+=GRAVITY*dt;
-        this.pos.x+=this.vel.x*dt;
-        this.pos.y+=this.vel.y*dt;
+        this.vel.y += GRAVITY * dt;
+        this.pos.x += this.vel.x * dt;
+        this.pos.y += this.vel.y * dt;
       }
       draw(){
-        noStroke(); fill(this.c);
+        noStroke();
+        fill(this.c);
         circle(this.pos.x,this.pos.y,this.r*2);
       }
-      offscreen(){ return this.pos.y-this.r>height; }
-      speedSq(){ return this.vel.x*this.vel.x+this.vel.y*this.vel.y; }
+      offscreen(){ return this.pos.y - this.r > height; }
+      speedSq(){ return this.vel.x*this.vel.x + this.vel.y*this.vel.y; }
       trySleep(){
-        if(this.speedSq()<SLEEP_SPEED_SQ){
+        if(this.speedSq() < SLEEP_SPEED_SQ){
           this.sleepCount++;
-          if(this.sleepCount>=SLEEP_FRAMES){
-            this.sleeping=true; this.vel.set(0,0);
+          if(this.sleepCount >= SLEEP_FRAMES){
+            this.sleeping=true;
+            this.vel.set(0,0);
           }
         } else this.sleepCount=0;
       }
@@ -335,14 +345,15 @@
       bind(bBackL, ()=> { if(balls.length>0) balls.pop(); });
       bind(bBackR, ()=> { if(lines.length>0) lines.pop(); rebuildSegments(); });
 
-      // ensure line mode is active on load
       setMode('line');
     }
 
     /* ========== Physics ========== */
     function physicsStep(dtFactor){
+      // remove balls that fell off bottom
       balls = balls.filter(b=>!b.offscreen());
 
+      // substeps
       let maxSpeed=0;
       balls.forEach(b=>{ if(!b.sleeping) maxSpeed=Math.max(maxSpeed,b.vel.mag()); });
       const steps=Math.max(1,Math.ceil((maxSpeed*dtFactor)/MAX_SUBSTEP_MOVE));
@@ -358,7 +369,7 @@
         if(b.pos.x + b.r < 0)      b.pos.x = width + b.r;
       });
 
-      // ball-ball collisions
+      // collisions
       const qt1=new Quadtree(new Rect(width/2,height/2,width/2,height/2),4);
       balls.forEach((b,i)=>qt1.insert({x:b.pos.x,y:b.pos.y,i}));
       balls.forEach((b1,i)=> {
@@ -372,14 +383,12 @@
         const r=new Rect(b2.pos.x,b2.pos.y,b2.r*2,b2.r*2);
         qt2.query(r).forEach(p=>{ if(p.i<i) resolveBallBall(balls[p.i],b2); });
       }
-
-      // ball-line collisions
       balls.forEach(b=>resolveBallLines(b));
 
-      // air damping once per frame
+      // damping once per frame
       balls.forEach(b=>b.vel.mult(AIR_DAMPING));
 
-      // sleep test
+      // sleep
       balls.forEach(b=>{ if(!b.sleeping) b.trySleep(); });
     }
 
