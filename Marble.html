@@ -3,21 +3,55 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <title>p5 Collisions &amp; Smoothed Lines</title>
+  <title>Marble Run</title>
   <style>
-    html, body { margin:0; padding:0; overflow:hidden; background:#000; }
+    html, body {
+      margin:0;
+      padding:0;
+      overflow:hidden;
+      background:#000;
+      overscroll-behavior: none;       /* disable pull-to-refresh on mobile */
+    }
     #ui {
-      position:fixed; top:0; left:0; width:100%; height:48px;
-      background:rgba(0,0,0,0.6); display:flex; gap:8px; padding:6px 8px;
-      box-sizing:border-box; z-index:1000; user-select:none;
+      position:fixed;
+      top:0; left:0;
+      width:100%;
+      height:48px;
+      background:rgba(0,0,0,0.6);
+      display:flex;
+      gap:8px;
+      padding:6px 8px;
+      box-sizing:border-box;
+      z-index:1000;
+      user-select:none;
     }
     #ui button {
-      padding:6px 12px; font-size:16px; font-family:system-ui,sans-serif;
-      background:#222; color:#eee; border:1px solid #555; border-radius:6px;
+      padding:6px 12px;
+      font-size:16px;
+      font-family:system-ui,sans-serif;
+      background:#222;
+      color:#eee;
+      border:1px solid #555;
+      border-radius:6px;
     }
-    #ui button.active { background:#4a90e2; color:#fff; border-color:#4a90e2; }
-    canvas { position:fixed; top:0; left:0; z-index:0; display:block; }
-    #fallback { color:#fff; font-family:system-ui,sans-serif; text-align:center; margin-top:30vh; }
+    #ui button.active {
+      background:#4a90e2;
+      color:#fff;
+      border-color:#4a90e2;
+    }
+    canvas {
+      position:fixed;
+      top:0; left:0;
+      z-index:0;
+      display:block;
+      touch-action:none;               /* disable default touch gestures */
+    }
+    #fallback {
+      color:#fff;
+      font-family:system-ui,sans-serif;
+      text-align:center;
+      margin-top:30vh;
+    }
   </style>
 </head>
 <body>
@@ -39,9 +73,9 @@
     const MIN_SEGMENT_DIST      = 5;
     const UI_HEIGHT             = 48;
     const GRAVITY               = 0.3;
-    const RESTITUTION_BALL_BALL = 0.85;  // 0–1 range
+    const RESTITUTION_BALL_BALL = 0.85;  
     const RESTITUTION_BALL_LINE = 0.35;
-    const AIR_DAMPING           = 0.999; // still used, but only once per frame
+    const AIR_DAMPING           = 0.995; // applied once per frame
     const NORMAL_STOP_THRESHOLD = 0.2;
     const MAX_SUBSTEP_MOVE      = 6;
 
@@ -71,26 +105,22 @@
     }
     class Quadtree {
       constructor(boundary, capacity=4, depth=0, maxDepth=8){
-        this.boundary = boundary;
-        this.capacity = capacity;
-        this.points   = [];
-        this.divided  = false;
-        this.depth    = depth;
-        this.maxDepth = maxDepth;
+        this.boundary=boundary; this.capacity=capacity;
+        this.points=[]; this.divided=false;
+        this.depth=depth; this.maxDepth=maxDepth;
       }
       subdivide(){
-        const {x,y,hw,hh} = this.boundary;
-        this.nw = new Quadtree(new Rect(x-hw/2,y-hh/2,hw/2,hh/2), this.capacity, this.depth+1, this.maxDepth);
-        this.ne = new Quadtree(new Rect(x+hw/2,y-hh/2,hw/2,hh/2), this.capacity, this.depth+1, this.maxDepth);
-        this.sw = new Quadtree(new Rect(x-hw/2,y+hh/2,hw/2,hh/2), this.capacity, this.depth+1, this.maxDepth);
-        this.se = new Quadtree(new Rect(x+hw/2,y+hh/2,hw/2,hh/2), this.capacity, this.depth+1, this.maxDepth);
-        this.divided = true;
+        const {x,y,hw,hh}=this.boundary;
+        this.nw=new Quadtree(new Rect(x-hw/2,y-hh/2,hw/2,hh/2),this.capacity,this.depth+1,this.maxDepth);
+        this.ne=new Quadtree(new Rect(x+hw/2,y-hh/2,hw/2,hh/2),this.capacity,this.depth+1,this.maxDepth);
+        this.sw=new Quadtree(new Rect(x-hw/2,y+hh/2,hw/2,hh/2),this.capacity,this.depth+1,this.maxDepth);
+        this.se=new Quadtree(new Rect(x+hw/2,y+hh/2,hw/2,hh/2),this.capacity,this.depth+1,this.maxDepth);
+        this.divided=true;
       }
       insert(pt){
         if(!this.boundary.contains(pt)) return false;
-        if(this.points.length<this.capacity || this.depth>=this.maxDepth){
-          this.points.push(pt);
-          return true;
+        if(this.points.length<this.capacity||this.depth>=this.maxDepth){
+          this.points.push(pt); return true;
         }
         if(!this.divided) this.subdivide();
         return this.nw.insert(pt)||this.ne.insert(pt)||this.sw.insert(pt)||this.se.insert(pt);
@@ -99,10 +129,10 @@
         if(!this.boundary.intersects(range)) return found;
         for(const p of this.points) if(range.contains(p)) found.push(p);
         if(this.divided){
-          this.nw.query(range, found);
-          this.ne.query(range, found);
-          this.sw.query(range, found);
-          this.se.query(range, found);
+          this.nw.query(range,found);
+          this.ne.query(range,found);
+          this.sw.query(range,found);
+          this.se.query(range,found);
         }
         return found;
       }
@@ -165,7 +195,7 @@
       }
     }
 
-    /* ========== Ball without per-substep damping ========= */
+    /* ========== Ball (no per-substep damping) ========== */
     class Ball {
       constructor(x,y){
         this.pos=createVector(x,y);
@@ -227,28 +257,46 @@
 
     /* ========== Input ========== */
     function touchStarted(){
-      const {x,y}=getPointer();
-      if(y<=UI_HEIGHT) return;
-      if(mode==='ball') balls.push(new Ball(x,y));
-      else startLine(x,y);
+      return handlePointerStart(getPointer());
     }
     function touchMoved(){
-      if(mode!=='line'||!currentLine) return;
-      const {x,y}=getPointer();
-      if(y<=UI_HEIGHT) return;
-      extendLine(x,y);
+      return handlePointerDrag(getPointer());
     }
-    function touchEnded(){ if(mode==='line') endLine(); }
+    function touchEnded(){
+      endLine();
+      return false;
+    }
     function mousePressed(){
-      if(mouseY>UI_HEIGHT){
-        if(mode==='ball') balls.push(new Ball(mouseX,mouseY));
-        else startLine(mouseX,mouseY);
-      }
+      // skip mouse if touch happened
+      if(touches && touches.length>0) return;
+      handlePointerStart({ x:mouseX, y:mouseY });
     }
     function mouseDragged(){
-      if(mode==='line'&&currentLine&&mouseY>UI_HEIGHT) extendLine(mouseX,mouseY);
+      if(mode==='line'&&currentLine&&mouseY>UI_HEIGHT){
+        handlePointerDrag({ x:mouseX, y:mouseY });
+      }
     }
-    function mouseReleased(){ if(mode==='line') endLine(); }
+    function mouseReleased(){
+      if(mode==='line') endLine();
+    }
+
+    function handlePointerStart({x,y}){
+      if(y<=UI_HEIGHT) return false;
+      if(mode==='ball') balls.push(new Ball(x,y));
+      else startLine(x,y);
+      return false;
+    }
+    function handlePointerDrag({x,y}){
+      if(!currentLine) return false;
+      if(y<=UI_HEIGHT) return false;
+      const dx=x-currentLine.tail.x, dy=y-currentLine.tail.y;
+      if(dx*dx+dy*dy>=MIN_SEGMENT_DIST*MIN_SEGMENT_DIST){
+        extendLine(x,y);
+        rebuildSegments();
+      }
+      return false;
+    }
+
     function getPointer(){
       return touches&&touches.length>0
         ? {x:touches[0].x,y:touches[0].y}
@@ -257,10 +305,7 @@
 
     function startLine(x,y){ currentLine=new LineLL(x,y); }
     function extendLine(x,y){
-      const dx=x-currentLine.tail.x, dy=y-currentLine.tail.y;
-      if(dx*dx+dy*dy>=MIN_SEGMENT_DIST*MIN_SEGMENT_DIST){
-        currentLine.addPoint(x,y);
-      }
+      currentLine.addPoint(x,y);
     }
     function endLine(){
       if(currentLine&&currentLine.length>1){
@@ -285,8 +330,8 @@
         bLine.classList.toggle('active',m==='line');
       };
       const bind=(el,fn)=>{
-        el.addEventListener('touchstart',e=>{e.stopPropagation();e.preventDefault();fn();},{passive:false});
-        el.addEventListener('click',     e=>{e.stopPropagation();e.preventDefault();fn();});
+        el.addEventListener('click',fn);
+        el.addEventListener('touchstart',e=>{ e.preventDefault(); fn(); },{passive:false});
       };
       bind(bBall, ()=>setMode('ball'));
       bind(bLine, ()=>setMode('line'));
@@ -298,44 +343,37 @@
 
     /* ========== Physics ========== */
     function physicsStep(dtFactor){
-      balls = balls.filter(b=>!b.offscreen());
+      balls=balls.filter(b=>!b.offscreen());
       let maxSpeed=0;
-      balls.forEach(b=>{ if(!b.sleeping) maxSpeed = max(maxSpeed, b.vel.mag()); });
-      const steps = Math.max(1, Math.ceil((maxSpeed*dtFactor)/MAX_SUBSTEP_MOVE));
-      const dt = dtFactor/steps;
+      balls.forEach(b=>{ if(!b.sleeping) maxSpeed=Math.max(maxSpeed,b.vel.mag()); });
+      const steps=Math.max(1,Math.ceil((maxSpeed*dtFactor)/MAX_SUBSTEP_MOVE));
+      const dt=dtFactor/steps;
 
-      // integrate sub-steps (gravity + move)
-      for(let s=0; s<steps; s++){
+      // integrate sub-steps
+      for(let s=0;s<steps;s++){
         balls.forEach(b=>b.integrate(dt));
       }
 
-      // ball-ball collisions (once per frame)
+      // ball-ball collisions (forward & reverse)
       const qt1=new Quadtree(new Rect(width/2,height/2,width/2,height/2),4);
-      balls.forEach((b,i)=> qt1.insert({x:b.pos.x,y:b.pos.y,i}));
-      for(let i=0;i<balls.length;i++){
-        const b1=balls[i];
+      balls.forEach((b,i)=>qt1.insert({x:b.pos.x,y:b.pos.y,i}));
+      balls.forEach((b1,i)=> {
         const range=new Rect(b1.pos.x,b1.pos.y,b1.r*2,b1.r*2);
-        qt1.query(range).forEach(p=>{
-          if(p.i>i) resolveBallBall(b1, balls[p.i]);
-        });
-      }
-
-      // reverse pass for greater stability
+        qt1.query(range).forEach(p=>{ if(p.i>i) resolveBallBall(b1, balls[p.i]); });
+      });
       const qt2=new Quadtree(new Rect(width/2,height/2,width/2,height/2),4);
-      balls.forEach((b,i)=> qt2.insert({x:b.pos.x,y:b.pos.y,i}));
+      balls.forEach((b,i)=>qt2.insert({x:b.pos.x,y:b.pos.y,i}));
       for(let i=balls.length-1;i>=0;i--){
         const b2=balls[i];
         const range=new Rect(b2.pos.x,b2.pos.y,b2.r*2,b2.r*2);
-        qt2.query(range).forEach(p=>{
-          if(p.i<i) resolveBallBall(balls[p.i], b2);
-        });
+        qt2.query(range).forEach(p=>{ if(p.i<i) resolveBallBall(balls[p.i], b2); });
       }
 
-      // ball-line collisions (once per frame)
-      balls.forEach(b=> resolveBallLines(b));
+      // ball-line collisions
+      balls.forEach(b=>resolveBallLines(b));
 
       // apply air damping once per frame
-      balls.forEach(b=> b.vel.mult(AIR_DAMPING));
+      balls.forEach(b=>b.vel.mult(AIR_DAMPING));
 
       // sleep test
       balls.forEach(b=>{ if(!b.sleeping) b.trySleep(); });
