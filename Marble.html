@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <title>p5 Collisions &amp; Smoothed Lines</title>
+  <title>p5 Collisions &amp; Smoothed Lines with Boom</title>
   <style>
     html, body {
       margin:0;
@@ -12,7 +12,7 @@
       background:#000;
       overscroll-behavior: none;
     }
-    #ui-left, #ui-right {
+    #ui-left, #ui-center, #ui-right {
       position:fixed;
       top:0;
       height:48px;
@@ -26,8 +26,14 @@
       user-select:none;
     }
     #ui-left { left:0; }
+    #ui-center {
+      left:50%;
+      transform:translateX(-50%);
+    }
     #ui-right { right:0; }
-    #ui-left button, #ui-right button {
+    #ui-left button,
+    #ui-center button,
+    #ui-right button {
       padding:6px 12px;
       font-size:16px;
       font-family:system-ui,sans-serif;
@@ -36,7 +42,9 @@
       border:1px solid #555;
       border-radius:6px;
     }
-    #ui-left button.active, #ui-right button.active {
+    #ui-left button.active,
+    #ui-center button.active,
+    #ui-right button.active {
       background:#4a90e2;
       color:#fff;
       border-color:#4a90e2;
@@ -48,18 +56,15 @@
       display:block;
       touch-action:none;
     }
-    #fallback {
-      color:#fff;
-      font-family:system-ui,sans-serif;
-      text-align:center;
-      margin-top:30vh;
-    }
   </style>
 </head>
 <body>
   <div id="ui-left">
     <button id="btnBall">Ball</button>
     <button id="btnBackLeft">Back</button>
+  </div>
+  <div id="ui-center">
+    <button id="btnBoom">Boom</button>
   </div>
   <div id="ui-right">
     <button id="btnLine" class="active">Line</button>
@@ -70,7 +75,7 @@
   <script>
     if (typeof window.p5 === "undefined") {
       document.body.innerHTML =
-        '<div id="fallback">Couldn’t find p5.js.<br>Check the script src path and filename.</div>';
+        '<div style="color:#fff;font-family:system-ui;text-align:center;margin-top:30vh;">Couldn’t find p5.js.<br>Check the script src path and filename.</div>';
     }
 
     /* ========== Config ========== */
@@ -98,10 +103,19 @@
     const BALL_HUES = [0, 30, 60, 120, 240, 300];
     let ballColorIndex = 0;
 
+    // boom effect config
+    const explosionRadius    = 100;
+    const explosionForce     = 50;    // increased from 5 to 50
+    const numParticles       = 30;
+    const particleSpeedMin   = 2;
+    const particleSpeedMax   = 6;
+    const particleLifespan   = 30;
+
     /* ========== Globals & Modes ========== */
-    let mode = 'line',
+    let mode = 'line',  // start in line mode
         lines = [], lineSegments = [], currentLine = null,
-        balls = [], cnv;
+        balls = [], particles = [],
+        cnv;
 
     /* ========== Geometry / Quadtree ========== */
     class Rect {
@@ -209,13 +223,31 @@
       }
     }
 
+    /* ========== Particle for Boom effect ========== */
+    class Particle {
+      constructor(x,y){
+        this.pos = createVector(x,y);
+        this.vel = p5.Vector.random2D().mult(random(particleSpeedMin, particleSpeedMax));
+        this.lifespan = particleLifespan;
+      }
+      update(){
+        this.pos.add(this.vel);
+        this.lifespan--;
+      }
+      draw(){
+        noStroke();
+        const alpha = map(this.lifespan, 0, particleLifespan, 0, 100);
+        fill(60,100,100, alpha);
+        circle(this.pos.x, this.pos.y, 4);
+      }
+    }
+
     /* ========== Ball (rainbow order) ========== */
     class Ball {
       constructor(x,y){
         this.pos = createVector(x,y);
         this.vel = createVector(random(-1,1), random(-2,-1));
         this.r   = BALL_RADIUS;
-        // pick next rainbow hue
         const hue = BALL_HUES[ballColorIndex];
         ballColorIndex = (ballColorIndex + 1) % BALL_HUES.length;
         this.c   = color(hue, 80, 100);
@@ -265,6 +297,12 @@
       lines.forEach(ln=>ln.draw());
       if(currentLine) currentLine.draw();
       balls.forEach(b=>b.draw());
+      // draw particles
+      for(let i=particles.length-1; i>=0; i--){
+        particles[i].update();
+        particles[i].draw();
+        if(particles[i].lifespan <= 0) particles.splice(i,1);
+      }
     }
 
     function windowResized(){
@@ -323,9 +361,11 @@
       balls.forEach(b=>b.wake());
     }
 
+    /* ========== Buttons & Boom ========== */
     function setupButtons(){
       const bBall   = document.getElementById('btnBall'),
             bLine   = document.getElementById('btnLine'),
+            bBoom   = document.getElementById('btnBoom'),
             bBackL  = document.getElementById('btnBackLeft'),
             bBackR  = document.getElementById('btnBackRight');
 
@@ -344,31 +384,48 @@
       bind(bLine,  ()=> setMode('line'));
       bind(bBackL, ()=> { if(balls.length>0) balls.pop(); });
       bind(bBackR, ()=> { if(lines.length>0) lines.pop(); rebuildSegments(); });
+      bind(bBoom,  doBoom);
 
       setMode('line');
+    }
+
+    function doBoom(){
+      if (balls.length === 0) return;
+      const i = floor(random(balls.length));
+      const b = balls.splice(i,1)[0];
+      const ex = b.pos.x, ey = b.pos.y;
+      // impulse nearby balls
+      for (const other of balls){
+        const dvec = p5.Vector.sub(other.pos, createVector(ex,ey));
+        const dist = dvec.mag();
+        if (dist < explosionRadius){
+          const strength = explosionForce * pow(1 - dist/explosionRadius, 2);
+          other.vel.add(dvec.normalize().mult(strength));
+        }
+      }
+      // spawn particles
+      for(let j=0;j<numParticles;j++){
+        particles.push(new Particle(ex, ey));
+      }
     }
 
     /* ========== Physics ========== */
     function physicsStep(dtFactor){
       // remove balls that fell off bottom
       balls = balls.filter(b=>!b.offscreen());
-
       // substeps
       let maxSpeed=0;
       balls.forEach(b=>{ if(!b.sleeping) maxSpeed=Math.max(maxSpeed,b.vel.mag()); });
       const steps=Math.max(1,Math.ceil((maxSpeed*dtFactor)/MAX_SUBSTEP_MOVE));
       const dt=dtFactor/steps;
-
       for(let s=0;s<steps;s++){
         balls.forEach(b=>b.integrate(dt));
       }
-
       // wrap left/right
       balls.forEach(b=>{
         if(b.pos.x - b.r > width)  b.pos.x = -b.r;
         if(b.pos.x + b.r < 0)      b.pos.x = width + b.r;
       });
-
       // collisions
       const qt1=new Quadtree(new Rect(width/2,height/2,width/2,height/2),4);
       balls.forEach((b,i)=>qt1.insert({x:b.pos.x,y:b.pos.y,i}));
@@ -384,11 +441,9 @@
         qt2.query(r).forEach(p=>{ if(p.i<i) resolveBallBall(balls[p.i],b2); });
       }
       balls.forEach(b=>resolveBallLines(b));
-
       // damping once per frame
       balls.forEach(b=>b.vel.mult(AIR_DAMPING));
-
-      // sleep
+      // sleep test
       balls.forEach(b=>{ if(!b.sleeping) b.trySleep(); });
     }
 
