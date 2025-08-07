@@ -5,56 +5,26 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <title>Marble Game</title>
   <style>
-    html, body {
-      margin:0;
-      padding:0;
-      overflow:hidden;
-      background:#000;
-      overscroll-behavior: none;
-    }
-    /* Left: Speed & Boom (single row) */
+    html, body { margin:0; padding:0; overflow:hidden; background:#000; overscroll-behavior:none; }
+    /* Left: Speed & Boom */
     #ui-left {
-      position:fixed; top:0; left:0;
-      height:48px;
-      background:rgba(0,0,0,0.6);
-      display:flex; gap:8px; align-items:center;
-      padding:6px 8px; box-sizing:border-box;
-      z-index:1000; user-select:none;
+      position:fixed; top:0; left:0; height:48px;
+      background:rgba(0,0,0,0.6); display:flex; gap:8px; align-items:center;
+      padding:6px 8px; box-sizing:border-box; z-index:1000; user-select:none;
     }
-    /* Right: two rows of controls */
+    /* Right: THREE rows */
     #ui-right {
-      position:fixed; top:0; right:0;
-      height:96px;
-      background:rgba(0,0,0,0.6);
-      display:flex; flex-direction:column;
-      justify-content:flex-start;
-      padding:6px 8px; box-sizing:border-box;
-      z-index:1000; user-select:none;
+      position:fixed; top:0; right:0; height:168px;
+      background:rgba(0,0,0,0.6); display:flex; flex-direction:column;
+      justify-content:flex-start; padding:6px 8px; box-sizing:border-box; z-index:1000; user-select:none;
     }
-    #ui-right .row {
-      display:flex; gap:8px;
-      margin-bottom:8px;
-    }
+    #ui-right .row { display:flex; gap:8px; margin-bottom:8px; }
     button {
-      padding:6px 12px;
-      font-size:16px;
-      font-family:system-ui,sans-serif;
-      background:#222;
-      color:#eee;
-      border:1px solid #555;
-      border-radius:6px;
+      padding:6px 12px; font-size:16px; font-family:system-ui,sans-serif;
+      background:#222; color:#eee; border:1px solid #555; border-radius:6px;
     }
-    button.active {
-      background:#4a90e2;
-      color:#fff;
-      border-color:#4a90e2;
-    }
-    canvas {
-      position:fixed; top:0; left:0;
-      z-index:0;
-      display:block;
-      touch-action:none;
-    }
+    button.active { background:#4a90e2; color:#fff; border-color:#4a90e2; }
+    canvas { position:fixed; top:0; left:0; z-index:0; display:block; touch-action:none; }
   </style>
 </head>
 <body>
@@ -65,416 +35,689 @@
   <div id="ui-right">
     <div class="row">
       <button id="btnLine" class="active">Line</button>
-      <button id="btnBackRight">Back</button>
+      <button id="btnBackLine">Back</button>
+    </div>
+    <div class="row">
+      <button id="btnTrack">Track</button>
+      <button id="btnBackTrack">Back</button>
     </div>
     <div class="row">
       <button id="btnBall">Ball</button>
-      <button id="btnBackLeft">Back</button>
+      <button id="btnBackBall">Back</button>
     </div>
   </div>
 
-  <script src="./P5.js"></script>
+  <!-- Ensure correct filename/case -->
+  <script src="P5.js"></script>
   <script>
-    if (typeof window.p5 === "undefined") {
-      document.body.innerHTML =
-        '<div style="color:#fff;font-family:system-ui;text-align:center;margin-top:30vh;">Couldn’t find p5.js.<br>Check the script src path and filename.</div>';
+  if (typeof window.p5 === "undefined") {
+    document.body.innerHTML =
+      '<div style="color:#fff;font-family:system-ui;text-align:center;margin-top:30vh;">Couldn’t find p5.js.<br>Check the script src path and filename.</div>';
+  }
+
+  /* ===== Config ===== */
+  const PHYSICS_ITERS         = 2;
+  const MIN_SEGMENT_DIST      = 6;
+  const UI_HEIGHT             = 48;
+  const GRAVITY               = 0.3;
+  const RESTITUTION_BALL_BALL = 0.85;
+  const RESTITUTION_BALL_LINE = 0.25;
+  const AIR_DAMPING           = 0.999;
+  const NORMAL_STOP_THRESHOLD = 0.18;
+  const TANGENTIAL_FRICTION   = 0.00;//0.03
+  const CORNER_BLEND          = 0.18;
+  const MAX_SUBSTEP_MOVE      = 6;
+
+  const SLEEP_SPEED    = 0.05;
+  const SLEEP_SPEED_SQ = SLEEP_SPEED * SLEEP_SPEED;
+  const SLEEP_FRAMES   = 25;
+  const WAKE_IMPULSE   = 0.6;
+  const POS_SLOP       = 0.3;
+  const PEN_CORRECT    = 0.8;
+
+  let SMOOTH_HISTORY = 10;
+  const BALL_RADIUS  = 12;
+  const BALL_DIAMETER = BALL_RADIUS*2;
+
+  // Track geometry: rails 1.5 ball widths apart (center-to-center)
+  const TRACK_GAP   = 1.5 * BALL_DIAMETER;
+  const TRACK_HALF  = TRACK_GAP / 2;
+
+  const SNAP_DIST     = 28;
+  const SNAP_DIST2    = SNAP_DIST*SNAP_DIST;
+  const BLEND_NODES   = 6;     // # of nodes to smooth near joints
+  const SMOOTH_ITERS  = 4;     // smoothing passes at seam
+
+  const BALL_HUES = [0, 30, 60, 120, 240, 300];
+  let ballColorIndex = 0;
+
+  const explosionRadius  = 100;
+  const explosionForce   = 50;
+  const numParticles     = 30;
+  const particleSpeedMin = 2;
+  const particleSpeedMax = 6;
+  const particleLifespan = 30;
+
+  let speedMode = false;
+  const SPEED_MAG = 10;
+
+  /* ===== Globals ===== */
+  let mode          = 'line';         // 'line' | 'track' | 'ball'
+  let lines         = [];             // array<LineLL>
+  let tracks        = [];             // array<TrackRef> (holds refs to two lines)
+  let lineSegments  = [];             // collision segments from lines
+  let currentLine   = null;           // LineLL being drawn
+  let currentTrack  = null;           // {center: p5.Vector[], previewLeft, previewRight}
+  let balls         = [];
+  let particles     = [];
+  let cnv;
+
+  /* ===== Geometry / Utils ===== */
+  class Rect {
+    constructor(x,y,hw,hh){ this.x=x; this.y=y; this.hw=hw; this.hh=hh; }
+    contains(p){ return p.x >= this.x-this.hw && p.x <= this.x+this.hw && p.y >= this.y-this.hh && p.y <= this.y+this.hh; }
+    intersects(r){ return !(r.x - r.hw > this.x + this.hw || r.x + r.hw < this.x - this.hw || r.y - r.hh > this.y + this.hh || r.y + r.hh < this.y - this.hh); }
+  }
+  class Quadtree {
+    constructor(boundary, cap=4, depth=0, maxD=8){
+      this.boundary=boundary; this.capacity=cap; this.points=[]; this.divided=false; this.depth=depth; this.maxDepth=maxD;
     }
-
-    /* ===== Config ===== */
-    const PHYSICS_ITERS         = 2;
-    const MIN_SEGMENT_DIST      = 5;
-    const UI_HEIGHT             = 48;
-    const GRAVITY               = 0.3;
-    const RESTITUTION_BALL_BALL = 0.85;
-    const RESTITUTION_BALL_LINE = 0.35;
-    const AIR_DAMPING           = 0.999;
-    const NORMAL_STOP_THRESHOLD = 0.2;
-    const MAX_SUBSTEP_MOVE      = 6;
-
-    const SLEEP_SPEED    = 0.05;
-    const SLEEP_SPEED_SQ = SLEEP_SPEED * SLEEP_SPEED;
-    const SLEEP_FRAMES   = 25;
-    const WAKE_IMPULSE   = 0.6;
-    const POS_SLOP       = 0.3;
-    const PEN_CORRECT    = 0.8;
-
-    let SMOOTH_HISTORY = 10;
-    const BALL_RADIUS  = 12;
-
-    const BALL_HUES = [0, 30, 60, 120, 240, 300];
-    let ballColorIndex = 0;
-
-    const explosionRadius  = 100;
-    const explosionForce   = 50;
-    const numParticles     = 30;
-    const particleSpeedMin = 2;
-    const particleSpeedMax = 6;
-    const particleLifespan = 30;
-
-    let speedMode = false;
-    const SPEED_MAG = 10;
-
-    /* ===== Globals ===== */
-    let mode          = 'line',
-        lines         = [],
-        lineSegments  = [],
-        currentLine   = null,
-        balls         = [],
-        particles     = [],
-        cnv;
-
-    /* ===== Geometry / Quadtree ===== */
-    class Rect {
-      constructor(x,y,hw,hh){ this.x=x; this.y=y; this.hw=hw; this.hh=hh; }
-      contains(p){
-        return p.x >= this.x-this.hw && p.x <= this.x+this.hw &&
-               p.y >= this.y-this.hh && p.y <= this.y+this.hh;
-      }
-      intersects(r){
-        return !(r.x - r.hw > this.x + this.hw ||
-                 r.x + r.hw < this.x - this.hw ||
-                 r.y - r.hh > this.y + this.hh ||
-                 r.y + r.hh < this.y - this.hh);
-      }
+    subdivide(){
+      const {x,y,hw,hh} = this.boundary;
+      this.nw = new Quadtree(new Rect(x-hw/2,y-hh/2,hw/2,hh/2), this.capacity, this.depth+1, this.maxDepth);
+      this.ne = new Quadtree(new Rect(x+hw/2,y-hh/2,hw/2,hh/2), this.capacity, this.depth+1, this.maxDepth);
+      this.sw = new Quadtree(new Rect(x-hw/2,y+hh/2,hw/2,hh/2), this.capacity, this.depth+1, this.maxDepth);
+      this.se = new Quadtree(new Rect(x+hw/2,y+hh/2,hw/2,hh/2), this.capacity, this.depth+1, this.maxDepth);
+      this.divided = true;
     }
-    class Quadtree {
-      constructor(boundary, cap=4, depth=0, maxD=8){
-        this.boundary=boundary; this.capacity=cap;
-        this.points=[]; this.divided=false;
-        this.depth=depth; this.maxDepth=maxD;
+    insert(pt){
+      if(!this.boundary.contains(pt)) return false;
+      if(this.points.length < this.capacity || this.depth >= this.maxDepth){
+        this.points.push(pt); return true;
       }
-      subdivide(){
-        const {x,y,hw,hh} = this.boundary;
-        this.nw = new Quadtree(new Rect(x-hw/2,y-hh/2,hw/2,hh/2), this.capacity, this.depth+1, this.maxDepth);
-        this.ne = new Quadtree(new Rect(x+hw/2,y-hh/2,hw/2,hh/2), this.capacity, this.depth+1, this.maxDepth);
-        this.sw = new Quadtree(new Rect(x-hw/2,y+hh/2,hw/2,hh/2), this.capacity, this.depth+1, this.maxDepth);
-        this.se = new Quadtree(new Rect(x+hw/2,y+hh/2,hw/2,hh/2), this.capacity, this.depth+1, this.maxDepth);
-        this.divided = true;
-      }
-      insert(pt){
-        if(!this.boundary.contains(pt)) return false;
-        if(this.points.length < this.capacity || this.depth >= this.maxDepth){
-          this.points.push(pt);
-          return true;
-        }
-        if(!this.divided) this.subdivide();
-        return this.nw.insert(pt) || this.ne.insert(pt) || this.sw.insert(pt) || this.se.insert(pt);
-      }
-      query(range, found=[]){
-        if(!this.boundary.intersects(range)) return found;
-        for(const p of this.points) if(range.contains(p)) found.push(p);
-        if(this.divided){
-          this.nw.query(range,found);
-          this.ne.query(range,found);
-          this.sw.query(range,found);
-          this.se.query(range,found);
-        }
-        return found;
-      }
+      if(!this.divided) this.subdivide();
+      return this.nw.insert(pt) || this.ne.insert(pt) || this.sw.insert(pt) || this.se.insert(pt);
     }
-    function closestPointOnSegment(ax,ay,bx,by,px,py){
-      const abx=bx-ax, aby=by-ay;
-      const apx=px-ax, apy=py-ay;
-      const ab2=Math.max(abx*abx+aby*aby,1e-8);
-      let t=(apx*abx+apy*aby)/ab2;
-      t=Math.max(0,Math.min(1,t));
-      return { x: ax+abx*t, y: ay+aby*t, t };
+    query(range, found=[]){
+      if(!this.boundary.intersects(range)) return found;
+      for(const p of this.points) if(range.contains(p)) found.push(p);
+      if(this.divided){ this.nw.query(range,found); this.ne.query(range,found); this.sw.query(range,found); this.se.query(range,found); }
+      return found;
     }
+  }
+  function closestPointOnSegment(ax,ay,bx,by,px,py){
+    const abx=bx-ax, aby=by-ay;
+    const apx=px-ax, apy=py-ay;
+    const ab2=Math.max(abx*abx+aby*aby,1e-8);
+    let t=(apx*abx+apy*aby)/ab2;
+    t=Math.max(0,Math.min(1,t));
+    return { x: ax+abx*t, y: ay+aby*t, t };
+  }
+  function dist2(x1,y1,x2,y2){ const dx=x1-x2, dy=y1-y2; return dx*dx+dy*dy; }
+  function perp(v){ return createVector(-v.y, v.x); }
 
-    /* ===== Line ===== */
-    class Node {
-      constructor(x,y){ this.x=x; this.y=y; this.next=null; this.prev=null; }
+  /* ===== Lines ===== */
+  class Node { constructor(x,y){ this.x=x; this.y=y; this.next=null; this.prev=null; } }
+  class LineLL {
+    constructor(x,y,col=255,w=3){  // default white so it’s visible on black
+      const n=new Node(x,y);
+      this.head=n; this.tail=n; this.length=1;
+      this.strokeCol=col; this.strokeW=w;
     }
-    class LineLL {
-      constructor(x,y,col=255,w=3){
-        const n=new Node(x,y);
-        this.head=n; this.tail=n; this.length=1;
-        this.strokeCol=col; this.strokeW=w;
-      }
-      addPoint(x,y){
-        const n=new Node(x,y);
-        this.tail.next=n; n.prev=this.tail;
-        this.tail=n; this.length++;
-        this.smoothLast(SMOOTH_HISTORY);
-      }
-      smoothLast(k){
-        let arr=[], node=this.tail;
-        for(let i=0;i<k&&node;i++){ arr.push(node); node=node.prev; }
-        if(arr.length<3) return;
-        for(let i=1;i<arr.length-1;i++){
-          const curr=arr[i], prev=arr[i+1], next=arr[i-1];
-          curr.x=(prev.x+2*curr.x+next.x)*0.25;
-          curr.y=(prev.y+2*curr.y+next.y)*0.25;
-        }
-      }
-      draw(){
-        stroke(this.strokeCol); strokeWeight(this.strokeW); noFill();
-        let n=this.head;
-        while(n&&n.next){ line(n.x,n.y,n.next.x,n.next.y); n=n.next; }
-      }
-      segments(){
-        const out=[]; let n=this.head;
-        while(n&&n.next){ out.push({ ax:n.x, ay:n.y, bx:n.next.x, by:n.next.y }); n=n.next; }
-        return out;
+    addPoint(x,y){
+      const n=new Node(x,y);
+      this.tail.next=n; n.prev=this.tail;
+      this.tail=n; this.length++;
+      this.smoothLast(SMOOTH_HISTORY);
+    }
+    smoothLast(k){
+      let arr=[], node=this.tail;
+      for(let i=0;i<k&&node;i++){ arr.push(node); node=node.prev; }
+      if(arr.length<3) return;
+      for(let i=1;i<arr.length-1;i++){
+        const curr=arr[i], prev=arr[i+1], next=arr[i-1];
+        curr.x=(prev.x+2*curr.x+next.x)*0.25;
+        curr.y=(prev.y+2*curr.y+next.y)*0.25;
       }
     }
+    popPoint(){
+      if(this.tail && this.tail.prev){
+        this.tail = this.tail.prev;
+        this.tail.next = null;
+        this.length--;
+      }
+    }
+    draw(){
+      stroke(this.strokeCol); strokeWeight(this.strokeW); noFill();
+      let n=this.head;
+      while(n&&n.next){ line(n.x,n.y,n.next.x,n.next.y); n=n.next; }
+    }
+    segments(){
+      const out=[]; let n=this.head;
+      while(n&&n.next){ out.push({ ax:n.x, ay:n.y, bx:n.next.x, by:n.next.y }); n=n.next; }
+      return out;
+    }
+  }
 
-    /* ===== Particle ===== */
-    class Particle {
-      constructor(x,y){
-        this.pos=createVector(x,y);
-        this.vel=p5.Vector.random2D().mult(random(particleSpeedMin, particleSpeedMax));
-        this.lifespan=particleLifespan;
+  /* ===== Tracks (store references to two LineLL rails) ===== */
+  class TrackRef {
+    constructor(centerPts){
+      this.center = centerPts; // array of p5.Vector
+      this.leftLineIdx  = -1;
+      this.rightLineIdx = -1;
+      this.isClosed = false;
+    }
+  }
+  // Build rails; if closed=true, rails include last->first by duplicating the first point at the end
+  function buildRailsFromCenter(center, closed=false){
+    const N = center.length;
+    if (N < 2) return { left:[], right:[] };
+
+    // per-node tangents (circular when closed)
+    const normals=[];
+    for (let i=0;i<N;i++){
+      const prev = center[(i-1+N)%N];
+      const curr = center[i];
+      const next = center[(i+1)%N];
+      let t;
+      if (closed) t = p5.Vector.sub(next, prev);
+      else {
+        if (i===0)        t = p5.Vector.sub(center[1], center[0]);
+        else if (i===N-1) t = p5.Vector.sub(center[N-1], center[N-2]);
+        else              t = p5.Vector.sub(next, prev);
       }
-      update(){ this.pos.add(this.vel); this.lifespan--; }
-      draw(){
-        noStroke();
-        fill(60,100,100,map(this.lifespan,0,particleLifespan,0,100));
-        circle(this.pos.x,this.pos.y,4);
-      }
+      if (t.magSq() < 1e-8) t.set(1,0);
+      t.normalize();
+      normals.push(createVector(-t.y, t.x));
+    }
+    const left  = center.map((p,i)=> createVector(p.x + normals[i].x*TRACK_HALF, p.y + normals[i].y*TRACK_HALF));
+    const right = center.map((p,i)=> createVector(p.x - normals[i].x*TRACK_HALF, p.y - normals[i].y*TRACK_HALF));
+    if (closed) { left.push(left[0].copy()); right.push(right[0].copy()); }
+    return {left,right};
+  }
+  function polylineToLineLL(pts, col=255, w=3, closed=false){
+    const ll=new LineLL(pts[0].x, pts[0].y, col, w);
+    const limit = pts.length; // when closed, pts already includes duplicate first point at end
+    for (let i=1; i<limit; i++) ll.addPoint(pts[i].x, pts[i].y);
+    return ll;
+  }
+  function drawPolyline(pts){
+    if(pts.length<2) return;
+    stroke(180,20,100); strokeWeight(3); noFill();
+    for(let i=0;i<pts.length-1;i++){
+      line(pts[i].x,pts[i].y,pts[i+1].x,pts[i+1].y);
+    }
+  }
+
+  /* ===== Particles ===== */
+  class Particle {
+    constructor(x,y){
+      this.pos=createVector(x,y);
+      this.vel=p5.Vector.random2D().mult(random(particleSpeedMin, particleSpeedMax));
+      this.lifespan=particleLifespan;
+    }
+    update(){ this.pos.add(this.vel); this.lifespan--; }
+    draw(){
+      noStroke(); fill(60,100,100,map(this.lifespan,0,particleLifespan,0,100));
+      circle(this.pos.x,this.pos.y,4);
+    }
+  }
+
+  /* ===== Ball ===== */
+  class Ball {
+    constructor(x,y){
+      this.pos=createVector(x,y);
+      this.vel=createVector(random(-1,1), random(-2,-1));
+      this.r=BALL_RADIUS;
+      const hue=BALL_HUES[ballColorIndex];
+      ballColorIndex=(ballColorIndex+1)%BALL_HUES.length;
+      this.c=color(hue,80,100);
+      this.mass=this.r*this.r;
+      this.sleeping=false; this.sleepCount=0;
+    }
+    integrate(dt){ if(this.sleeping) return; this.vel.y += GRAVITY*dt; this.pos.add(p5.Vector.mult(this.vel,dt)); }
+    draw(){ noStroke(); fill(this.c); circle(this.pos.x,this.pos.y,this.r*2); }
+    offscreen(){ return this.pos.y - this.r > height; }
+    speedSq(){ return this.vel.x*this.vel.x + this.vel.y*this.vel.y; }
+    trySleep(){ if(this.speedSq()<SLEEP_SPEED_SQ){ if(++this.sleepCount>=SLEEP_FRAMES){ this.sleeping=true; this.vel.set(0,0);} } else this.sleepCount=0; }
+    wake(){ this.sleeping=false; this.sleepCount=0; }
+  }
+
+  /* ===== p5 Hooks ===== */
+  function setup(){
+    cnv=createCanvas(windowWidth,windowHeight);
+    cnv.style('position','fixed').style('z-index','0');
+    colorMode(HSB,360,100,100);
+    background(0);
+    setupButtons();
+  }
+  function draw(){
+    background(0);
+    for(let i=0;i<PHYSICS_ITERS;i++) physicsStep(1/PHYSICS_ITERS);
+
+    // render: lines (includes track rails after commit)
+    lines.forEach(ln=>ln.draw());
+
+    // preview current line/track
+    if(currentLine) currentLine.draw();
+    if(currentTrack){
+      stroke(180,20,100); strokeWeight(3); noFill();
+      if(currentTrack.previewLeft.length>1)  drawPolyline(currentTrack.previewLeft);
+      if(currentTrack.previewRight.length>1) drawPolyline(currentTrack.previewRight);
     }
 
-    /* ===== Ball ===== */
-    class Ball {
-      constructor(x,y){
-        this.pos=createVector(x,y);
-        this.vel=createVector(random(-1,1), random(-2,-1));
-        this.r=BALL_RADIUS;
-        const hue=BALL_HUES[ballColorIndex];
-        ballColorIndex=(ballColorIndex+1)%BALL_HUES.length;
-        this.c=color(hue,80,100);
-        this.mass=this.r*this.r;
-        this.sleeping=false; this.sleepCount=0;
-      }
-      integrate(dt){
-        if(this.sleeping) return;
-        this.vel.y += GRAVITY * dt;
-        this.pos.x += this.vel.x * dt;
-        this.pos.y += this.vel.y * dt;
-      }
-      draw(){
-        noStroke(); fill(this.c);
-        circle(this.pos.x,this.pos.y,this.r*2);
-      }
-      offscreen(){ return this.pos.y - this.r > height; }
-      speedSq(){ return this.vel.x*this.vel.x + this.vel.y*this.vel.y; }
-      trySleep(){
-        if(this.speedSq() < SLEEP_SPEED_SQ){
-          this.sleepCount++;
-          if(this.sleepCount >= SLEEP_FRAMES){
-            this.sleeping=true; this.vel.set(0,0);
-          }
-        } else this.sleepCount=0;
-      }
-      wake(){ this.sleeping=false; this.sleepCount=0; }
+    balls.forEach(b=>b.draw());
+    for(let i=particles.length-1;i>=0;i--){
+      particles[i].update(); particles[i].draw();
+      if(particles[i].lifespan<=0) particles.splice(i,1);
     }
+  }
+  function windowResized(){ resizeCanvas(windowWidth,windowHeight); }
 
-    /* ===== p5 Hooks ===== */
-    function setup(){
-      cnv=createCanvas(windowWidth,windowHeight);
-      cnv.style('position','fixed').style('z-index','0');
-      colorMode(HSB,360,100,100);
-      background(0);
-      setupButtons();
-    }
+  /* ===== Input ===== */
+  function touchStarted(){ return handlePointerStart(getPointer()); }
+  function touchMoved(){ return handlePointerDrag(getPointer()); }
+  function touchEnded(){ finishStroke(); return false; }
+  function mousePressed(){ if(touches&&touches.length>0) return; handlePointerStart({x:mouseX,y:mouseY}); }
+  function mouseDragged(){ handlePointerDrag({x:mouseX,y:mouseY}); }
+  function mouseReleased(){ finishStroke(); }
 
-    function draw(){
-      background(0);
-      for(let i=0;i<PHYSICS_ITERS;i++) physicsStep(1/PHYSICS_ITERS);
-      lines.forEach(ln=>ln.draw());
-      if(currentLine) currentLine.draw();
-      balls.forEach(b=>b.draw());
-      for(let i=particles.length-1;i>=0;i--){
-        particles[i].update(); particles[i].draw();
-        if(particles[i].lifespan<=0) particles.splice(i,1);
-      }
-    }
+  function getPointer(){
+    return touches&&touches.length>0 ? {x:touches[0].x,y:touches[0].y} : {x:mouseX,y:mouseY};
+  }
 
-    function windowResized(){
-      resizeCanvas(windowWidth,windowHeight);
-    }
+  function handlePointerStart({x,y}){
+    if(y<=UI_HEIGHT) return false;
+    if(mode==='ball'){ balls.push(new Ball(x,y)); return false; }
 
-    /* ===== Input ===== */
-    function touchStarted(){ return handlePointerStart(getPointer()); }
-    function touchMoved(){ return handlePointerDrag(getPointer()); }
-    function touchEnded(){ endLine(); return false; }
-    function mousePressed(){
-      if(touches&&touches.length>0) return;
-      handlePointerStart({x:mouseX,y:mouseY});
-    }
-    function mouseDragged(){
-      if(mode==='line'&&currentLine&&mouseY>UI_HEIGHT){
-        handlePointerDrag({x:mouseX,y:mouseY});
-      }
-    }
-    function mouseReleased(){
-      if(mode==='line') endLine();
-    }
-
-    function handlePointerStart({x,y}){
-      if(y<=UI_HEIGHT) return false;
-      if(mode==='ball') balls.push(new Ball(x,y));
-      else startLine(x,y);
+    if(mode==='line'){
+      currentLine = new LineLL(x,y, 255, 3); // white
       return false;
     }
-    function handlePointerDrag({x,y}){
-      if(!currentLine||y<=UI_HEIGHT) return false;
+    if(mode==='track'){
+      // start near an existing track endpoint? snap
+      const snap = findNearestTrackEndpoint(x,y,SNAP_DIST);
+      const start = snap ? createVector(snap.x, snap.y) : createVector(x,y);
+      currentTrack = { center:[start], previewLeft:[], previewRight:[] };
+      updateTrackPreview();
+      return false;
+    }
+  }
+
+  function handlePointerDrag({x,y}){
+    if(mode==='line' && currentLine){
       const dx=x-currentLine.tail.x, dy=y-currentLine.tail.y;
+      if(dx*dx+dy*dy>=MIN_SEGMENT_DIST*MIN_SEGMENT_DIST){ currentLine.addPoint(x,y); rebuildSegments(); }
+      return false;
+    }
+    if(mode==='track' && currentTrack){
+      const last=currentTrack.center[currentTrack.center.length-1];
+      const dx=x-last.x, dy=y-last.y;
       if(dx*dx+dy*dy>=MIN_SEGMENT_DIST*MIN_SEGMENT_DIST){
-        extendLine(x,y); rebuildSegments();
+        currentTrack.center.push(createVector(x,y));
+        updateTrackPreview();
       }
       return false;
     }
-    function getPointer(){
-      return touches&&touches.length>0
-        ? {x:touches[0].x,y:touches[0].y}
-        : {x:mouseX,y:mouseY};
+  }
+
+  function finishStroke(){
+    if(mode==='line'){
+      if(currentLine && currentLine.length>1){ lines.push(currentLine); rebuildSegments(); }
+      currentLine=null; return;
     }
+    if(mode==='track'){
+      if(currentTrack && currentTrack.center.length>1){
+        // snap end if near endpoint (self or other)
+        let end = currentTrack.center[currentTrack.center.length-1];
+        const snapEnd = findNearestTrackEndpoint(end.x,end.y,SNAP_DIST, /*includeSelfStart=*/true, currentTrack.center[0]);
+        if (snapEnd){ end.x = snapEnd.x; end.y = snapEnd.y; }
 
-    function startLine(x,y){ currentLine=new LineLL(x,y); }
-    function extendLine(x,y){ currentLine.addPoint(x,y); }
-    function endLine(){
-      if(currentLine&&currentLine.length>1){
-        lines.push(currentLine); rebuildSegments();
-      }
-      currentLine=null;
-    }
-    function rebuildSegments(){
-      lineSegments=[]; lines.forEach(ln=>lineSegments.push(...ln.segments()));
-      balls.forEach(b=>b.wake());
-    }
+        const start = currentTrack.center[0];
+        const isLoop = dist2(start.x,start.y, end.x,end.y) < 1e-6;
 
-    /* ===== Buttons & Boom & Speed ===== */
-    function setupButtons(){
-      const bBall   =document.getElementById('btnBall'),
-            bLine   =document.getElementById('btnLine'),
-            bBoom   =document.getElementById('btnBoom'),
-            bSpeed  =document.getElementById('btnSpeed'),
-            bBackL  =document.getElementById('btnBackLeft'),
-            bBackR  =document.getElementById('btnBackRight');
+        if (isLoop){
+          // 1) close first (ensure exact closure)
+          currentTrack.center[currentTrack.center.length-1] = start.copy();
 
-      function setMode(m){
-        mode=m;
-        bBall.classList.toggle('active',m==='ball');
-        bLine.classList.toggle('active',m==='line');
-      }
-      function bind(el,fn){
-        el.addEventListener('click', e=>{
-          e.stopPropagation();
-          fn();
-        });
-        el.addEventListener('touchstart', e=>{
-          e.stopPropagation();
-          e.preventDefault();
-          fn();
-        },{passive:false});
-      }
+          // 2) smooth the seam on the closed centerline
+          smoothClosedPolyline(currentTrack.center, SMOOTH_ITERS, BLEND_NODES);
 
-      bind(bBall,  ()=>setMode('ball'));
-      bind(bLine,  ()=>setMode('line'));
-      bind(bBackL, ()=>{ if(balls.length>0) balls.pop(); });
-      bind(bBackR, ()=>{ if(lines.length>0) lines.pop(); rebuildSegments(); });
-      bind(bBoom,  doBoom);
-      bind(bSpeed, ()=>{ speedMode=!speedMode; bSpeed.classList.toggle('active',speedMode); });
+          // 3) build rails AS CLOSED (adds last→first rail segments)
+          const {left,right} = buildRailsFromCenter(currentTrack.center, /*closed=*/true);
 
-      setMode('line');
-    }
+          // 4) commit rails (pts already include duplicate first at end)
+          const leftLL  = polylineToLineLL(left, 180, 3, /*closed=*/true);
+          const rightLL = polylineToLineLL(right,180, 3, /*closed=*/true);
+          const leftIdx  = lines.push(leftLL)  - 1;
+          const rightIdx = lines.push(rightLL) - 1;
 
-    function doBoom(){
-      if(!balls.length) return;
-      const i=floor(random(balls.length)), b=balls.splice(i,1)[0],
-            ex=b.pos.x, ey=b.pos.y;
-      for(const o of balls){
-        const d=p5.Vector.sub(o.pos,createVector(ex,ey)), dist=d.mag();
-        if(dist<explosionRadius){
-          const strength=explosionForce*pow(1-dist/explosionRadius,2);
-          o.vel.add(d.normalize().mult(strength));
-        }
-      }
-      for(let j=0;j<numParticles;j++) particles.push(new Particle(ex,ey));
-    }
-
-    /* ===== Physics ===== */
-    function physicsStep(dtFactor){
-      balls=balls.filter(b=>!b.offscreen());
-      let maxSpeed=0;
-      balls.forEach(b=>{ if(!b.sleeping) maxSpeed=Math.max(maxSpeed,b.vel.mag()); });
-      const steps=Math.max(1,Math.ceil((maxSpeed*dtFactor)/MAX_SUBSTEP_MOVE));
-      const dt=dtFactor/steps;
-      for(let s=0;s<steps;s++) balls.forEach(b=>b.integrate(dt));
-
-      balls.forEach(b=>{
-        if(b.pos.x-b.r>width) b.pos.x=-b.r;
-        if(b.pos.x+b.r<0)     b.pos.x=width+b.r;
-      });
-
-      const qt1=new Quadtree(new Rect(width/2,height/2,width/2,height/2),4);
-      balls.forEach((b,i)=>qt1.insert({x:b.pos.x,y:b.pos.y,i}));
-      balls.forEach((b1,i)=>{
-        const r=new Rect(b1.pos.x,b1.pos.y,b1.r*2,b1.r*2);
-        qt1.query(r).forEach(p=>{ if(p.i>i) resolveBallBall(b1,balls[p.i]); });
-      });
-
-      const qt2=new Quadtree(new Rect(width/2,height/2,width/2,height/2),4);
-      balls.forEach((b,i)=>qt2.insert({x:b.pos.x,y:b.pos.y,i}));
-      for(let i=balls.length-1;i>=0;i--){
-        const b2=balls[i], r=new Rect(b2.pos.x,b2.pos.y,b2.r*2,b2.r*2);
-        qt2.query(r).forEach(p=>{ if(p.i<i) resolveBallBall(balls[p.i],b2); });
-      }
-
-      balls.forEach(b=>resolveBallLines(b));
-      balls.forEach(b=>b.vel.mult(AIR_DAMPING));
-
-      if(speedMode){
-        balls.forEach(b=>{
-          if(b.vel.mag()>0) b.vel.setMag(SPEED_MAG);
-        });
-      }
-
-      balls.forEach(b=>{ if(!b.sleeping) b.trySleep(); });
-    }
-
-    function resolveBallBall(b1,b2){
-      const n=p5.Vector.sub(b2.pos,b1.pos);
-      const dist=n.mag(), minD=b1.r+b2.r;
-      if(dist===0||dist>=minD-POS_SLOP) return;
-      const normal=n.copy().div(dist||1e-8);
-      const overlap=(minD-dist)*PEN_CORRECT;
-      const mSum=b1.mass+b2.mass;
-      b1.pos.add(p5.Vector.mult(normal,-overlap*(b2.mass/mSum)));
-      b2.pos.add(p5.Vector.mult(normal, overlap*(b1.mass/mSum)));
-      const rv=p5.Vector.sub(b2.vel,b1.vel);
-      const velN=rv.dot(normal);
-      if(velN>0) return;
-      const j=-(1+RESTITUTION_BALL_BALL)*velN/(1/b1.mass+1/b2.mass);
-      const imp=p5.Vector.mult(normal,j);
-      b1.vel.sub(p5.Vector.mult(imp,1/b1.mass));
-      b2.vel.add(p5.Vector.mult(imp,1/b2.mass));
-      if(Math.abs(j)>WAKE_IMPULSE){ b1.wake(); b2.wake(); }
-    }
-
-    function resolveBallLines(b){
-      if(!lineSegments.length) return;
-      for(const seg of lineSegments){
-        const cp=closestPointOnSegment(seg.ax,seg.ay,seg.bx,seg.by,b.pos.x,b.pos.y);
-        const dx=b.pos.x-cp.x, dy=b.pos.y-cp.y;
-        const dist2=dx*dx+dy*dy, r=b.r;
-        if(dist2<r*r-POS_SLOP){
-          const dist=Math.sqrt(dist2)||1e-8;
-          const normal=createVector(dx/dist,dy/dist);
-          b.pos.add(p5.Vector.mult(normal,(r-dist)*PEN_CORRECT));
-          const vn=b.vel.dot(normal);
-          if(vn<0){
-            b.vel.sub(p5.Vector.mult(normal,(1+RESTITUTION_BALL_LINE)*vn));
-            const vn2=b.vel.dot(normal);
-            if(Math.abs(vn2)<NORMAL_STOP_THRESHOLD){
-              b.vel.sub(normal.copy().mult(vn2));
-            }
+          const tr = new TrackRef(currentTrack.center.map(v=>v.copy()));
+          tr.leftLineIdx = leftIdx;
+          tr.rightLineIdx= rightIdx;
+          tr.isClosed = true;
+          tracks.push(tr);
+          rebuildSegments();
+        } else {
+          // merging into another track endpoint (not a loop)
+          if (snapEnd && snapEnd.trackIdx>=0){
+            smoothTail(currentTrack.center, BLEND_NODES);
+            nudgeTrackEndpointTowards(tracks[snapEnd.trackIdx], snapEnd.whichEnd, createVector(snapEnd.x,snapEnd.y));
           }
-          b.wake();
+
+          const {left,right} = buildRailsFromCenter(currentTrack.center, /*closed=*/false);
+          if(left.length>1 && right.length>1){
+            const leftLL  = polylineToLineLL(left, 180, 3, false);
+            const rightLL = polylineToLineLL(right,180, 3, false);
+            const leftIdx  = lines.push(leftLL)  - 1;
+            const rightIdx = lines.push(rightLL) - 1;
+
+            const tr = new TrackRef(currentTrack.center.map(v=>v.copy()));
+            tr.leftLineIdx = leftIdx;
+            tr.rightLineIdx= rightIdx;
+            tr.isClosed = false;
+            tracks.push(tr);
+            rebuildSegments();
+          }
         }
       }
+      currentTrack=null;
+      return;
     }
+  }
+
+  /* ===== Track helpers ===== */
+  function updateTrackPreview(){
+    if(!currentTrack) return;
+    const start = currentTrack.center[0];
+    const end   = currentTrack.center[currentTrack.center.length-1];
+    const willClose = dist2(start.x,start.y,end.x,end.y) <= SNAP_DIST2;
+    const lr = buildRailsFromCenter(currentTrack.center, /*closed=*/willClose);
+    currentTrack.previewLeft  = lr.left;
+    currentTrack.previewRight = lr.right;
+  }
+
+  function findNearestTrackEndpoint(x,y, radius, includeSelfStart=false, selfStart=null){
+    let best=null, bestD2=radius*radius;
+    tracks.forEach((t, ti)=>{
+      const cStart = t.center[0], cEnd = t.center[t.center.length-1];
+      const candidates = [
+        {x:cStart.x,y:cStart.y, trackIdx:ti, whichEnd:'start'},
+        {x:cEnd.x,  y:cEnd.y,  trackIdx:ti, whichEnd:'end'}
+      ];
+      for(const c of candidates){
+        const d2=dist2(x,y,c.x,c.y);
+        if(d2<bestD2){ bestD2=d2; best=c; }
+      }
+    });
+    // allow snapping to our *own* start while drawing (loop closure)
+    if(includeSelfStart && selfStart){
+      const d2 = dist2(x,y,selfStart.x,selfStart.y);
+      if(d2 < bestD2){ best = {x:selfStart.x, y:selfStart.y, trackIdx:-1, whichEnd:'start'}; }
+    }
+    return best;
+  }
+
+  function smoothTail(pts, k){
+    const n=pts.length;
+    const s=Math.max(1, n - k);
+    for(let pass=0; pass<2; pass++){
+      for(let i=s; i<n-1; i++){
+        const a=pts[i-1] ?? pts[i], b=pts[i], c=pts[i+1];
+        b.x = (a.x + 2*b.x + c.x)*0.25;
+        b.y = (a.y + 2*b.y + c.y)*0.25;
+      }
+    }
+  }
+
+  function smoothClosedPolyline(pts, passes, windowK){
+    // treat pts as circular list; do local smoothing near seam (start/end)
+    for(let p=0;p<passes;p++){
+      for(let j=0;j<windowK;j++){
+        const i1 = (j) % pts.length;
+        const i2 = (pts.length - 1 - j + pts.length) % pts.length;
+        const neighbors1 = [pts[(i1-1+pts.length)%pts.length], pts[i1], pts[(i1+1)%pts.length]];
+        const neighbors2 = [pts[(i2-1+pts.length)%pts.length], pts[i2], pts[(i2+1)%pts.length]];
+        // smooth mid point toward neighbors
+        pts[i1].x = (neighbors1[0].x + 2*neighbors1[1].x + neighbors1[2].x)*0.25;
+        pts[i1].y = (neighbors1[0].y + 2*neighbors1[1].y + neighbors1[2].y)*0.25;
+        pts[i2].x = (neighbors2[0].x + 2*neighbors2[1].x + neighbors2[2].x)*0.25;
+        pts[i2].y = (neighbors2[0].y + 2*neighbors2[1].y + neighbors2[2].y)*0.25;
+      }
+    }
+  }
+
+  function nudgeTrackEndpointTowards(trackRef, whichEnd, target){
+    // gentle smoothing near an endpoint of an existing track to blend the meeting
+    const pts = trackRef.center;
+    if(pts.length<3) return;
+    const idx = (whichEnd==='start') ? 0 : pts.length-1;
+    // snap the endpoint exactly and smooth its neighborhood
+    pts[idx].x = target.x; pts[idx].y = target.y;
+    const window = Math.min(BLEND_NODES, Math.floor(pts.length/2));
+    for(let pass=0; pass<SMOOTH_ITERS; pass++){
+      for(let j=0;j<window;j++){
+        const i = (whichEnd==='start') ? j : (pts.length-1-j);
+        const a = pts[Math.max(0, i-1)];
+        const b = pts[i];
+        const c = pts[Math.min(pts.length-1, i+1)];
+        b.x = (a.x + 2*b.x + c.x)*0.25;
+        b.y = (a.y + 2*b.y + c.y)*0.25;
+      }
+    }
+    // rebuild its rails/lines
+    const closed = trackRef.isClosed;
+    const lr = buildRailsFromCenter(pts, closed);
+    if(lr.left.length>1 && lr.right.length>1){
+      lines[trackRef.leftLineIdx]  = polylineToLineLL(lr.left, 180, 3, closed);
+      lines[trackRef.rightLineIdx] = polylineToLineLL(lr.right,180, 3, closed);
+      rebuildSegments();
+    }
+  }
+
+  /* ===== Buttons & Boom & Speed ===== */
+  function setupButtons(){
+    const bBall   =document.getElementById('btnBall'),
+          bLine   =document.getElementById('btnLine'),
+          bTrack  =document.getElementById('btnTrack'),
+          bBackBall  =document.getElementById('btnBackBall'),
+          bBackLine  =document.getElementById('btnBackLine'),
+          bBackTrack =document.getElementById('btnBackTrack'),
+          bBoom   =document.getElementById('btnBoom'),
+          bSpeed  =document.getElementById('btnSpeed');
+
+    function setMode(m){
+      mode=m;
+      bBall.classList.toggle('active',m==='ball');
+      bLine.classList.toggle('active',m==='line');
+      bTrack.classList.toggle('active',m==='track');
+    }
+    function bind(el,fn){
+      el.addEventListener('click', e=>{ e.stopPropagation(); fn(); });
+      el.addEventListener('touchstart', e=>{ e.stopPropagation(); e.preventDefault(); fn(); },{passive:false});
+    }
+
+    bind(bBall,  ()=>setMode('ball'));
+    bind(bLine,  ()=>setMode('line'));
+    bind(bTrack, ()=>setMode('track'));
+
+    bind(bBackBall, ()=>{ if(balls.length>0) balls.pop(); });
+
+    bind(bBackLine, ()=>{
+      if(mode==='line' && currentLine){
+        if(currentLine.length>1) currentLine.popPoint(); else currentLine=null;
+        rebuildSegments(); return;
+      }
+      // delete last standalone line (prefer not to nuke rails—those belong to tracks)
+      for(let i=lines.length-1;i>=0;i--){
+        const usedByTrack = tracks.some(t=> t.leftLineIdx===i || t.rightLineIdx===i);
+        if(!usedByTrack){ lines.splice(i,1); rebuildSegments(); break; }
+      }
+    });
+
+    bind(bBackTrack, ()=>{
+      if(mode==='track' && currentTrack){
+        if(currentTrack.center.length>1){ currentTrack.center.pop(); updateTrackPreview(); }
+        else currentTrack=null;
+        return;
+      }
+      if(tracks.length>0){
+        const tr = tracks.pop();
+        // remove its two lines (remove higher index first)
+        const idxs = [tr.leftLineIdx,tr.rightLineIdx].sort((a,b)=>b-a);
+        for(const idx of idxs){ lines.splice(idx,1); }
+        // fix other track line indices after splices
+        tracks.forEach(t=>{
+          idxs.forEach(removed=>{
+            if(t.leftLineIdx>removed)  t.leftLineIdx--;
+            if(t.rightLineIdx>removed) t.rightLineIdx--;
+          });
+        });
+        rebuildSegments();
+      }
+    });
+
+    bind(bBoom,  doBoom);
+    bind(bSpeed, ()=>{ speedMode=!speedMode; bSpeed.classList.toggle('active',speedMode); });
+
+    setMode('line');
+  }
+
+  function doBoom(){
+    if(!balls.length) return;
+    const i=floor(random(balls.length)), b=balls.splice(i,1)[0],
+          ex=b.pos.x, ey=b.pos.y;
+    for(const o of balls){
+      const d=p5.Vector.sub(o.pos,createVector(ex,ey)), dist=d.mag();
+      if(dist<explosionRadius){
+        const strength=explosionForce*pow(1-dist/explosionRadius,2);
+        o.vel.add(d.normalize().mult(strength));
+      }
+    }
+    for(let j=0;j<numParticles;j++) particles.push(new Particle(ex,ey));
+  }
+
+  /* ===== Physics ===== */
+  function rebuildSegments(){
+    lineSegments.length = 0;
+    lines.forEach(ln=> lineSegments.push(...ln.segments()));
+    balls.forEach(b=>b.wake());
+  }
+
+  function physicsStep(dtFactor){
+    balls=balls.filter(b=>!b.offscreen());
+    let maxSpeed=0;
+    balls.forEach(b=>{ if(!b.sleeping) maxSpeed=Math.max(maxSpeed,b.vel.mag()); });
+    const steps=Math.max(1,Math.ceil((maxSpeed*dtFactor)/MAX_SUBSTEP_MOVE));
+    const dt=dtFactor/steps;
+    for(let s=0;s<steps;s++) balls.forEach(b=>b.integrate(dt));
+
+    // horizontal wrap
+    balls.forEach(b=>{
+      if(b.pos.x-b.r>width) b.pos.x=-b.r;
+      if(b.pos.x+b.r<0)     b.pos.x=width+b.r;
+    });
+
+    // ball-ball
+    const qt=new Quadtree(new Rect(width/2,height/2,width/2,height/2),4);
+    balls.forEach((b,i)=>qt.insert({x:b.pos.x,y:b.pos.y,i}));
+    balls.forEach((b1,i)=>{
+      const r=new Rect(b1.pos.x,b1.pos.y,b1.r*2,b1.r*2);
+      qt.query(r).forEach(p=>{ if(p.i>i) resolveBallBall(b1,balls[p.i]); });
+    });
+
+    // ball-lines (includes rails)
+    balls.forEach(b=>resolveBallSegments(b));
+
+    // Mild “magnet” along track tangents (only when inside corridor)
+    balls.forEach(b=>{
+      const assist = projectVelocityAlongTrack(b);
+      if(assist){ b.vel.x = lerp(b.vel.x, assist.x, 0.25); b.vel.y = lerp(b.vel.y, assist.y, 0.25); }
+    });
+
+    balls.forEach(b=>b.vel.mult(AIR_DAMPING));
+    if(speedMode){ balls.forEach(b=>{ if(b.vel.mag()>0) b.vel.setMag(SPEED_MAG); }); }
+    balls.forEach(b=>{ if(!b.sleeping) b.trySleep(); });
+  }
+
+  function resolveBallBall(b1,b2){
+    const n=p5.Vector.sub(b2.pos,b1.pos);
+    const dist=n.mag(), minD=b1.r+b2.r;
+    if(dist===0||dist>=minD-POS_SLOP) return;
+    const normal=n.copy().div(dist||1e-8);
+    const overlap=(minD-dist)*PEN_CORRECT;
+    const mSum=b1.mass+b2.mass;
+    b1.pos.add(p5.Vector.mult(normal,-overlap*(b2.mass/mSum)));
+    b2.pos.add(p5.Vector.mult(normal, overlap*(b1.mass/mSum)));
+    const rv=p5.Vector.sub(b2.vel,b1.vel);
+    const velN=rv.dot(normal);
+    if(velN>0) return;
+    const j=-(1+RESTITUTION_BALL_BALL)*velN/(1/b1.mass+1/b2.mass);
+    const imp=p5.Vector.mult(normal,j);
+    b1.vel.sub(p5.Vector.mult(imp,1/b1.mass));
+    b2.vel.add(p5.Vector.mult(imp,1/b2.mass));
+    if(Math.abs(j)>WAKE_IMPULSE){ b1.wake(); b2.wake(); }
+  }
+
+  function resolveBallSegments(b){
+    if(!lineSegments.length) return;
+    let bestDepth=0, bestN=null;
+    for(const seg of lineSegments){
+      const cp=closestPointOnSegment(seg.ax,seg.ay,seg.bx,seg.by,b.pos.x,b.pos.y);
+      const dx=b.pos.x-cp.x, dy=b.pos.y-cp.y;
+      const d2=dx*dx+dy*dy, r=b.r;
+      if(d2 < (r*r - POS_SLOP)){
+        const d=Math.sqrt(Math.max(d2,1e-8));
+        const n=createVector(dx/d, dy/d);
+        // blend toward segment normal to avoid “corner spikes”
+        const tx=seg.bx-seg.ax, ty=seg.by-seg.ay;
+        const tl=Math.hypot(tx,ty)||1e-8;
+        const segN=createVector(-ty/tl, tx/tl);
+        const blendN = p5.Vector.lerp(n, segN, CORNER_BLEND).normalize();
+        const depth=r - d;
+        if(depth>bestDepth){ bestDepth=depth; bestN=blendN; }
+      }
+    }
+    if(!bestN) return;
+    // position correction
+    b.pos.add(p5.Vector.mult(bestN, bestDepth * PEN_CORRECT));
+    // velocity split
+    const vn = b.vel.dot(bestN);
+    if(vn<0){
+      const normalImpulse = (1+RESTITUTION_BALL_LINE) * vn;
+      b.vel.sub(p5.Vector.mult(bestN, normalImpulse));
+      const vt = b.vel.dot( perp(bestN) );
+      const fric = -TANGENTIAL_FRICTION * vt;
+      b.vel.add( p5.Vector.mult(perp(bestN), fric) );
+      const vn2=b.vel.dot(bestN);
+      if(Math.abs(vn2)<NORMAL_STOP_THRESHOLD) b.vel.sub(bestN.copy().mult(vn2));
+      b.wake();
+    }
+  }
+
+  function projectVelocityAlongTrack(b){
+    // pick nearest track center segment if inside corridor; project velocity onto tangent
+    let bestD2=Infinity, bestSeg=0, bestPts=null;
+    for(const tr of tracks){
+      const pts=tr.center; if(pts.length<2) continue;
+      for(let i=0;i<pts.length-1;i++){
+        const a=pts[i], c=pts[i+1];
+        const cp=closestPointOnSegment(a.x,a.y,c.x,c.y,b.pos.x,b.pos.y);
+        const d2=dist2(b.pos.x,b.pos.y,cp.x,cp.y);
+        if(d2<bestD2){ bestD2=d2; bestSeg=i; bestPts=pts; }
+      }
+    }
+    if(!bestPts) return null;
+    const dist = Math.sqrt(bestD2);
+    if(dist > TRACK_HALF - b.r*0.6) return null;
+    const a=bestPts[bestSeg], c=bestPts[bestSeg+1];
+    const tang = createVector(c.x-a.x, c.y-a.y);
+    if(tang.magSq()<1e-8) return null;
+    tang.normalize();
+    const speed = b.vel.dot(tang);
+    return p5.Vector.mult(tang, speed);
+  }
+
   </script>
 </body>
 </html>
