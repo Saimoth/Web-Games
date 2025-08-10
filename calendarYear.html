@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Year</title>
+<style>
+  :root{
+    --bg:#0c0d10; --ink:#e9ecf1; --muted:#9aa3af;
+    --accent:#5ab0ff; --card:#151821; --grid:#222736;
+    --viewShade:#11243a;
+  }
+  @media (prefers-color-scheme: light){
+    :root{
+      --bg:#f5f7fb; --ink:#0c0d10; --muted:#5c6470; --accent:#2563eb;
+      --card:#ffffff; --grid:#e6e9f0; --viewShade:#dfeafe;
+    }
+  }
+
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;-webkit-tap-highlight-color:transparent}
+  .app{min-height:100%;display:flex;flex-direction:column}
+
+  .toolbar{display:flex;align-items:center;justify-content:center;gap:8px;padding:10px 12px;position:sticky;top:0;z-index:10;background:var(--bg);border-bottom:1px solid var(--grid)}
+  .toolbar .title{font-weight:700;font-size:18px;text-align:center}
+
+  .years{display:flex; flex-direction:column; gap:14px; padding:12px; overflow:auto; height:calc(100dvh - 64px)}
+  .row{display:grid; grid-template-columns:repeat(2,1fr); gap:14px}
+  .row.single{grid-template-columns:1fr}
+
+  .year-card{
+    background:var(--card); border:1px solid var(--grid); border-radius:14px; padding:12px;
+  }
+  .year-card.big{padding:16px; border-width:2px}
+  .year-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+  .year-head h3{margin:0;font-size:16px}
+  .year-card.big .year-head h3{font-size:20px}
+
+  .months{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .m-btn{
+    border:1px solid var(--grid); border-radius:10px; padding:10px; text-align:center; font-weight:700;
+    background:var(--bg); cursor:pointer;
+  }
+  .m-btn:active{transform:translateY(1px)}
+  .m-btn.today-outline{ outline:2px solid var(--accent); }
+  .m-btn.view-highlight{ background:var(--viewShade); }
+
+  .hint{text-align:center;color:var(--muted);font-size:12px;padding:4px 0 8px}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="toolbar">
+    <div class="title" id="title">Today</div>
+  </div>
+
+  <div id="years" class="years"></div>
+  <div class="hint">Tap a month to open the month view • Blue outline = current month • Shaded = viewed month</div>
+</div>
+
+<script>
+(function(){
+  const monthNames=["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const params = new URLSearchParams(location.search);
+  const today=new Date();
+
+  let viewYear = parseInt(params.get("year") || today.getFullYear(),10);
+  let viewMonth = (parseInt(params.get("month")|| (today.getMonth()+1),10) - 1);
+  if(isNaN(viewYear)) viewYear=today.getFullYear();
+  if(isNaN(viewMonth) || viewMonth<0 || viewMonth>11) viewMonth=today.getMonth();
+
+  // Title shows today's date (UK style)
+  const titleEl=document.getElementById("title");
+  titleEl.textContent = today.toLocaleDateString("en-GB", { weekday:"long", day:"2-digit", month:"long", year:"numeric" });
+
+  const yearsEl=document.getElementById("years");
+
+  // Fixed 2-1-2 layout centered on the viewed year
+  const centerYear = viewYear;
+
+  function renderYears(){
+    yearsEl.innerHTML="";
+
+    const years = [centerYear-2, centerYear-1, centerYear, centerYear+1, centerYear+2];
+
+    // Top row (two small)
+    const top=document.createElement("div"); top.className="row";
+    top.appendChild(buildYearCard(years[0], false));
+    top.appendChild(buildYearCard(years[1], false));
+    yearsEl.appendChild(top);
+
+    // Middle row (one big)
+    const mid=document.createElement("div"); mid.className="row single";
+    mid.appendChild(buildYearCard(years[2], true));
+    yearsEl.appendChild(mid);
+
+    // Bottom row (two small)
+    const bot=document.createElement("div"); bot.className="row";
+    bot.appendChild(buildYearCard(years[3], false));
+    bot.appendChild(buildYearCard(years[4], false));
+    yearsEl.appendChild(bot);
+  }
+
+  function buildYearCard(year, isBig){
+    const card=document.createElement("div");
+    card.className="year-card"+(isBig?" big":"");
+
+    const head=document.createElement("div"); head.className="year-head";
+    const h3=document.createElement("h3"); h3.textContent=year;
+    head.append(h3);
+    const months=document.createElement("div"); months.className="months";
+
+    for(let m=0;m<12;m++){
+      const b=document.createElement("button"); b.className="m-btn"; b.type="button";
+      b.textContent=monthNames[m].slice(0,3);
+
+      // Blue outline for ACTUAL current month (today)
+      if(year===today.getFullYear() && m===today.getMonth()){
+        b.classList.add("today-outline");
+      }
+      // Shaded background for the month we are currently viewing
+      if(year===viewYear && m===viewMonth){
+        b.classList.add("view-highlight");
+      }
+
+      b.addEventListener("click", ()=>{
+        const mm = String(m+1).padStart(2,"0");
+        window.location.href = `calendar.html?year=${year}&month=${mm}`;
+      });
+      months.appendChild(b);
+    }
+
+    card.append(head, months);
+    return card;
+  }
+
+  renderYears();
+})();
+</script>
+</body>
+</html>
