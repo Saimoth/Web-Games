@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Day — Annual Leave & Cover</title>
+<style>
+  :root{
+    --bg:#0c0d10; --ink:#e9ecf1; --muted:#9aa3af; --card:#151821; --grid:#222736;
+    --accent:#5ab0ff; --danger:#ef4444; --ok:#10b981;
+    --shadow:0 6px 20px rgba(0,0,0,0.35);
+    --day:#10b981; --aa:#ef4444; --ab:#3b82f6;
+  }
+  @media (prefers-color-scheme: light){
+    :root{
+      --bg:#f5f7fb; --ink:#0c0d10; --muted:#5c6470; --card:#ffffff; --grid:#e6e9f0;
+      --accent:#2563eb; --danger:#dc2626; --shadow:0 6px 16px rgba(0,0,0,0.08);
+      --day:#059669; --aa:#dc2626; --ab:#2563eb;
+    }
+  }
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+  .wrap{min-height:100%;display:flex;flex-direction:column}
+
+  .top{
+    padding:14px 12px; border-bottom:1px solid var(--grid);
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    position:sticky; top:0; background:var(--bg); z-index:5;
+  }
+  .date{font-size:18px; font-weight:800}
+  .btn{min-width:44px; min-height:38px; padding:8px 12px; font-weight:700; border-radius:10px;
+       border:1px solid var(--grid); background:var(--card); color:inherit; box-shadow:var(--shadow); cursor:pointer}
+  .btn:active{transform:translateY(1px)}
+  .btn.primary{background:var(--accent); color:#fff; border-color:transparent}
+  .btn.danger{background:transparent; color:var(--danger); border-color:var(--danger)}
+  .btnrow{display:flex; gap:8px; align-items:center}
+
+  .shift-banner{margin:8px 12px 0; border-radius:10px; padding:8px 12px; font-weight:900; color:#fff; display:none}
+  .shift-day{background:var(--day)}
+  .shift-aa{background:var(--aa)}
+  .shift-ab{background:var(--ab)}
+
+  .section{padding:14px 12px; display:flex; flex-direction:column; gap:10px}
+  .row{display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+  .label{font-weight:700; cursor:pointer}
+  .muted{color:var(--muted)}
+
+  .counter{font-weight:700}
+  .list{display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:10px}
+  @media (max-width:700px){ .list{grid-template-columns:repeat(3, minmax(0,1fr));} }
+  @media (max-width:520px){ .list{grid-template-columns:repeat(2, minmax(0,1fr));} }
+
+  .card{background:var(--card); border:1px solid var(--grid); border-radius:12px; padding:10px; display:flex; flex-direction:column; gap:6px}
+  .kv{display:flex; justify-content:space-between; gap:6px; font-size:14px}
+  .kv b{font-weight:800}
+  .actions{display:flex; justify-content:space-between; gap:6px}
+  .pill{display:inline-block; padding:4px 8px; border-radius:999px; border:1px solid var(--grid); font-weight:700; font-size:12px}
+
+  .notes-box{background:var(--card); border:1px solid var(--grid); border-radius:12px; padding:12px; min-height:64px; white-space:pre-wrap}
+  .empty{color:var(--muted); font-style:italic}
+
+  .overlay{position:fixed; inset:0; display:none; z-index:20; background:rgba(0,0,0,0.45); backdrop-filter:blur(4px)}
+  .overlay.active{display:block}
+  .sheet{
+    position:absolute; left:0; right:0; bottom:0; background:var(--card); color:inherit;
+    border-top-left-radius:16px; border-top-right-radius:16px; box-shadow:var(--shadow);
+    max-height:88dvh; transform:translateY(0); display:flex; flex-direction:column; border:1px solid var(--grid);
+  }
+  .sheet .topbar{display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border-bottom:1px solid var(--grid)}
+  .sheet .title{font-weight:800}
+  .sheet .content{padding:12px; display:flex; flex-direction:column; gap:12px; overflow:auto}
+  .field{display:flex; flex-direction:column; gap:6px}
+  select, textarea{width:100%; padding:10px; border-radius:10px; border:1px solid var(--grid); background:var(--bg); color:inherit}
+  textarea{min-height:120px; resize:vertical}
+  .radios{display:flex; gap:16px; align-items:center}
+
+  .modal{position:fixed; inset:0; display:none; z-index:30; align-items:center; justify-content:center; background:rgba(0,0,0,0.5)}
+  .modal.active{display:flex}
+  .modal .box{background:var(--card); border:1px solid var(--grid); border-radius:14px; padding:16px; width:min(420px, 92vw)}
+  .modal .actions{display:flex; gap:10px; justify-content:flex-end}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div id="dateText" class="date">Mon 01 01 25</div>
+    <div class="btnrow">
+      <button id="addBtn" class="btn primary">Add</button>
+      <button id="backBtn" class="btn">Back</button>
+    </div>
+  </div>
+
+  <div id="shiftBanner" class="shift-banner"></div>
+
+  <div class="section" id="ALSection">
+    <div class="row">
+      <div class="label">Annual Leave:</div>
+      <div id="alCount" class="counter">0</div>
+      <div class="muted">booked</div>
+    </div>
+    <div id="listWrap" class="list" style="display:none"></div>
+  </div>
+
+  <div class="section">
+    <div id="notesLabel" class="label">Notes:</div>
+    <div id="notesView" class="notes-box empty">(No notes)</div>
+  </div>
+</div>
+
+<!-- Add/Edit Entry overlay -->
+<div id="editOverlay" class="overlay" role="dialog" aria-modal="true">
+  <div class="sheet">
+    <div class="topbar">
+      <button id="editCancel" class="btn">Cancel</button>
+      <div class="title" id="editTitle">Edit</div>
+      <button id="editSave" class="btn primary">Save</button>
+    </div>
+    <div class="content">
+      <div class="field">
+        <label for="whoSel"><b>Annual Leave</b></label>
+        <select id="whoSel"></select>
+      </div>
+      <div class="field">
+        <label for="coverSel"><b>Cover</b></label>
+        <select id="coverSel"></select>
+      </div>
+      <div class="field">
+        <b>Cover Type</b>
+        <div class="radios" id="ctypeWrap">
+          <label><input type="radio" name="ctype" value="Extra" checked> Extra</label>
+          <label><input type="radio" name="ctype" value="Overtime"> Overtime</label>
+        </div>
+        <div id="ctypeDash" class="muted" style="display:none">—</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Note overlay -->
+<div id="noteOverlay" class="overlay" role="dialog" aria-modal="true">
+  <div class="sheet">
+    <div class="topbar">
+      <button id="noteCancel" class="btn">Cancel</button>
+      <div class="title" id="noteTitle">Note</div>
+      <div style="display:flex; gap:8px">
+        <button id="clearNoteBtn" class="btn danger" title="Clear note">Clear</button>
+        <button id="noteSave" class="btn primary">Save</button>
+      </div>
+    </div>
+    <div class="content">
+      <div class="field">
+        <label for="notesInput"><b>Notes</b></label>
+        <textarea id="notesInput" placeholder="Add a note for this day..."></textarea>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm delete modal -->
+<div id="confirmModal" class="modal" role="dialog" aria-modal="true">
+  <div class="box">
+    <h3>Delete entry?</h3>
+    <p>This will remove the annual leave booking for this person on this day.</p>
+    <div class="actions">
+      <button id="confirmNo" class="btn">No</button>
+      <button id="confirmYes" class="btn danger">Yes, delete</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  /* Shift rotation */
+  const SHIFT_PATTERN=["DAY","DAY","AA","AA","OFF","OFF","DAY","DAY","AB","AB","OFF","OFF"];
+  const ANCHOR=new Date("2025-08-14T00:00:00Z");
+  function startUTC(d){return Date.UTC(d.getFullYear(),d.getMonth(),d.getDate());}
+  function shiftIndexFor(date){const diffDays=Math.floor((startUTC(date)-startUTC(ANCHOR))/86400000);return ((diffDays%12)+12)%12;}
+  function shiftCodeFor(date){return SHIFT_PATTERN[shiftIndexFor(date)];}
+  function shiftLabel(code){if(code==="DAY")return"Day";if(code==="AA")return"AA Night";if(code==="AB")return"AB Night";return"";}
+  function shiftClass(code){if(code==="DAY")return"shift-day";if(code==="AA")return"shift-aa";if(code==="AB")return"shift-ab";return"";}
+
+  /* Storage */
+  function loadDB(){try{return JSON.parse(localStorage.getItem("calendarData")||"{}");}catch(e){return {};}}
+  function saveDB(db){localStorage.setItem("calendarData", JSON.stringify(db));}
+
+  const ALL_PEOPLE=["RC","BK","DB","AG","CG","CD","WT","SK","KP","JR","HB"];
+
+  const params=new URLSearchParams(location.search);
+  const qp=params.get("date");
+  const d= qp && /^\d{4}-\d{2}-\d{2}$/.test(qp) ? new Date(qp+"T00:00:00") : new Date();
+
+  function fmtHuman(x){
+    const dd=String(x.getDate()).padStart(2,"0");
+    const mm=String(x.getMonth()+1).padStart(2,"0");
+    const yy=String(x.getFullYear()).slice(-2);
+    const days=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+    return `${days[x.getDay()]} ${dd} ${mm} ${yy}`;
+  }
+  function keyFromDate(x){
+    return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,"0")}-${String(x.getDate()).padStart(2,"0")}`;
+  }
+  const dayKey=keyFromDate(d);
+
+  /* Elements */
+  const dateText=document.getElementById("dateText");
+  const shiftBanner=document.getElementById("shiftBanner");
+  const addBtn=document.getElementById("addBtn");
+  const backBtn=document.getElementById("backBtn");
+  const alCount=document.getElementById("alCount");
+  const listWrap=document.getElementById("listWrap");
+  const notesLabel=document.getElementById("notesLabel");
+  const notesView=document.getElementById("notesView");
+  const editOverlay=document.getElementById("editOverlay");
+  const editCancel=document.getElementById("editCancel");
+  const editSave=document.getElementById("editSave");
+  const whoSel=document.getElementById("whoSel");
+  const coverSel=document.getElementById("coverSel");
+  const ctypeWrap=document.getElementById("ctypeWrap");
+  const ctypeDash=document.getElementById("ctypeDash");
+  const noteOverlay=document.getElementById("noteOverlay");
+  const noteCancel=document.getElementById("noteCancel");
+  const noteSave=document.getElementById("noteSave");
+  const clearNoteBtn=document.getElementById("clearNoteBtn");
+  const notesInput=document.getElementById("notesInput");
+  const confirmModal=document.getElementById("confirmModal");
+  const confirmYes=document.getElementById("confirmYes");
+  const confirmNo=document.getElementById("confirmNo");
+
+  dateText.textContent=fmtHuman(d);
+  document.getElementById("editTitle").textContent="Edit — "+fmtHuman(d);
+  document.getElementById("noteTitle").textContent=fmtHuman(d); // no "Note -"
+
+  /* Shift banner */
+  const code=shiftCodeFor(d);
+  const cls=shiftClass(code);
+  const label=shiftLabel(code);
+  if(cls){shiftBanner.classList.add(cls);shiftBanner.textContent=label;shiftBanner.style.display="block";}
+
+  function getModel(){
+    const db=loadDB();
+    if(!db[dayKey]) db[dayKey]={notes:"", entries:[]};
+    return db;
+  }
+  function currentEntries(db){return db[dayKey].entries;}
+
+  function render(){
+    const db=getModel();
+    const entries=currentEntries(db);
+
+    alCount.textContent=entries.length;
+    listWrap.innerHTML="";
+    listWrap.style.display=entries.length?"grid":"none";
+    entries.forEach((e,idx)=>{
+      const card=document.createElement("div");card.className="card";
+      card.innerHTML = `
+        <div class="kv"><div><b>Person</b></div><div>${e.who}</div></div>
+        <div class="kv"><div><b>Cover</b></div><div>${e.cover}</div></div>
+        ${e.cover!=="N/A" ? `<div class="kv"><div><b>Type</b></div><div><span class="pill">${e.type}</span></div></div>` : `<div class="kv"><div><b>Type</b></div><div class="muted">—</div></div>`}
+      `;
+      const actions=document.createElement("div");actions.className="actions";
+      const editB=document.createElement("button");editB.className="btn";editB.textContent="Edit";editB.onclick=()=>openEdit(idx);
+      const delB=document.createElement("button");delB.className="btn danger";delB.textContent="Delete";delB.onclick=()=>askDelete(idx);
+      actions.append(editB,delB);card.appendChild(actions);
+      listWrap.appendChild(card);
+    });
+
+    const n=db[dayKey].notes||"";
+    if(n.trim()){notesView.textContent=n.trim();notesView.classList.remove("empty");}
+    else{notesView.textContent="(No notes)";notesView.classList.add("empty");}
+  }
+  render();
+
+  /* Helpers to compute available options */
+  function getBookedOffSet(db,excludeIndex=null){
+    const s=new Set();
+    db[dayKey].entries.forEach((e,i)=>{ if(i!==excludeIndex) s.add(e.who); });
+    return s;
+  }
+  function getCoveringSet(db,excludeIndex=null){
+    const s=new Set();
+    db[dayKey].entries.forEach((e,i)=>{ if(i!==excludeIndex && e.cover && e.cover!=="N/A") s.add(e.cover); });
+    return s;
+  }
+
+  /* Fill selects */
+  function fillWhoOptions(db,currentWho=null,excludeIndex=null){
+    const booked=getBookedOffSet(db,excludeIndex);
+    whoSel.innerHTML="";
+    ALL_PEOPLE.filter(p=>!booked.has(p) || p===currentWho).forEach(p=>{
+      const opt=document.createElement("option"); opt.value=p; opt.textContent=p; whoSel.appendChild(opt);
+    });
+  }
+  function fillCoverOptions(db,currentCover=null,selectedWho=null,excludeIndex=null){
+    const covering=getCoveringSet(db,excludeIndex);
+    coverSel.innerHTML="";
+    const na=document.createElement("option"); na.value="N/A"; na.textContent="N/A"; coverSel.appendChild(na);
+    ALL_PEOPLE.filter(p=>(!covering.has(p)||p===currentCover)&&p!==selectedWho).forEach(p=>{
+      const opt=document.createElement("option"); opt.value=p; opt.textContent=p; coverSel.appendChild(opt);
+    });
+  }
+
+  /* Add/Edit overlay */
+  let editingIndex=null;
+  function openEdit(index){
+    const db=getModel(); editingIndex=(typeof index==="number")?index:null;
+    if(editingIndex!==null){
+      const entry=db[dayKey].entries[editingIndex];
+      fillWhoOptions(db, entry.who, editingIndex); whoSel.value=entry.who;
+      fillCoverOptions(db, entry.cover, entry.who, editingIndex); coverSel.value=entry.cover;
+      (document.querySelector(`input[name="ctype"][value="${entry.type}"]`)||{}).checked=true;
+      // Show/hide type row depending on cover
+      if(entry.cover==="N/A"){ctypeWrap.style.display="none"; ctypeDash.style.display="block";}
+      else{ctypeWrap.style.display="flex"; ctypeDash.style.display="none";}
+    }else{
+      fillWhoOptions(db, null, null); whoSel.value=whoSel.options[0]?.value||"";
+      fillCoverOptions(db, "N/A", whoSel.value, null); coverSel.value="N/A";
+      document.querySelector('input[name="ctype"][value="Extra"]').checked=true;
+      ctypeWrap.style.display="none"; ctypeDash.style.display="block";
+    }
+    whoSel.onchange=()=>{
+      const db2=getModel();
+      const cur=(editingIndex!==null)?db2[dayKey].entries[editingIndex].cover:"N/A";
+      fillCoverOptions(db2, cur, whoSel.value, editingIndex);
+      if(coverSel.value==="N/A"){ctypeWrap.style.display="none"; ctypeDash.style.display="block";}
+      else{ctypeWrap.style.display="flex"; ctypeDash.style.display="none";}
+    };
+    coverSel.onchange=()=>{
+      if(coverSel.value==="N/A"){ctypeWrap.style.display="none"; ctypeDash.style.display="block";}
+      else{ctypeWrap.style.display="flex"; ctypeDash.style.display="none";}
+    };
+    editOverlay.classList.add("active");
+    editOverlay.onclick=e=>{if(e.target===editOverlay) editOverlay.classList.remove("active");};
+  }
+  function closeEdit(){editOverlay.classList.remove("active"); editingIndex=null;}
+
+  editCancel.onclick=closeEdit;
+  editSave.onclick=()=>{
+    const db=getModel();
+    const who=whoSel.value;
+    const cover=coverSel.value;
+    const type=(document.querySelector('input[name="ctype"]:checked')||{value:"Extra"}).value;
+    if(!who){alert("No available person to book.");return;}
+    const newEntry={who,cover,type};
+    if(editingIndex!==null){ db[dayKey].entries[editingIndex]=newEntry; }
+    else{
+      const i=db[dayKey].entries.findIndex(x=>x.who===who);
+      if(i>=0) db[dayKey].entries[i]=newEntry; else db[dayKey].entries.push(newEntry);
+    }
+    saveDB(db); render(); closeEdit();
+    try{localStorage.setItem("__ping__",Math.random()+"");localStorage.removeItem("__ping__");}catch(e){}
+  };
+
+  /* Notes overlay */
+  function openNote(){
+    const db=getModel();
+    notesInput.value=db[dayKey].notes||"";
+    noteOverlay.classList.add("active");
+    noteOverlay.onclick=e=>{if(e.target===noteOverlay) noteOverlay.classList.remove("active");};
+  }
+  function closeNote(){noteOverlay.classList.remove("active");}
+
+  notesLabel.onclick=openNote; notesView.onclick=openNote;
+  noteCancel.onclick=closeNote;
+  noteSave.onclick=()=>{
+    const db=getModel(); db[dayKey].notes=notesInput.value||""; saveDB(db); render(); closeNote();
+    try{localStorage.setItem("__ping__",Math.random()+"");localStorage.removeItem("__ping__");}catch(e){}
+  };
+  clearNoteBtn.onclick=()=>{
+    const db=getModel(); db[dayKey].notes=""; saveDB(db); render(); closeNote();
+    try{localStorage.setItem("__ping__",Math.random()+"");localStorage.removeItem("__ping__");}catch(e){}
+  };
+
+  /* Delete entry confirmation */
+  let pendingDeleteIndex=null;
+  function askDelete(index){pendingDeleteIndex=index;confirmModal.classList.add("active");}
+  function closeConfirm(){confirmModal.classList.remove("active"); pendingDeleteIndex=null;}
+  confirmNo.onclick=closeConfirm;
+  confirmYes.onclick=()=>{
+    const db=getModel();
+    if(pendingDeleteIndex!==null){ db[dayKey].entries.splice(pendingDeleteIndex,1); saveDB(db); render();
+      try{localStorage.setItem("__ping__",Math.random()+"");localStorage.removeItem("__ping__");}catch(e){}
+    }
+    closeConfirm();
+  };
+
+  /* Buttons */
+  addBtn.onclick=()=>openEdit(null);
+  backBtn.onclick=()=>{window.location.href=`calendar.html?year=${d.getFullYear()}&month=${String(d.getMonth()+1).padStart(2,"0")}`;}
+
+})();
+</script>
+</body>
+</html>
