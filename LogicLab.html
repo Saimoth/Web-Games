@@ -6,7 +6,8 @@
     <title>Logic Lab: Circuit Simulator</title>
     <style>
         :root {
-            --bg-color: #1a1a2e;
+            /* Updated to Dark Grey as requested */
+            --bg-color: #2c2c2c; 
             --sidebar-bg: #16213e;
             --text-color: #e94560;
             --accent: #0f3460;
@@ -140,7 +141,7 @@
         #canvas-container {
             flex: 1;
             position: relative;
-            background-color: #222;
+            background-color: var(--bg-color);
             overflow: hidden;
             cursor: crosshair;
         }
@@ -284,7 +285,7 @@
                 <span>Blue LED</span>
             </div>
             <div class="tool-item" draggable="true" data-type="SEVEN_SEG">
-                <div class="tool-icon" style="background:#222; color:red; border:1px solid #444;">8.</div>
+                <div class="tool-icon" style="background:#000; color:red; border:1px solid #444;">8.</div>
                 <span>7-Seg Display</span>
             </div>
 
@@ -383,7 +384,7 @@
             <p>2. <strong>Clock Gen:</strong> Generates square wave. Right-click to set Frequency and Duty Cycle.</p>
             <p>3. <strong>Shift Register:</strong> 8-bit Serial-In Parallel-Out. Top In: Data, Mid In: Clock, Bot In: Reset.</p>
             <p>4. <strong>7-Seg Display:</strong> 8 Inputs. Top to Bottom: a, b, c, d, e, f, g, dp.</p>
-            <p>5. <strong>Wiring:</strong> Drag from Circle (Out) to Square (In).</p>
+            <p>5. <strong>Wiring:</strong> Drag from Circle (Out) to Square (In). Multiple wires can be connected to the same input.</p>
             <p>6. <strong>Controls:</strong>
                 <br>- Double Right-Click Component: Delete
                 <br>- Right-Click Pin: Clear Wires
@@ -401,6 +402,7 @@ const WIRE_COLOR_OFF = '#53354a';
 const WIRE_COLOR_ON = '#00ff9d';
 const SNAP_DIST = 15;
 const FPS = 60;
+const SUB_STEPS = 4; // Number of logic updates per frame
 
 /**
  * STATE MANAGEMENT
@@ -446,7 +448,7 @@ const COMP_TYPES = {
     LIGHT_G:   { w: 60, h: 60, inputs: 1, outputs: 0, color: '#333333', onColor: '#2ecc71', label: 'GRN' },
     LIGHT_B:   { w: 60, h: 60, inputs: 1, outputs: 0, color: '#333333', onColor: '#3498db', label: 'BLU' },
     
-    SEVEN_SEG: { w: 90, h: 160, inputs: 8, outputs: 0, color: '#222', label: '' },
+    SEVEN_SEG: { w: 90, h: 160, inputs: 8, outputs: 0, color: '#000000', label: '' }, // Black BG
     
     AND:       { w: 80, h: 60, inputs: 2, outputs: 1, color: '#50e3c2', label: '&', textColor: 'black' },
     OR:        { w: 80, h: 60, inputs: 2, outputs: 1, color: '#b8e986', label: '≥1', textColor: 'black' },
@@ -495,7 +497,8 @@ class Component {
     }
 
     updateTimerLimit() {
-        this.timerLimit = Math.max(1, Math.round(this.timeSetting * this.timeBase * FPS));
+        // Updated to account for SUB_STEPS so real-time remains correct
+        this.timerLimit = Math.max(1, Math.round(this.timeSetting * this.timeBase * FPS * SUB_STEPS));
     }
 
     update() {
@@ -629,16 +632,14 @@ class Component {
             ctx.restore();
         } else if (this.type === 'SEVEN_SEG') {
             // Draw 7-Segment Display
-            // Inputs: 0=a, 1=b, 2=c, 3=d, 4=e, 5=f, 6=g, 7=dp
             const segW = 6;
             const segL = 35;
-            const cx = this.x + 45; // Center X of component body
-            const cy = this.y + 75; // Center Y of component body
+            const cx = this.x + 45; // Center X
+            const cy = this.y + 75; // Center Y
             
             // Helper to draw segment
             const drawSeg = (id, x, y, w, h) => {
-                ctx.fillStyle = this.inputStates[id] ? '#ff0000' : '#4a0000'; // Neon Red vs Dark Red
-                // Add glow if on
+                ctx.fillStyle = this.inputStates[id] ? '#ff0000' : '#220000'; // Neon Red vs Very Dark Red
                 if(this.inputStates[id]) {
                     ctx.shadowColor = '#ff0000';
                     ctx.shadowBlur = 10;
@@ -650,7 +651,7 @@ class Component {
                 ctx.shadowBlur = 0;
             };
 
-            // Segment Positions relative to cx, cy
+            // Segment Positions
             // a: top
             drawSeg(0, cx - segL/2, cy - segL - segW, segL, segW);
             // b: top right
@@ -665,8 +666,8 @@ class Component {
             drawSeg(5, cx - segL/2 - segW, cy - segL, segW, segL);
             // g: middle
             drawSeg(6, cx - segL/2, cy, segL, segW);
-            // dp: decimal point (bottom right corner)
-            ctx.fillStyle = this.inputStates[7] ? '#ff0000' : '#4a0000';
+            // dp: decimal point
+            ctx.fillStyle = this.inputStates[7] ? '#ff0000' : '#220000';
             if(this.inputStates[7]) { ctx.shadowColor = '#ff0000'; ctx.shadowBlur = 10; }
             ctx.beginPath();
             ctx.arc(cx + segL/2 + 10, cy + segL + segW + 2, 3, 0, Math.PI*2);
@@ -795,13 +796,13 @@ function isHoveringPin(worldPos) {
 /**
  * MAIN LOOP
  */
-function gameLoop() {
-    // Reset Inputs
+function updateLogic() {
+    // 1. Reset Inputs
     components.forEach(c => {
         for(let i=0; i<c.def.inputs; i++) c.inputStates[i] = false;
     });
 
-    // Propagate Logic
+    // 2. Propagate Logic (Wires)
     wires.forEach(w => {
         // Source Component output state
         if (w.from.comp.outputStates[w.from.pinIdx]) {
@@ -809,15 +810,23 @@ function gameLoop() {
         }
     });
 
-    // Update Logic
+    // 3. Update Components
     components.forEach(c => c.update());
+}
 
+function gameLoop() {
+    // Run Logic Update multiple times per frame to settle feedback loops (Sub-stepping)
+    for(let i=0; i<SUB_STEPS; i++) {
+        updateLogic();
+    }
+
+    // Render Once
     draw();
     requestAnimationFrame(gameLoop);
 }
 
 function draw() {
-    ctx.fillStyle = '#1a1a2e';
+    ctx.fillStyle = '#2c2c2c'; // Dark Grey
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     // Background Grid
@@ -1047,8 +1056,8 @@ function handleInputEnd(e) {
                 for(let i=0; i<c.def.inputs; i++) {
                     const pos = c.getInputPos(i);
                     if (Math.hypot(mouseWorld.x - pos.x, mouseWorld.y - pos.y) < SNAP_DIST) {
-                        if (c === wiringStart.comp) continue;
-                        wires = wires.filter(w => !(w.to.comp === c && w.to.pinIdx === i));
+                        // REMOVED CHECK: if (c === wiringStart.comp) continue; (Allows Feedback)
+                        // REMOVED FILTER: wires.filter... (Allows Many-to-One)
                         wires.push({ from: { comp: wiringStart.comp, pinIdx: wiringStart.pinIndex }, to: { comp: c, pinIdx: i } });
                     }
                 }
@@ -1056,8 +1065,8 @@ function handleInputEnd(e) {
                  for(let i=0; i<c.def.outputs; i++) {
                     const pos = c.getOutputPos(i);
                     if (Math.hypot(mouseWorld.x - pos.x, mouseWorld.y - pos.y) < SNAP_DIST) {
-                        if (c === wiringStart.comp) continue;
-                        wires = wires.filter(w => !(w.to.comp === wiringStart.comp && w.to.pinIdx === wiringStart.pinIndex));
+                        // REMOVED CHECK: if (c === wiringStart.comp) continue;
+                        // REMOVED FILTER: wires.filter...
                         wires.push({ from: { comp: c, pinIdx: i }, to: { comp: wiringStart.comp, pinIdx: wiringStart.pinIndex } });
                     }
                 }
