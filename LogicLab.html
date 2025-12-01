@@ -258,8 +258,16 @@
         <div class="tools-container">
             <div class="category-label">Inputs</div>
             <div class="tool-item" draggable="true" data-type="SWITCH">
-                <div class="tool-icon" style="background:#4a90e2">S</div>
-                <span>Switch</span>
+                <div class="tool-icon" style="background:#4a90e2">SW</div>
+                <span>Toggle Switch</span>
+            </div>
+            <div class="tool-item" draggable="true" data-type="PUSH_BTN">
+                <div class="tool-icon" style="background:#2ecc71; color:black">PB</div>
+                <span>Push Button</span>
+            </div>
+            <div class="tool-item" draggable="true" data-type="CLOCK">
+                <div class="tool-icon" style="background:#34495e; color:white">Clk</div>
+                <span>Clock Gen</span>
             </div>
             
             <div class="category-label">Outputs (LEDs)</div>
@@ -302,7 +310,11 @@
                 <span>RS Latch</span>
             </div>
 
-            <div class="category-label">Timers</div>
+            <div class="category-label">Complex</div>
+            <div class="tool-item" draggable="true" data-type="SHIFT_REG">
+                <div class="tool-icon" style="background:#8e44ad; color:white">SR</div>
+                <span>Shift Reg (8)</span>
+            </div>
             <div class="tool-item" draggable="true" data-type="TON">
                 <div class="tool-icon" style="background:#417505; color:white">T+</div>
                 <span>Timer ON (Delay)</span>
@@ -318,7 +330,7 @@
                 <strong>Double Right-Click</strong> Comp to Delete.<br>
                 <strong>Right-Click Pin</strong> to Delete Wires.<br>
                 Drag background to Pan.<br>
-                Right Click Timer to Edit.
+                Right Click Timer/Clock to Edit.
             </div>
             <button class="btn-clear" onclick="clearBoard()">Clear Board</button>
             <button class="btn-help" onclick="toggleHelp()">How to Play</button>
@@ -332,12 +344,17 @@
         
         <!-- Context Menu / Config Panel -->
         <div id="configPanel">
-            <h3>Timer Settings</h3>
+            <h3 id="configTitle">Settings</h3>
             <div class="config-row">
-                <div class="config-label">Multiplier: <span id="valDisplay" style="color:var(--wire-on); font-weight:bold;">0.5</span></div>
-                <!-- Range 0 to 1 with step 0.01 -->
+                <div class="config-label">Period/Duration: <span id="valDisplay" style="color:var(--wire-on); font-weight:bold;">0.5</span></div>
                 <input type="range" id="timerSlider" min="0" max="1" step="0.01" value="0.5" oninput="updateValDisplay(this.value)">
             </div>
+            
+            <div class="config-row" id="dutyRow" style="display:none;">
+                <div class="config-label">Duty Cycle %: <span id="dutyDisplay" style="color:var(--wire-on); font-weight:bold;">50</span></div>
+                <input type="range" id="dutySlider" min="0" max="100" step="5" value="50" oninput="updateDutyDisplay(this.value)">
+            </div>
+
             <div class="config-row">
                 <div class="config-label">Time Base</div>
                 <div class="radio-group">
@@ -358,13 +375,19 @@
         <div class="modal-content">
             <span class="close-modal" onclick="toggleHelp()">&times;</span>
             <h2>How to Use Logic Lab</h2>
-            <p>1. <strong>Add Components:</strong> Drag items from the left sidebar onto the grid.</p>
-            <p>2. <strong>Pan View:</strong> Click and drag anywhere on the empty background to move the view.</p>
-            <p>3. <strong>Move Items:</strong> Left-click and drag components to rearrange them.</p>
-            <p>4. <strong>Wiring:</strong> Drag from a circle <strong>Output</strong> to a square <strong>Input</strong>.</p>
-            <p>5. <strong>Switch:</strong> Click a switch to toggle On/Off.</p>
-            <p>6. <strong>SR Latch:</strong> Set Dominant (S priority). Pin S is top, Pin R is bottom.</p>
-            <p>7. <strong>RS Latch:</strong> Reset Dominant (Safety priority). Pin R is top, Pin S is bottom.</p>
+            <p>1. <strong>Push Button:</strong> Active only while held down.</p>
+            <p>2. <strong>Clock Gen:</strong> Generates square wave. Right-click to set Frequency and Duty Cycle.</p>
+            <p>3. <strong>Shift Register:</strong> 8-bit Serial-In Parallel-Out.
+                <br>- Top In: Data
+                <br>- Mid In: Clock (Rising Edge)
+                <br>- Bot In: Reset
+            </p>
+            <p>4. <strong>Wiring:</strong> Drag from Circle (Out) to Square (In).</p>
+            <p>5. <strong>Controls:</strong>
+                <br>- Double Right-Click Component: Delete
+                <br>- Right-Click Pin: Clear Wires
+                <br>- Drag Background: Pan View
+            </p>
         </div>
     </div>
 
@@ -398,9 +421,10 @@ let draggingComponent = null;
 let dragOffset = { x: 0, y: 0 };
 let isDraggingComp = false; 
 let dragStartPos = {x:0, y:0};
+let pressedButtonId = null; // Track held push buttons
 
 let wiringStart = null; 
-let mousePos = { x: 0, y: 0 }; // Always screen coordinates relative to canvas
+let mousePos = { x: 0, y: 0 };
 
 // Config Panel State
 let editingComponent = null;
@@ -413,18 +437,26 @@ let lastRightClickId = null;
  * COMPONENT DEFINITIONS
  */
 const COMP_TYPES = {
-    SWITCH:   { w: 60, h: 60, inputs: 0, outputs: 1, color: '#4a90e2', label: 'SW' },
-    LIGHT_R:  { w: 60, h: 60, inputs: 1, outputs: 0, color: '#333333', onColor: '#e74c3c', label: 'RED' },
-    LIGHT_G:  { w: 60, h: 60, inputs: 1, outputs: 0, color: '#333333', onColor: '#2ecc71', label: 'GRN' },
-    LIGHT_B:  { w: 60, h: 60, inputs: 1, outputs: 0, color: '#333333', onColor: '#3498db', label: 'BLU' },
-    AND:      { w: 80, h: 60, inputs: 2, outputs: 1, color: '#50e3c2', label: '&', textColor: 'black' },
-    OR:       { w: 80, h: 60, inputs: 2, outputs: 1, color: '#b8e986', label: '≥1', textColor: 'black' },
-    NOT:      { w: 60, h: 40, inputs: 1, outputs: 1, color: '#bd10e0', label: '1', shape: 'triangle' },
-    XOR:      { w: 80, h: 60, inputs: 2, outputs: 1, color: '#9013fe', label: '=1' },
-    LATCH:    { w: 80, h: 60, inputs: 2, outputs: 1, color: '#d35400', label: 'SR' }, // Set Dominant
-    RS_LATCH: { w: 80, h: 60, inputs: 2, outputs: 1, color: '#d35400', label: 'RS' }, // Reset Dominant
-    TON:      { w: 80, h: 60, inputs: 1, outputs: 1, color: '#417505', label: 'TON' }, 
-    TOF:      { w: 80, h: 60, inputs: 1, outputs: 1, color: '#d0021b', label: 'TOF' }, 
+    SWITCH:    { w: 60, h: 60, inputs: 0, outputs: 1, color: '#4a90e2', label: 'SW' },
+    PUSH_BTN:  { w: 60, h: 60, inputs: 0, outputs: 1, color: '#27ae60', label: 'PB' },
+    CLOCK:     { w: 60, h: 60, inputs: 0, outputs: 1, color: '#34495e', label: 'CLK' },
+    
+    LIGHT_R:   { w: 60, h: 60, inputs: 1, outputs: 0, color: '#333333', onColor: '#e74c3c', label: 'RED' },
+    LIGHT_G:   { w: 60, h: 60, inputs: 1, outputs: 0, color: '#333333', onColor: '#2ecc71', label: 'GRN' },
+    LIGHT_B:   { w: 60, h: 60, inputs: 1, outputs: 0, color: '#333333', onColor: '#3498db', label: 'BLU' },
+    
+    AND:       { w: 80, h: 60, inputs: 2, outputs: 1, color: '#50e3c2', label: '&', textColor: 'black' },
+    OR:        { w: 80, h: 60, inputs: 2, outputs: 1, color: '#b8e986', label: '≥1', textColor: 'black' },
+    NOT:       { w: 60, h: 40, inputs: 1, outputs: 1, color: '#bd10e0', label: '1', shape: 'triangle' },
+    XOR:       { w: 80, h: 60, inputs: 2, outputs: 1, color: '#9013fe', label: '=1' },
+    
+    LATCH:     { w: 80, h: 60, inputs: 2, outputs: 1, color: '#d35400', label: 'SR' }, 
+    RS_LATCH:  { w: 80, h: 60, inputs: 2, outputs: 1, color: '#d35400', label: 'RS' }, 
+    
+    SHIFT_REG: { w: 100, h: 180, inputs: 3, outputs: 8, color: '#8e44ad', label: 'SHIFT' },
+    
+    TON:       { w: 80, h: 60, inputs: 1, outputs: 1, color: '#417505', label: 'TON' }, 
+    TOF:       { w: 80, h: 60, inputs: 1, outputs: 1, color: '#d0021b', label: 'TOF' }, 
 };
 
 class Component {
@@ -437,23 +469,27 @@ class Component {
         this.w = this.def.w;
         this.h = this.def.h;
         
-        // State
-        this.state = false; 
+        // State Management
+        // Multi-output components use array, Single output use index 0
+        this.outputStates = new Array(this.def.outputs).fill(false);
         this.inputStates = new Array(this.def.inputs).fill(false);
         
-        // Timer specifics
-        this.timerValue = 0; // Current count (in frames)
-        this.timeSetting = 0.5; // Default slider value
-        this.timeBase = 1.0; // Default base
+        // Timer/Clock specifics
+        this.timerValue = 0; 
+        this.timeSetting = 0.5; 
+        this.timeBase = 1.0; 
+        this.dutyCycle = 50; // Percentage (Clock only)
         this.updateTimerLimit();
+        
+        // Shift Register Specifics
+        this.prevClockState = false;
     }
 
-    updateConfig(val, base) {
+    updateConfig(val, base, duty) {
         this.timeSetting = parseFloat(val);
         this.timeBase = parseFloat(base);
+        if(duty !== undefined) this.dutyCycle = parseInt(duty);
         this.updateTimerLimit();
-        // Reset if invalid state
-        if (this.timerValue > this.timerLimit) this.timerValue = this.timerLimit;
     }
 
     updateTimerLimit() {
@@ -463,63 +499,86 @@ class Component {
 
     // Logic Update Tick
     update() {
+        // --- LOGIC GATES ---
         if (this.type === 'AND') {
-            this.state = this.inputStates[0] && this.inputStates[1];
+            this.outputStates[0] = this.inputStates[0] && this.inputStates[1];
         } else if (this.type === 'OR') {
-            this.state = this.inputStates[0] || this.inputStates[1];
+            this.outputStates[0] = this.inputStates[0] || this.inputStates[1];
         } else if (this.type === 'NOT') {
-            this.state = !this.inputStates[0];
+            this.outputStates[0] = !this.inputStates[0];
         } else if (this.type === 'XOR') {
-            this.state = (this.inputStates[0] ? 1 : 0) ^ (this.inputStates[1] ? 1 : 0);
-        } else if (this.type === 'LATCH') {
-            // SR Latch (Set Dominant - Standard PLC SR)
-            // Input 0: Set (Top)
-            // Input 1: Reset (Bottom)
+            this.outputStates[0] = (this.inputStates[0] ? 1 : 0) ^ (this.inputStates[1] ? 1 : 0);
+        } 
+        
+        // --- LATCHES ---
+        else if (this.type === 'LATCH') { // SR Set Dominant
             const set = this.inputStates[0];
             const rst = this.inputStates[1];
-            
-            if (set) {
-                this.state = true;
-            } else if (rst) {
-                this.state = false;
-            }
-            // If both, Set ran first in logic block? No, if (set) triggers, else if (rst) is skipped.
-            // Thus, Set is dominant.
-        } else if (this.type === 'RS_LATCH') {
-            // RS Latch (Reset Dominant - Standard PLC RS)
-            // Input 0: Reset (Top) -- Convention for RS
-            // Input 1: Set (Bottom)
+            if (set) this.outputStates[0] = true;
+            else if (rst) this.outputStates[0] = false;
+        } else if (this.type === 'RS_LATCH') { // RS Reset Dominant
             const rst = this.inputStates[0];
             const set = this.inputStates[1];
-            
-            if (rst) {
-                this.state = false;
-            } else if (set) {
-                this.state = true;
-            }
-            // If both, Reset triggers first. Reset is dominant.
-        } else if (this.type.startsWith('LIGHT')) {
-            this.state = this.inputStates[0];
-        } else if (this.type === 'TON') {
+            if (rst) this.outputStates[0] = false;
+            else if (set) this.outputStates[0] = true;
+        } 
+        
+        // --- OUTPUTS ---
+        else if (this.type.startsWith('LIGHT')) {
+            this.outputStates[0] = this.inputStates[0]; // State used for coloring
+        } 
+        
+        // --- TIMERS ---
+        else if (this.type === 'TON') {
             if (this.inputStates[0]) {
                 if (this.timerValue < this.timerLimit) this.timerValue++;
             } else {
                 this.timerValue = 0;
             }
-            this.state = (this.timerValue >= this.timerLimit);
+            this.outputStates[0] = (this.timerValue >= this.timerLimit);
         } else if (this.type === 'TOF') {
             if (this.inputStates[0]) {
-                this.state = true;
+                this.outputStates[0] = true;
                 this.timerValue = this.timerLimit;
             } else {
                 if (this.timerValue > 0) {
                     this.timerValue--;
-                    this.state = true;
+                    this.outputStates[0] = true;
                 } else {
-                    this.state = false;
+                    this.outputStates[0] = false;
                 }
             }
+        } 
+        
+        // --- CLOCK ---
+        else if (this.type === 'CLOCK') {
+            this.timerValue++;
+            if (this.timerValue >= this.timerLimit) this.timerValue = 0;
+            
+            // Calculate duty cycle threshold
+            const threshold = (this.dutyCycle / 100) * this.timerLimit;
+            this.outputStates[0] = (this.timerValue < threshold);
         }
+
+        // --- SHIFT REGISTER ---
+        else if (this.type === 'SHIFT_REG') {
+            const data = this.inputStates[0];
+            const clk = this.inputStates[1];
+            const rst = this.inputStates[2];
+
+            if (rst) {
+                this.outputStates.fill(false);
+            } else if (clk && !this.prevClockState) {
+                // Rising Edge
+                for (let i = 7; i > 0; i--) {
+                    this.outputStates[i] = this.outputStates[i-1];
+                }
+                this.outputStates[0] = data;
+            }
+            this.prevClockState = clk;
+        }
+        
+        // Switch & PushBtn handled by interaction
     }
 
     getInputPos(index) {
@@ -528,14 +587,21 @@ class Component {
     }
 
     getOutputPos(index) {
-        return { x: this.x + this.w, y: this.y + this.h / 2 };
+        const spacing = this.h / (this.def.outputs + 1);
+        return { x: this.x + this.w, y: this.y + spacing * (index + 1) };
     }
 
     draw(ctx) {
         let fillColor = this.def.color;
-        if (this.type.startsWith('LIGHT') && this.state) {
+        // Lights light up
+        if (this.type.startsWith('LIGHT') && this.outputStates[0]) {
             fillColor = this.def.onColor;
         }
+        // Push button lights up when pressed
+        if (this.type === 'PUSH_BTN' && this.outputStates[0]) {
+            fillColor = '#2ecc71'; // Brighter green
+        }
+
         ctx.fillStyle = fillColor;
         
         if (this === draggingComponent) {
@@ -543,6 +609,7 @@ class Component {
             ctx.shadowBlur = 10;
         }
 
+        // Body Shape
         ctx.beginPath();
         if (this.type === 'NOT') {
             ctx.moveTo(this.x, this.y);
@@ -556,12 +623,14 @@ class Component {
         }
         ctx.shadowBlur = 0;
 
+        // Label
         ctx.fillStyle = this.def.textColor || 'white';
         ctx.font = "bold 16px sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         
-        if ((this.type === 'TON' || this.type === 'TOF')) {
+        // Special rendering for Timers/Clock
+        if (this.type === 'TON' || this.type === 'TOF' || this.type === 'CLOCK') {
             let pct = this.timerValue / this.timerLimit;
             const barW = this.w - 20;
             const barX = this.x + 10;
@@ -576,55 +645,61 @@ class Component {
             ctx.font = "10px sans-serif";
             const totalSec = (this.timeSetting * this.timeBase).toFixed(2) + "s";
             ctx.fillText(totalSec, this.x + this.w/2, this.y + 55);
+        } else if (this.type === 'SHIFT_REG') {
+            ctx.save();
+            ctx.translate(this.x + this.w/2, this.y + this.h/2);
+            ctx.rotate(-Math.PI/2);
+            ctx.fillText("SHIFT REG", 0, 0);
+            ctx.restore();
         } else {
             let label = this.def.label;
-            if (this.type === 'SWITCH') label = this.state ? 'ON' : 'OFF';
+            if (this.type === 'SWITCH') label = this.outputStates[0] ? 'ON' : 'OFF';
             ctx.fillText(label, this.x + this.w/2, this.y + this.h/2);
         }
 
-        if (this.type === 'SWITCH' || this.type.startsWith('LIGHT') || this.type === 'LATCH' || this.type === 'RS_LATCH') {
+        // Visual Indicator (LED)
+        if (['SWITCH', 'PUSH_BTN', 'LATCH', 'RS_LATCH', 'CLOCK'].includes(this.type) || this.type.startsWith('LIGHT')) {
             ctx.beginPath();
             ctx.arc(this.x + this.w/2, this.y - 10, 6, 0, Math.PI*2);
-            if (this.type.startsWith('LIGHT')) {
-                ctx.fillStyle = this.state ? this.def.onColor : '#222';
-            } else {
-                ctx.fillStyle = this.state ? WIRE_COLOR_ON : '#333';
-            }
+            let ledColor = '#333';
+            if (this.type.startsWith('LIGHT')) ledColor = this.outputStates[0] ? this.def.onColor : '#222';
+            else ledColor = this.outputStates[0] ? WIRE_COLOR_ON : '#333';
+            
+            ctx.fillStyle = ledColor;
             ctx.fill();
             ctx.strokeStyle = '#fff';
             ctx.stroke();
         }
 
+        // Input Pins
         ctx.fillStyle = '#fff';
         for(let i=0; i<this.def.inputs; i++) {
             const pos = this.getInputPos(i);
             ctx.fillRect(pos.x - 5, pos.y - 5, 10, 10);
-            // Pass world coordinates to hovering check
             if (isHoveringPin(pos)) {
                 ctx.strokeStyle = WIRE_COLOR_ON;
                 ctx.strokeRect(pos.x - 7, pos.y - 7, 14, 14);
             }
             
-            if (this.type === 'LATCH' || this.type === 'RS_LATCH') {
-                ctx.fillStyle = 'rgba(255,255,255,0.7)';
-                ctx.font = "bold 10px monospace";
-                ctx.textAlign = "left";
-                ctx.textBaseline = "middle";
-                
-                let label = "";
-                if (this.type === 'LATCH') {
-                    // SR: Top S, Bottom R
-                    label = (i === 0) ? "S" : "R";
-                } else {
-                    // RS: Top R, Bottom S
-                    label = (i === 0) ? "R" : "S";
-                }
-                
-                ctx.fillText(label, pos.x + 10, pos.y);
-                ctx.fillStyle = '#fff';
+            // Labels
+            let label = "";
+            ctx.fillStyle = 'rgba(255,255,255,0.7)';
+            ctx.font = "bold 10px monospace";
+            ctx.textAlign = "left";
+            ctx.textBaseline = "middle";
+
+            if (this.type === 'LATCH') label = (i===0) ? "S" : "R";
+            if (this.type === 'RS_LATCH') label = (i===0) ? "R" : "S";
+            if (this.type === 'SHIFT_REG') {
+                if(i===0) label = "D";
+                if(i===1) label = ">";
+                if(i===2) label = "R";
             }
+            if (label) ctx.fillText(label, pos.x + 10, pos.y);
+            ctx.fillStyle = '#fff';
         }
 
+        // Output Pins
         for(let i=0; i<this.def.outputs; i++) {
             const pos = this.getOutputPos(i);
             ctx.beginPath();
@@ -635,6 +710,15 @@ class Component {
                 ctx.beginPath();
                 ctx.arc(pos.x, pos.y, 8, 0, Math.PI*2);
                 ctx.stroke();
+            }
+            
+            if (this.type === 'SHIFT_REG') {
+                ctx.fillStyle = 'rgba(255,255,255,0.7)';
+                ctx.font = "bold 10px monospace";
+                ctx.textAlign = "right";
+                ctx.textBaseline = "middle";
+                ctx.fillText("Q"+i, pos.x - 10, pos.y);
+                ctx.fillStyle = '#fff';
             }
         }
     }
@@ -672,36 +756,33 @@ function getMousePos(e) {
     };
 }
 
-// Transform Screen Coordinates to World Coordinates
 function getWorldPos(screenPos) {
-    return {
-        x: screenPos.x - viewX,
-        y: screenPos.y - viewY
-    };
+    return { x: screenPos.x - viewX, y: screenPos.y - viewY };
 }
 
-// Check hovering using World Coordinates
 function isHoveringPin(worldPos) {
     const mouseWorld = getWorldPos(mousePos);
-    const d = Math.hypot(mouseWorld.x - worldPos.x, mouseWorld.y - worldPos.y);
-    return d < SNAP_DIST;
+    return Math.hypot(mouseWorld.x - worldPos.x, mouseWorld.y - worldPos.y) < SNAP_DIST;
 }
 
 /**
  * MAIN LOOP
  */
 function gameLoop() {
-    // Logic Tick
+    // Reset Inputs
     components.forEach(c => {
         for(let i=0; i<c.def.inputs; i++) c.inputStates[i] = false;
     });
 
+    // Propagate Logic
     wires.forEach(w => {
-        if (w.from.comp.state) {
+        // Source Component output state
+        if (w.from.comp.outputStates[w.from.pinIdx]) {
             w.to.comp.inputStates[w.to.pinIdx] = true;
         }
     });
 
+    // Update Logic
     components.forEach(c => c.update());
 
     draw();
@@ -712,29 +793,21 @@ function draw() {
     ctx.fillStyle = '#1a1a2e';
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // BACKGROUND GRID (Fixed Pattern that pans)
+    // Background Grid
     ctx.save();
-    
-    // Draw grid pattern based on offset
     ctx.fillStyle = 'rgba(255,255,255,0.05)';
-    
-    // Calculate start offset for grid lines so they appear infinite
     const offsetX = viewX % GRID_SIZE;
     const offsetY = viewY % GRID_SIZE;
-    
     for (let x = offsetX; x < canvas.width; x += GRID_SIZE) {
         for (let y = offsetY; y < canvas.height; y += GRID_SIZE) {
             ctx.fillRect(x, y, 1, 1);
         }
     }
-    
-    // Center point marker (Origin)
     ctx.fillStyle = 'rgba(255, 0, 0, 0.5)';
     ctx.fillRect(viewX - 2, viewY - 2, 4, 4);
-    
     ctx.restore();
 
-    // WORLD CONTENT
+    // World Content
     ctx.save();
     ctx.translate(viewX, viewY);
 
@@ -742,7 +815,8 @@ function draw() {
     wires.forEach(w => {
         const start = w.from.comp.getOutputPos(w.from.pinIdx);
         const end = w.to.comp.getInputPos(w.to.pinIdx);
-        drawWire(start, end, w.from.comp.state);
+        // Visual state check
+        drawWire(start, end, w.from.comp.outputStates[w.from.pinIdx]);
     });
 
     // Temp Wire
@@ -753,7 +827,7 @@ function draw() {
         if (wiringStart.pinType === 'output') {
             startPos = wiringStart.comp.getOutputPos(wiringStart.pinIndex);
             endPos = mouseWorld;
-            isActive = wiringStart.comp.state;
+            isActive = wiringStart.comp.outputStates[wiringStart.pinIndex];
         } else {
             startPos = mouseWorld;
             endPos = wiringStart.comp.getInputPos(wiringStart.pinIndex);
@@ -763,7 +837,6 @@ function draw() {
     }
 
     components.forEach(c => c.draw(ctx));
-    
     ctx.restore();
 }
 
@@ -801,13 +874,8 @@ container.addEventListener('drop', (e) => {
     e.preventDefault();
     const type = e.dataTransfer.getData('type');
     const rect = canvas.getBoundingClientRect();
-    
-    // Calculate Drop Position in World Coordinates
-    const screenX = e.clientX - rect.left - 30;
-    const screenY = e.clientY - rect.top - 30;
-    const worldX = screenX - viewX;
-    const worldY = screenY - viewY;
-    
+    const worldX = e.clientX - rect.left - 30 - viewX;
+    const worldY = e.clientY - rect.top - 30 - viewY;
     const snapX = Math.round(worldX / GRID_SIZE) * GRID_SIZE;
     const snapY = Math.round(worldY / GRID_SIZE) * GRID_SIZE;
     components.push(new Component(type, snapX, snapY));
@@ -817,30 +885,25 @@ canvas.addEventListener('mousedown', handleInputStart);
 window.addEventListener('mousemove', handleInputMove);
 window.addEventListener('mouseup', handleInputEnd);
 
-// Context Menu (Right Click)
 canvas.addEventListener('contextmenu', (e) => {
     e.preventDefault();
     mousePos = getMousePos(e);
     const mouseWorld = getWorldPos(mousePos);
     
-    // 1. Check for Pins (Wire Delete) - Single Right Click
     let pinClicked = false;
     components.forEach(c => {
-        // Check Inputs
+        // Inputs
         for(let i=0; i<c.def.inputs; i++) {
             const pos = c.getInputPos(i);
-            const d = Math.hypot(mouseWorld.x - pos.x, mouseWorld.y - pos.y);
-            if(d < SNAP_DIST) {
+            if(Math.hypot(mouseWorld.x - pos.x, mouseWorld.y - pos.y) < SNAP_DIST) {
                 wires = wires.filter(w => !(w.to.comp === c && w.to.pinIdx === i));
                 pinClicked = true;
             }
         }
-        // Check Outputs
+        // Outputs
         for(let i=0; i<c.def.outputs; i++) {
              const pos = c.getOutputPos(i);
-             const d = Math.hypot(mouseWorld.x - pos.x, mouseWorld.y - pos.y);
-             if(d < SNAP_DIST) {
-                 // Remove all wires originating from this output
+             if(Math.hypot(mouseWorld.x - pos.x, mouseWorld.y - pos.y) < SNAP_DIST) {
                  wires = wires.filter(w => !(w.from.comp === c && w.from.pinIdx === i));
                  pinClicked = true;
              }
@@ -848,41 +911,35 @@ canvas.addEventListener('contextmenu', (e) => {
     });
     if (pinClicked) return;
 
-    // 2. Check for Component Hit
     const clickedComp = components.find(c => 
         mouseWorld.x >= c.x && mouseWorld.x <= c.x + c.w &&
         mouseWorld.y >= c.y && mouseWorld.y <= c.y + c.h
     );
 
     if (clickedComp) {
-        // Double Right Click Detection
         const now = Date.now();
         if (lastRightClickId === clickedComp.id && (now - lastRightClickTime < 300)) {
-            // Double Right Click -> Delete Component
             wires = wires.filter(w => w.from.comp !== clickedComp && w.to.comp !== clickedComp);
             components = components.filter(c => c !== clickedComp);
             closeConfig();
             lastRightClickId = null;
             return;
         }
-        
-        // Register first click
         lastRightClickId = clickedComp.id;
         lastRightClickTime = now;
 
-        // Single Right Click -> Open Config if Timer
-        if (clickedComp.type === 'TON' || clickedComp.type === 'TOF') {
+        if (clickedComp.type === 'TON' || clickedComp.type === 'TOF' || clickedComp.type === 'CLOCK') {
             openConfig(clickedComp);
         }
     }
 });
 
 function handleInputStart(e) {
-    if(e.button !== 0) return; // Only Left Click
+    if(e.button !== 0) return; 
     mousePos = getMousePos(e);
     const mouseWorld = getWorldPos(mousePos);
     
-    // 1. Check Pins (Wiring)
+    // Check Pins
     for (let c of components) {
         for(let i=0; i<c.def.outputs; i++) {
             const pos = c.getOutputPos(i);
@@ -900,25 +957,28 @@ function handleInputStart(e) {
         }
     }
 
-    // 2. Check Components (Drag/Toggle)
+    // Check Components
     for (let i = components.length - 1; i >= 0; i--) {
         let c = components[i];
         if (mouseWorld.x >= c.x && mouseWorld.x <= c.x + c.w &&
             mouseWorld.y >= c.y && mouseWorld.y <= c.y + c.h) {
             
+            // Push Button Logic
+            if (c.type === 'PUSH_BTN') {
+                c.outputStates[0] = true;
+                pressedButtonId = c.id;
+            }
+            
             draggingComponent = c;
             dragOffset = { x: mouseWorld.x - c.x, y: mouseWorld.y - c.y };
             dragStartPos = { x: mouseWorld.x, y: mouseWorld.y };
             isDraggingComp = false; 
-            
-            // Move to top
             components.splice(i, 1);
             components.push(c);
             return;
         }
     }
 
-    // 3. Background (Pan)
     isPanning = true;
     panStart = { x: mousePos.x - viewX, y: mousePos.y - viewY };
     container.style.cursor = "grabbing";
@@ -942,8 +1002,15 @@ function handleInputMove(e) {
 }
 
 function handleInputEnd(e) {
+    // Release Push Button
+    if (pressedButtonId) {
+        const btn = components.find(c => c.id === pressedButtonId);
+        if (btn) btn.outputStates[0] = false;
+        pressedButtonId = null;
+    }
+
     if (draggingComponent && draggingComponent.type === 'SWITCH' && !isDraggingComp) {
-        draggingComponent.state = !draggingComponent.state;
+        draggingComponent.outputStates[0] = !draggingComponent.outputStates[0];
     }
 
     if (wiringStart) {
@@ -984,15 +1051,24 @@ function openConfig(comp) {
     const panel = document.getElementById('configPanel');
     const slider = document.getElementById('timerSlider');
     const valDisplay = document.getElementById('valDisplay');
+    const dutyRow = document.getElementById('dutyRow');
+    const dutySlider = document.getElementById('dutySlider');
+    const dutyDisplay = document.getElementById('dutyDisplay');
     
-    // Set Values
     slider.value = comp.timeSetting;
     valDisplay.textContent = comp.timeSetting;
     
-    // Set Radio
     const radios = document.getElementsByName('timebase');
     for(let r of radios) {
         if(parseFloat(r.value) === comp.timeBase) r.checked = true;
+    }
+
+    if (comp.type === 'CLOCK') {
+        dutyRow.style.display = 'block';
+        dutySlider.value = comp.dutyCycle;
+        dutyDisplay.textContent = comp.dutyCycle;
+    } else {
+        dutyRow.style.display = 'none';
     }
 
     panel.style.display = 'block';
@@ -1001,17 +1077,21 @@ function openConfig(comp) {
 function updateValDisplay(val) {
     document.getElementById('valDisplay').textContent = val;
 }
+function updateDutyDisplay(val) {
+    document.getElementById('dutyDisplay').textContent = val;
+}
 
 function saveConfig() {
     if (!editingComponent) return;
     const sliderVal = document.getElementById('timerSlider').value;
+    const dutyVal = document.getElementById('dutySlider').value;
     const radios = document.getElementsByName('timebase');
     let baseVal = 1;
     for(let r of radios) {
         if (r.checked) baseVal = r.value;
     }
     
-    editingComponent.updateConfig(sliderVal, baseVal);
+    editingComponent.updateConfig(sliderVal, baseVal, dutyVal);
     closeConfig();
 }
 
@@ -1037,15 +1117,14 @@ function toggleHelp() {
 requestAnimationFrame(gameLoop);
 
 function loadDemo() {
-    // Demo content should appear near origin
-    const sw1 = new Component('SWITCH', 100, 100);
-    const ton = new Component('TON', 300, 100);
-    const light = new Component('LIGHT_G', 500, 100);
+    const clk = new Component('CLOCK', 100, 100);
+    const sreg = new Component('SHIFT_REG', 300, 100);
+    const sw = new Component('SWITCH', 100, 200);
     
-    components.push(sw1, ton, light);
+    components.push(clk, sreg, sw);
     
-    wires.push({ from: {comp: sw1, pinIdx: 0}, to: {comp: ton, pinIdx: 0} });
-    wires.push({ from: {comp: ton, pinIdx: 0}, to: {comp: light, pinIdx: 0} });
+    wires.push({ from: {comp: clk, pinIdx: 0}, to: {comp: sreg, pinIdx: 1} }); // Clock to Clock
+    wires.push({ from: {comp: sw, pinIdx: 0}, to: {comp: sreg, pinIdx: 0} });  // Switch to Data
 }
 setTimeout(loadDemo, 100);
 
