@@ -582,15 +582,17 @@ class Component {
     }
 
     draw(ctx) {
-        let fillColor = this.def.color;
+        // 1. Determine base color
+        let bodyColor = this.def.color;
+        if (this.type === 'PUSH_BTN' && this.outputStates[0]) bodyColor = '#2ecc71';
         
+        // 2. Dragging Shadow
         if (this === draggingComponent) {
             ctx.shadowColor = 'rgba(255,255,255,0.5)';
             ctx.shadowBlur = 10;
         }
 
-        // --- CUSTOM COMPONENT DRAWING ---
-
+        // 3. Draw Component Body
         if (this.isLed) {
             const colors = LED_PALETTE[this.type];
             for (let i = 0; i < this.inputStates.length; i++) {
@@ -604,62 +606,46 @@ class Component {
                 }
             }
         } 
-        
         else if (this.type === 'PUSH_BTN') {
-            // Silvery Bezel Gradient
             const grad = ctx.createRadialGradient(this.x+30, this.y+30, 10, this.x+30, this.y+30, 30);
             grad.addColorStop(0, '#bdc3c7'); grad.addColorStop(1, '#7f8c8d');
             ctx.fillStyle = grad;
             ctx.beginPath(); ctx.arc(this.x+30, this.y+30, 28, 0, Math.PI*2); ctx.fill();
 
-            // Button Head
             const pressed = this.outputStates[0];
-            const btnColor = pressed ? '#e74c3c' : '#c0392b'; // Bright red if pressed
+            const btnColor = pressed ? '#e74c3c' : '#c0392b'; 
             const inset = pressed ? 2 : 0;
-            
             ctx.fillStyle = btnColor;
             ctx.beginPath(); 
             ctx.arc(this.x+30, this.y+30 + inset, 20 - inset/2, 0, Math.PI*2); 
             ctx.fill();
-
-            if(pressed) {
-                ctx.shadowColor = '#ff0000'; ctx.shadowBlur = 20; ctx.fill(); ctx.shadowBlur = 0;
-            }
+            if(pressed) { ctx.shadowColor = '#ff0000'; ctx.shadowBlur = 20; ctx.fill(); ctx.shadowBlur = 0; }
         }
-        
         else if (this.type === 'SWITCH') {
-             // Base plate
              roundRect(ctx, this.x, this.y, this.w, this.h, 4);
              ctx.fillStyle = '#7f8c8d'; ctx.fill();
              
-             // Toggle Slot background
              ctx.fillStyle = '#2c3e50';
-             roundRect(ctx, this.x+20, this.y+5, 20, this.h-10, 10);
-             ctx.fill();
+             roundRect(ctx, this.x+20, this.y+5, 20, this.h-10, 10); ctx.fill();
              
-             // ON Indicator
              if(this.outputStates[0]) {
                  ctx.fillStyle = WIRE_COLOR_ON; ctx.shadowColor = WIRE_COLOR_ON; ctx.shadowBlur = 5;
                  ctx.fillRect(this.x+25, this.y+8, 10, 5); ctx.shadowBlur = 0;
              }
 
-             // Lever Handle
              const leverY = this.outputStates[0] ? this.y + 15 : this.y + this.h - 15;
              const grad = ctx.createLinearGradient(this.x, this.y, this.x+60, this.y);
              grad.addColorStop(0, '#bdc3c7'); grad.addColorStop(1, '#ecf0f1');
              ctx.fillStyle = grad;
              ctx.beginPath(); ctx.arc(this.x+30, leverY, 12, 0, Math.PI*2); ctx.fill();
              
-             // Lever shaft
              ctx.strokeStyle = '#bdc3c7'; ctx.lineWidth = 6; ctx.beginPath();
              ctx.moveTo(this.x+30, this.y + this.h/2); ctx.lineTo(this.x+30, leverY); ctx.stroke();
         }
-
         else if (this.type === 'CLOCK') {
             roundRect(ctx, this.x, this.y, this.w, this.h, 6);
-            ctx.fillStyle = this.def.color; ctx.fill();
+            ctx.fillStyle = bodyColor; ctx.fill();
             
-            // 1. Square Wave Symbol (Centered Top)
             ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath();
             const cx = this.x + this.w/2;
             const cy = this.y + 20; 
@@ -667,24 +653,16 @@ class Component {
             ctx.lineTo(cx+5, cy-8); ctx.lineTo(cx+5, cy+5); ctx.lineTo(cx+12, cy+5);
             ctx.stroke();
 
-            // Bottom Status Area
             const bottomY = this.y + this.h - 12;
             
-            // 2. Indicator LED (Left)
-            ctx.beginPath(); 
-            ctx.arc(this.x + 10, bottomY, 4, 0, Math.PI*2);
-            ctx.fillStyle = this.outputStates[0] ? WIRE_COLOR_ON : '#222'; 
-            ctx.fill();
+            ctx.beginPath(); ctx.arc(this.x + 10, bottomY, 4, 0, Math.PI*2);
+            ctx.fillStyle = this.outputStates[0] ? WIRE_COLOR_ON : '#222'; ctx.fill();
 
-            // 3. Time Text (Right)
-            ctx.fillStyle = '#bdc3c7'; 
-            ctx.font = "bold 9px sans-serif"; 
-            ctx.textAlign = "right";
-            ctx.textBaseline = "middle";
+            ctx.fillStyle = '#bdc3c7'; ctx.font = "bold 9px sans-serif"; 
+            ctx.textAlign = "right"; ctx.textBaseline = "middle";
             const totalSec = (this.timeSetting * this.timeBase).toFixed(1) + "s";
             ctx.fillText(totalSec, this.x + this.w - 5, bottomY);
 
-            // 4. Progress Bar (Middle - Horizontal)
             const ledEnd = this.x + 18;
             const textStart = this.x + this.w - 28; 
             const barX = ledEnd;
@@ -693,28 +671,22 @@ class Component {
             const barY = bottomY - 2;
 
             if (barW > 5) {
-                // Background
-                ctx.fillStyle = 'rgba(0,0,0,0.4)'; 
-                ctx.fillRect(barX, barY, barW, barH);
-                
-                // Fill (Horizontal)
+                ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(barX, barY, barW, barH);
                 let pct = this.timerValue / this.timerLimit;
-                ctx.fillStyle = '#3498db'; // Nice blue for clock progress
-                ctx.fillRect(barX, barY, barW * pct, barH);
+                ctx.fillStyle = '#3498db'; ctx.fillRect(barX, barY, barW * pct, barH);
             }
         }
-
         else {
-            // Generic Block Drawing for Gates/Timers
+            // Generic Block Drawing (Gates, Timers, Latches)
             roundRect(ctx, this.x, this.y, this.w, this.h, 6);
+            ctx.fillStyle = bodyColor; // Explicitly set fill style here
             ctx.fill();
         }
         ctx.shadowBlur = 0;
 
-        // --- GENERIC LABELS & PINS ---
-
+        // 4. Labels and Text
         if (!this.isLed && !['SWITCH','PUSH_BTN','CLOCK'].includes(this.type)) {
-            ctx.fillStyle = this.def.textColor || 'white';
+            ctx.fillStyle = this.def.textColor || 'white'; // Explicitly set text color
             ctx.font = "bold 14px sans-serif";
             ctx.textAlign = "center";
             ctx.textBaseline = "top";
@@ -723,9 +695,12 @@ class Component {
                 let pct = this.timerValue / this.timerLimit;
                 const barW = this.w - 10;
                 ctx.fillText(this.def.label, this.x + this.w/2, this.y + 5);
+                
                 const barY = this.y + this.h - 20;
                 ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(this.x + 5, barY, barW, 6);
                 ctx.fillStyle = 'white'; ctx.fillRect(this.x + 5, barY, barW * pct, 6);
+                
+                ctx.fillStyle = 'white'; // Reset for text
                 ctx.font = "10px sans-serif";
                 const totalSec = (this.timeSetting * this.timeBase).toFixed(1) + "s";
                 ctx.fillText(totalSec, this.x + this.w/2, this.y + this.h - 12);
@@ -740,11 +715,25 @@ class Component {
             }
         }
 
-        // Pins
+        // 5. Indicator LEDs (Small lights on body)
+        if (['SWITCH', 'PUSH_BTN'].includes(this.type) || this.type.startsWith('LIGHT')) {
+            ctx.beginPath();
+            ctx.arc(this.x + this.w/2, this.y + 35, 6, 0, Math.PI*2);
+            let ledColor = '#333';
+            if (this.type.startsWith('LIGHT')) ledColor = this.outputStates[0] ? this.def.onColor : '#222';
+            else ledColor = this.outputStates[0] ? WIRE_COLOR_ON : '#333';
+            
+            ctx.fillStyle = ledColor;
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.stroke();
+        }
+
+        // 6. Pins
         ctx.fillStyle = '#fff';
         ctx.strokeStyle = '#fff';
         
-        // Inputs
+        // Input Pins
         for(let i=0; i<this.inputStates.length; i++) {
             const pos = this.getInputPos(i);
             ctx.fillRect(pos.x - 5, pos.y - 5, 10, 10);
@@ -763,10 +752,9 @@ class Component {
             }
         }
 
-        // Outputs
+        // Output Pins
         for(let i=0; i<this.outputStates.length; i++) {
             const pos = this.getOutputPos(i);
-            // Dont draw output pins for things that dont have them visually
             if (!this.isLed && this.type !== 'SEVEN_SEG') {
                 ctx.beginPath(); ctx.arc(pos.x, pos.y, 5, 0, Math.PI*2); ctx.fill();
                 if (isHoveringPin(pos)) {
@@ -1199,6 +1187,7 @@ setTimeout(loadDemo, 100);
 </script>
 </body>
 </html>
+
 
 
 
