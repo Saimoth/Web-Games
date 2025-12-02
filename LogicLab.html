@@ -523,8 +523,12 @@ class Component {
         else if (this.type === 'OR') this.outputStates[0] = this.inputStates.some(Boolean);
         else if (this.type === 'NOT') this.outputStates[0] = !this.inputStates[0];
         else if (this.type === 'XOR') {
-            const trueCount = this.inputStates.filter(Boolean).length;
-            this.outputStates[0] = (trueCount % 2) === 1;
+            // Inequality Logic: Output ON only if inputs are mixed (not all ON and not all OFF)
+            // 2-Input: Equivalent to standard XOR
+            // >2 Input: Returns true if any input differs from the others
+            const allOn = this.inputStates.every(Boolean);
+            const allOff = this.inputStates.every(s => !s);
+            this.outputStates[0] = !(allOn || allOff);
         }
         
         else if (this.type === 'LATCH') { 
@@ -1232,5 +1236,6 @@ setTimeout(loadDemo, 100);
 </script>
 </body>
 </html>
+
 
 
