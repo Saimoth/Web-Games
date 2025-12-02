@@ -294,7 +294,7 @@
         <div class="controls">
             <div style="font-size: 0.75rem; color:#888; text-align:center; margin-bottom:5px;">
                 <strong>Double Right-Click</strong> Comp to Delete.<br>
-                <strong>Right-Click</strong> Gate to set Inputs.<br>
+                <strong>Right-Click</strong> to Configure.<br>
                 Drag BG to Pan.
             </div>
             <div class="btn-group">
@@ -337,11 +337,11 @@
                 </div>
             </div>
 
-            <!-- Gate Inputs -->
-            <div id="gateControls" style="display:none;">
+            <!-- Gate/LED Inputs -->
+            <div id="inputCountControls" style="display:none;">
                 <div class="config-row">
-                    <div class="config-label">Number of Inputs: <span id="inputCountDisplay" style="color:var(--wire-on); font-weight:bold;">2</span></div>
-                    <input type="range" id="inputCountSlider" min="2" max="8" step="1" value="2" oninput="updateInputCountDisplay(this.value)">
+                    <div class="config-label">Count / Inputs: <span id="inputCountDisplay" style="color:var(--wire-on); font-weight:bold;">2</span></div>
+                    <input type="range" id="inputCountSlider" min="1" max="8" step="1" value="2" oninput="updateInputCountDisplay(this.value)">
                 </div>
             </div>
 
@@ -358,7 +358,7 @@
             <span class="close-modal" onclick="toggleHelp()">&times;</span>
             <h2>How to Use Logic Lab</h2>
             <p>1. <strong>Wiring:</strong> Drag from Circle (Out) to Square (In).</p>
-            <p>2. <strong>Config:</strong> Right-Click a Gate (AND/OR/XOR) to change input count (2-8).</p>
+            <p>2. <strong>Config:</strong> Right-Click a Gate or LED to change count (1-8).</p>
             <p>3. <strong>LEDs:</strong> Dim color = OFF, Bright Neon = ON.</p>
             <p>4. <strong>Controls:</strong>
                 <br>- Double Right-Click Component: Delete
@@ -455,7 +455,8 @@ class Component {
         
         // Is it an LED?
         this.isLed = LED_PALETTE[type] !== undefined;
-        this.def = this.isLed ? { w:20, inputs:1, outputs:0 } : COMP_DEFS[type];
+        // LEDs allow resizing (multistrip)
+        this.def = this.isLed ? { w:20, inputs:1, outputs:0, resizable:true } : COMP_DEFS[type];
         
         this.x = x;
         this.y = y;
@@ -483,11 +484,12 @@ class Component {
     resize() {
         // Height calculation: 20px per max(input, output). Min 40px (2 units)
         const maxPins = Math.max(this.inputStates.length, this.outputStates.length);
-        // Ensure at least 40px high for simple blocks, except LEDs
+        
         if (this.isLed) {
-            this.h = 20; 
+            // LEDs scale precisely with count
+            this.h = Math.max(20, this.inputStates.length * 20);
         } else if (this.type === 'SEVEN_SEG') {
-            this.h = 180; // Fixed height for visual consistency
+            this.h = 180; // Fixed height
         } else {
             this.h = Math.max(40, maxPins * 20);
         }
@@ -500,7 +502,7 @@ class Component {
         
         if (config.inputCount && this.def.resizable) {
             const count = parseInt(config.inputCount);
-            // Resize input array preserving existing states where possible
+            // Resize input array preserving existing states
             const newInputs = new Array(count).fill(false);
             for(let i=0; i<Math.min(this.inputStates.length, count); i++) {
                 newInputs[i] = this.inputStates[i];
@@ -521,7 +523,6 @@ class Component {
         else if (this.type === 'OR') this.outputStates[0] = this.inputStates.some(Boolean);
         else if (this.type === 'NOT') this.outputStates[0] = !this.inputStates[0];
         else if (this.type === 'XOR') {
-            // XOR for >2 inputs usually means parity (odd number of true inputs = true)
             const trueCount = this.inputStates.filter(Boolean).length;
             this.outputStates[0] = (trueCount % 2) === 1;
         }
@@ -535,7 +536,7 @@ class Component {
         } 
         
         else if (this.isLed) {
-            this.outputStates[0] = this.inputStates[0]; // State used for coloring
+            // Visual only, no output logic change needed, state resides in inputStates
         } 
         
         else if (this.type === 'TON') {
@@ -580,10 +581,10 @@ class Component {
         }
     }
 
-    // New Standard: Start from top, 20px steps
-    // Offset Y by 10 to center pin in the 20px grid row
     getInputPos(index) {
-        return { x: this.x, y: this.y + (index * 20) + 10 };
+        // LED Input Connector Shifted 5px Left
+        const xOff = this.isLed ? -5 : 0;
+        return { x: this.x + xOff, y: this.y + (index * 20) + 10 };
     }
 
     getOutputPos(index) {
@@ -593,12 +594,7 @@ class Component {
     draw(ctx) {
         let fillColor = this.def.color;
         
-        // LEDs
-        if (this.isLed) {
-            const colors = LED_PALETTE[this.type];
-            fillColor = this.inputStates[0] ? colors.on : colors.off;
-        }
-        else if (this.type === 'PUSH_BTN' && this.outputStates[0]) fillColor = '#2ecc71';
+        if (this.type === 'PUSH_BTN' && this.outputStates[0]) fillColor = '#2ecc71';
 
         ctx.fillStyle = fillColor;
         
@@ -609,15 +605,20 @@ class Component {
 
         // Draw Body
         if (this.isLed) {
-            // Draw Circle
-            ctx.beginPath();
-            ctx.arc(this.x + 10, this.y + 10, 8, 0, Math.PI*2);
-            ctx.fill();
-            if (this.inputStates[0]) {
-                ctx.shadowColor = fillColor;
-                ctx.shadowBlur = 15;
-                ctx.fill(); // re-fill for glow intensity
-                ctx.shadowBlur = 0;
+            // Draw possibly multiple LEDs vertically
+            const colors = LED_PALETTE[this.type];
+            for (let i = 0; i < this.inputStates.length; i++) {
+                const on = this.inputStates[i];
+                ctx.fillStyle = on ? colors.on : colors.off;
+                ctx.beginPath();
+                ctx.arc(this.x + 10, this.y + (i * 20) + 10, 8, 0, Math.PI*2);
+                ctx.fill();
+                if (on) {
+                    ctx.shadowColor = colors.on;
+                    ctx.shadowBlur = 15;
+                    ctx.fill(); 
+                    ctx.shadowBlur = 0;
+                }
             }
         } else {
             // Draw Block
@@ -634,19 +635,14 @@ class Component {
             ctx.textBaseline = "top";
             
             if (this.type === 'TON' || this.type === 'TOF' || this.type === 'CLOCK') {
-                // Timer Progress Bar
                 let pct = this.timerValue / this.timerLimit;
                 const barW = this.w - 10;
                 ctx.fillText(this.def.label, this.x + this.w/2, this.y + 5);
-                
-                // Bar at bottom
                 const barY = this.y + this.h - 20;
                 ctx.fillStyle = 'rgba(0,0,0,0.3)';
                 ctx.fillRect(this.x + 5, barY, barW, 6);
                 ctx.fillStyle = 'white';
                 ctx.fillRect(this.x + 5, barY, barW * pct, 6);
-                
-                // Time Text
                 ctx.font = "10px sans-serif";
                 const totalSec = (this.timeSetting * this.timeBase).toFixed(1) + "s";
                 ctx.fillText(totalSec, this.x + this.w/2, this.y + this.h - 12);
@@ -687,7 +683,6 @@ class Component {
                 ctx.strokeStyle = '#fff';
             }
             
-            // Labels for complex parts
             if(this.type === 'LATCH' || this.type === 'RS_LATCH' || this.type === 'SHIFT_REG') {
                 ctx.fillStyle = 'rgba(255,255,255,0.7)';
                 ctx.font = "bold 10px monospace";
@@ -742,8 +737,6 @@ class Component {
             ctx.shadowBlur = 0;
         };
 
-        // Segments: 0=a, 1=b, 2=c, 3=d, 4=e, 5=f, 6=g, 7=dp
-        // Positions calculated relative to center
         drawSeg(0, cx - segL/2, cy - segL - segW, segL, segW); // a
         drawSeg(1, cx + segL/2, cy - segL, segW, segL); // b
         drawSeg(2, cx + segL/2, cy + segW, segW, segL); // c
@@ -752,7 +745,6 @@ class Component {
         drawSeg(5, cx - segL/2 - segW, cy - segL, segW, segL); // f
         drawSeg(6, cx - segL/2, cy, segL, segW); // g
         
-        // DP
         const on = this.inputStates[7];
         ctx.fillStyle = on ? '#ff0000' : '#2a0000';
         if(on) { ctx.shadowColor = '#ff0000'; ctx.shadowBlur = 10; }
@@ -824,7 +816,7 @@ function gameLoop() {
 }
 
 function draw() {
-    ctx.fillStyle = '#2c2c2c';
+    ctx.fillStyle = '#2c2c2c'; // Dark Grey
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     // Background Grid
@@ -979,6 +971,10 @@ function handleInputStart(e) {
                 return;
             }
         }
+        
+        // --- CHANGE: Prevent wiring FROM LED inputs ---
+        if (c.isLed) continue; 
+
         for(let i=0; i<c.inputStates.length; i++) {
             if (isHoveringPin(c.getInputPos(i))) {
                 wiringStart = { comp: c, pinType: 'input', pinIndex: i };
@@ -1072,10 +1068,10 @@ function openConfig(comp) {
     editingComponent = comp;
     const panel = document.getElementById('configPanel');
     const timerControls = document.getElementById('timerControls');
-    const gateControls = document.getElementById('gateControls');
+    const inputCountControls = document.getElementById('inputCountControls');
     
     timerControls.style.display = 'none';
-    gateControls.style.display = 'none';
+    inputCountControls.style.display = 'none';
 
     if (['TON', 'TOF', 'CLOCK'].includes(comp.type)) {
         timerControls.style.display = 'block';
@@ -1097,7 +1093,7 @@ function openConfig(comp) {
     }
     
     if (comp.def.resizable) {
-        gateControls.style.display = 'block';
+        inputCountControls.style.display = 'block';
         document.getElementById('inputCountSlider').value = comp.inputStates.length;
         updateInputCountDisplay(comp.inputStates.length);
     }
