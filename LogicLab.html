@@ -6,7 +6,6 @@
     <title>Logic Lab: Circuit Simulator</title>
     <style>
         :root {
-            /* Updated to Dark Grey as requested */
             --bg-color: #2c2c2c; 
             --sidebar-bg: #16213e;
             --text-color: #e94560;
@@ -93,6 +92,7 @@
             justify-content: center;
             font-weight: bold;
             border-radius: 4px;
+            font-size: 12px;
         }
 
         /* Bottom Controls */
@@ -104,6 +104,11 @@
             gap: 10px;
         }
 
+        .btn-group {
+            display: flex;
+            gap: 5px;
+        }
+
         button {
             padding: 10px;
             border: none;
@@ -111,31 +116,16 @@
             cursor: pointer;
             font-weight: bold;
             transition: opacity 0.2s;
+            flex: 1;
         }
 
-        .btn-clear {
-            background-color: #e94560;
-            color: white;
-        }
-        
-        .btn-help {
-            background-color: #0f3460;
-            color: white;
-        }
-        
-        .btn-save {
-            background-color: var(--wire-on);
-            color: #000;
-        }
+        .btn-clear { background-color: #e94560; color: white; }
+        .btn-help { background-color: #0f3460; color: white; }
+        .btn-save { background-color: var(--wire-on); color: #000; }
+        .btn-load { background-color: #d35400; color: white; }
+        .btn-cancel { background-color: #555; color: white; }
 
-        .btn-cancel {
-            background-color: #555;
-            color: white;
-        }
-
-        button:hover {
-            opacity: 0.8;
-        }
+        button:hover { opacity: 0.8; }
 
         /* Canvas Area */
         #canvas-container {
@@ -146,45 +136,7 @@
             cursor: crosshair;
         }
 
-        canvas {
-            display: block;
-        }
-
-        #tooltip {
-            position: absolute;
-            background: rgba(0, 0, 0, 0.8);
-            color: white;
-            padding: 5px 10px;
-            border-radius: 4px;
-            font-size: 12px;
-            pointer-events: none;
-            display: none;
-            z-index: 100;
-        }
-
-        /* Modal styling */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-        }
-        .modal-content {
-            background: var(--sidebar-bg);
-            padding: 30px;
-            border-radius: 10px;
-            max-width: 500px;
-            line-height: 1.6;
-            color: #ddd;
-        }
-        .close-modal {
-            float: right;
-            cursor: pointer;
-            font-size: 20px;
-        }
+        canvas { display: block; }
 
         /* Context Menu (Config Panel) */
         #configPanel {
@@ -209,20 +161,9 @@
             font-size: 1rem;
         }
 
-        .config-row {
-            margin-bottom: 15px;
-        }
-
-        .config-label {
-            display: block;
-            margin-bottom: 5px;
-            font-size: 0.9rem;
-            color: #aaa;
-        }
-
-        input[type="range"] {
-            width: 100%;
-        }
+        .config-row { margin-bottom: 15px; }
+        .config-label { display: block; margin-bottom: 5px; font-size: 0.9rem; color: #aaa; }
+        input[type="range"] { width: 100%; }
 
         .radio-group {
             display: grid;
@@ -236,10 +177,7 @@
             font-size: 0.9rem;
             cursor: pointer;
         }
-
-        .radio-label input {
-            margin-right: 8px;
-        }
+        .radio-label input { margin-right: 8px; }
         
         .panel-actions {
             display: flex;
@@ -247,6 +185,29 @@
             gap: 10px;
             margin-top: 20px;
         }
+
+        /* Hidden File Input */
+        #fileInput { display: none; }
+
+        /* Modal styling */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content {
+            background: var(--sidebar-bg);
+            padding: 30px;
+            border-radius: 10px;
+            max-width: 500px;
+            line-height: 1.6;
+            color: #ddd;
+        }
+        .close-modal { float: right; cursor: pointer; font-size: 20px; }
 
     </style>
 </head>
@@ -263,27 +224,27 @@
                 <span>Toggle Switch</span>
             </div>
             <div class="tool-item" draggable="true" data-type="PUSH_BTN">
-                <div class="tool-icon" style="background:#2ecc71; color:black">PB</div>
+                <div class="tool-icon" style="background:#27ae60; color:white">PB</div>
                 <span>Push Button</span>
             </div>
             <div class="tool-item" draggable="true" data-type="CLOCK">
-                <div class="tool-icon" style="background:#34495e; color:white">Clk</div>
+                <div class="tool-icon" style="background:#34495e; color:white">CLK</div>
                 <span>Clock Gen</span>
             </div>
             
-            <div class="category-label">Outputs (LEDs)</div>
-            <div class="tool-item" draggable="true" data-type="LIGHT_R">
-                <div class="tool-icon" style="background:#e74c3c; color:white">R</div>
-                <span>Red LED</span>
+            <div class="category-label">LEDs</div>
+            <!-- Small circular LED icons -->
+            <div style="display:flex; flex-wrap:wrap; gap:5px; padding-left:5px;">
+                <div class="tool-item" draggable="true" data-type="LED_R" style="width:30px; padding:5px;" title="Red"><div class="tool-icon" style="background:#e74c3c; margin:0; border-radius:50%;"></div></div>
+                <div class="tool-item" draggable="true" data-type="LED_O" style="width:30px; padding:5px;" title="Orange"><div class="tool-icon" style="background:#e67e22; margin:0; border-radius:50%;"></div></div>
+                <div class="tool-item" draggable="true" data-type="LED_Y" style="width:30px; padding:5px;" title="Yellow"><div class="tool-icon" style="background:#f1c40f; margin:0; border-radius:50%;"></div></div>
+                <div class="tool-item" draggable="true" data-type="LED_G" style="width:30px; padding:5px;" title="Green"><div class="tool-icon" style="background:#2ecc71; margin:0; border-radius:50%;"></div></div>
+                <div class="tool-item" draggable="true" data-type="LED_B" style="width:30px; padding:5px;" title="Blue"><div class="tool-icon" style="background:#3498db; margin:0; border-radius:50%;"></div></div>
+                <div class="tool-item" draggable="true" data-type="LED_P" style="width:30px; padding:5px;" title="Purple"><div class="tool-icon" style="background:#9b59b6; margin:0; border-radius:50%;"></div></div>
+                <div class="tool-item" draggable="true" data-type="LED_W" style="width:30px; padding:5px;" title="White"><div class="tool-icon" style="background:#ffffff; margin:0; border-radius:50%;"></div></div>
             </div>
-            <div class="tool-item" draggable="true" data-type="LIGHT_G">
-                <div class="tool-icon" style="background:#2ecc71; color:white">G</div>
-                <span>Green LED</span>
-            </div>
-            <div class="tool-item" draggable="true" data-type="LIGHT_B">
-                <div class="tool-icon" style="background:#3498db; color:white">B</div>
-                <span>Blue LED</span>
-            </div>
+
+            <div class="category-label">Complex Output</div>
             <div class="tool-item" draggable="true" data-type="SEVEN_SEG">
                 <div class="tool-icon" style="background:#000; color:red; border:1px solid #444;">8.</div>
                 <span>7-Seg Display</span>
@@ -291,19 +252,19 @@
 
             <div class="category-label">Logic Gates</div>
             <div class="tool-item" draggable="true" data-type="AND">
-                <div class="tool-icon" style="background:#50e3c2; color:black">&</div>
+                <div class="tool-icon" style="background:#50e3c2; color:black">AND</div>
                 <span>AND Gate</span>
             </div>
             <div class="tool-item" draggable="true" data-type="OR">
-                <div class="tool-icon" style="background:#b8e986; color:black">≥1</div>
+                <div class="tool-icon" style="background:#b8e986; color:black">OR</div>
                 <span>OR Gate</span>
             </div>
             <div class="tool-item" draggable="true" data-type="NOT">
-                <div class="tool-icon" style="background:#bd10e0; color:white">!</div>
+                <div class="tool-icon" style="background:#bd10e0; color:white">NOT</div>
                 <span>NOT Gate</span>
             </div>
             <div class="tool-item" draggable="true" data-type="XOR">
-                <div class="tool-icon" style="background:#9013fe; color:white">=1</div>
+                <div class="tool-icon" style="background:#9013fe; color:white">XOR</div>
                 <span>XOR Gate</span>
             </div>
             <div class="tool-item" draggable="true" data-type="LATCH">
@@ -315,59 +276,75 @@
                 <span>RS Latch</span>
             </div>
 
-            <div class="category-label">Complex</div>
+            <div class="category-label">Advanced</div>
             <div class="tool-item" draggable="true" data-type="SHIFT_REG">
-                <div class="tool-icon" style="background:#8e44ad; color:white">SR</div>
+                <div class="tool-icon" style="background:#8e44ad; color:white">SR8</div>
                 <span>Shift Reg (8)</span>
             </div>
             <div class="tool-item" draggable="true" data-type="TON">
-                <div class="tool-icon" style="background:#417505; color:white">T+</div>
-                <span>Timer ON (Delay)</span>
+                <div class="tool-icon" style="background:#417505; color:white">TON</div>
+                <span>Timer ON</span>
             </div>
             <div class="tool-item" draggable="true" data-type="TOF">
-                <div class="tool-icon" style="background:#d0021b; color:white">T-</div>
-                <span>Timer OFF (Hold)</span>
+                <div class="tool-icon" style="background:#d0021b; color:white">TOF</div>
+                <span>Timer OFF</span>
             </div>
         </div>
 
         <div class="controls">
-            <div style="font-size: 0.8rem; color:#888; text-align:center;">
+            <div style="font-size: 0.75rem; color:#888; text-align:center; margin-bottom:5px;">
                 <strong>Double Right-Click</strong> Comp to Delete.<br>
-                <strong>Right-Click Pin</strong> to Delete Wires.<br>
-                Drag background to Pan.<br>
-                Right Click Timer/Clock to Edit.
+                <strong>Right-Click</strong> Gate to set Inputs.<br>
+                Drag BG to Pan.
+            </div>
+            <div class="btn-group">
+                <button class="btn-save" onclick="saveProject()">Save</button>
+                <button class="btn-load" onclick="document.getElementById('fileInput').click()">Load</button>
             </div>
             <button class="btn-clear" onclick="clearBoard()">Clear Board</button>
             <button class="btn-help" onclick="toggleHelp()">How to Play</button>
+            <input type="file" id="fileInput" accept=".json" onchange="loadProject(this)">
         </div>
     </div>
 
     <!-- Main Canvas -->
     <div id="canvas-container">
         <canvas id="circuitCanvas"></canvas>
-        <div id="tooltip"></div>
         
         <!-- Context Menu / Config Panel -->
         <div id="configPanel">
             <h3 id="configTitle">Settings</h3>
-            <div class="config-row">
-                <div class="config-label">Period/Duration: <span id="valDisplay" style="color:var(--wire-on); font-weight:bold;">0.5</span></div>
-                <input type="range" id="timerSlider" min="0" max="1" step="0.01" value="0.5" oninput="updateValDisplay(this.value)">
-            </div>
             
-            <div class="config-row" id="dutyRow" style="display:none;">
-                <div class="config-label">Duty Cycle %: <span id="dutyDisplay" style="color:var(--wire-on); font-weight:bold;">50</span></div>
-                <input type="range" id="dutySlider" min="0" max="100" step="5" value="50" oninput="updateDutyDisplay(this.value)">
-            </div>
+            <!-- Timers/Clock -->
+            <div id="timerControls">
+                <div class="config-row">
+                    <div class="config-label">Period/Duration: <span id="valDisplay" style="color:var(--wire-on); font-weight:bold;">0.5</span></div>
+                    <input type="range" id="timerSlider" min="0" max="1" step="0.01" value="0.5" oninput="updateValDisplay(this.value)">
+                </div>
+                
+                <div class="config-row" id="dutyRow" style="display:none;">
+                    <div class="config-label">Duty Cycle %: <span id="dutyDisplay" style="color:var(--wire-on); font-weight:bold;">50</span></div>
+                    <input type="range" id="dutySlider" min="0" max="100" step="5" value="50" oninput="updateDutyDisplay(this.value)">
+                </div>
 
-            <div class="config-row">
-                <div class="config-label">Time Base</div>
-                <div class="radio-group">
-                    <label class="radio-label"><input type="radio" name="timebase" value="1" checked> 1s</label>
-                    <label class="radio-label"><input type="radio" name="timebase" value="10"> 10s</label>
-                    <label class="radio-label"><input type="radio" name="timebase" value="100"> 100s</label>
+                <div class="config-row">
+                    <div class="config-label">Time Base</div>
+                    <div class="radio-group">
+                        <label class="radio-label"><input type="radio" name="timebase" value="1" checked> 1s</label>
+                        <label class="radio-label"><input type="radio" name="timebase" value="10"> 10s</label>
+                        <label class="radio-label"><input type="radio" name="timebase" value="100"> 100s</label>
+                    </div>
                 </div>
             </div>
+
+            <!-- Gate Inputs -->
+            <div id="gateControls" style="display:none;">
+                <div class="config-row">
+                    <div class="config-label">Number of Inputs: <span id="inputCountDisplay" style="color:var(--wire-on); font-weight:bold;">2</span></div>
+                    <input type="range" id="inputCountSlider" min="2" max="8" step="1" value="2" oninput="updateInputCountDisplay(this.value)">
+                </div>
+            </div>
+
             <div class="panel-actions">
                 <button class="btn-cancel" onclick="closeConfig()">Cancel</button>
                 <button class="btn-save" onclick="saveConfig()">Apply</button>
@@ -380,15 +357,14 @@
         <div class="modal-content">
             <span class="close-modal" onclick="toggleHelp()">&times;</span>
             <h2>How to Use Logic Lab</h2>
-            <p>1. <strong>Push Button:</strong> Active only while held down.</p>
-            <p>2. <strong>Clock Gen:</strong> Generates square wave. Right-click to set Frequency and Duty Cycle.</p>
-            <p>3. <strong>Shift Register:</strong> 8-bit Serial-In Parallel-Out. Top In: Data, Mid In: Clock, Bot In: Reset.</p>
-            <p>4. <strong>7-Seg Display:</strong> 8 Inputs. Top to Bottom: a, b, c, d, e, f, g, dp.</p>
-            <p>5. <strong>Wiring:</strong> Drag from Circle (Out) to Square (In). Multiple wires can be connected to the same input.</p>
-            <p>6. <strong>Controls:</strong>
+            <p>1. <strong>Wiring:</strong> Drag from Circle (Out) to Square (In).</p>
+            <p>2. <strong>Config:</strong> Right-Click a Gate (AND/OR/XOR) to change input count (2-8).</p>
+            <p>3. <strong>LEDs:</strong> Dim color = OFF, Bright Neon = ON.</p>
+            <p>4. <strong>Controls:</strong>
                 <br>- Double Right-Click Component: Delete
                 <br>- Right-Click Pin: Clear Wires
                 <br>- Drag Background: Pan View
+                <br>- Save/Load: Keep your projects locally.
             </p>
         </div>
     </div>
@@ -402,7 +378,7 @@ const WIRE_COLOR_OFF = '#53354a';
 const WIRE_COLOR_ON = '#00ff9d';
 const SNAP_DIST = 15;
 const FPS = 60;
-const SUB_STEPS = 4; // Number of logic updates per frame
+const SUB_STEPS = 4; 
 
 /**
  * STATE MANAGEMENT
@@ -411,7 +387,7 @@ const canvas = document.getElementById('circuitCanvas');
 const ctx = canvas.getContext('2d');
 const container = document.getElementById('canvas-container');
 
-// View State (Panning)
+// View State
 let viewX = 0;
 let viewY = 0;
 let isPanning = false;
@@ -424,7 +400,7 @@ let draggingComponent = null;
 let dragOffset = { x: 0, y: 0 };
 let isDraggingComp = false; 
 let dragStartPos = {x:0, y:0};
-let pressedButtonId = null; // Track held push buttons
+let pressedButtonId = null; 
 
 let wiringStart = null; 
 let mousePos = { x: 0, y: 0 };
@@ -437,90 +413,129 @@ let lastRightClickTime = 0;
 let lastRightClickId = null;
 
 /**
- * COMPONENT DEFINITIONS
+ * COMPONENT DEFINITIONS & FACTORY
  */
-const COMP_TYPES = {
-    SWITCH:    { w: 60, h: 60, inputs: 0, outputs: 1, color: '#4a90e2', label: 'SW' },
-    PUSH_BTN:  { w: 60, h: 60, inputs: 0, outputs: 1, color: '#27ae60', label: 'PB' },
-    CLOCK:     { w: 60, h: 60, inputs: 0, outputs: 1, color: '#34495e', label: 'CLK' },
+const LED_PALETTE = {
+    LED_R: { on: '#ff0000', off: '#440000', label: 'RED' },
+    LED_O: { on: '#ff7f00', off: '#442200', label: 'ORG' },
+    LED_Y: { on: '#ffff00', off: '#444400', label: 'YEL' },
+    LED_G: { on: '#00ff00', off: '#004400', label: 'GRN' },
+    LED_B: { on: '#0055ff', off: '#001144', label: 'BLU' },
+    LED_P: { on: '#aa00ff', off: '#330044', label: 'PUR' },
+    LED_W: { on: '#ffffff', off: '#444444', label: 'WHT' },
+};
+
+const COMP_DEFS = {
+    // Inputs
+    SWITCH:    { w: 60, inputs: 0, outputs: 1, color: '#4a90e2', label: 'SW' },
+    PUSH_BTN:  { w: 60, inputs: 0, outputs: 1, color: '#27ae60', label: 'PB' },
+    CLOCK:     { w: 60, inputs: 0, outputs: 1, color: '#34495e', label: 'CLK' },
     
-    LIGHT_R:   { w: 60, h: 60, inputs: 1, outputs: 0, color: '#333333', onColor: '#e74c3c', label: 'RED' },
-    LIGHT_G:   { w: 60, h: 60, inputs: 1, outputs: 0, color: '#333333', onColor: '#2ecc71', label: 'GRN' },
-    LIGHT_B:   { w: 60, h: 60, inputs: 1, outputs: 0, color: '#333333', onColor: '#3498db', label: 'BLU' },
+    // Gates (Default 2 inputs, Resizable)
+    AND:       { w: 60, inputs: 2, outputs: 1, color: '#50e3c2', label: 'AND', textColor: 'black', resizable: true },
+    OR:        { w: 60, inputs: 2, outputs: 1, color: '#b8e986', label: 'OR', textColor: 'black', resizable: true },
+    NOT:       { w: 60, inputs: 1, outputs: 1, color: '#bd10e0', label: 'NOT', textColor: 'white' },
+    XOR:       { w: 60, inputs: 2, outputs: 1, color: '#9013fe', label: 'XOR', resizable: true },
     
-    SEVEN_SEG: { w: 90, h: 160, inputs: 8, outputs: 0, color: '#000000', label: '' }, // Black BG
+    // Latches
+    LATCH:     { w: 60, inputs: 2, outputs: 1, color: '#d35400', label: 'SR' }, 
+    RS_LATCH:  { w: 60, inputs: 2, outputs: 1, color: '#d35400', label: 'RS' }, 
     
-    AND:       { w: 80, h: 60, inputs: 2, outputs: 1, color: '#50e3c2', label: '&', textColor: 'black' },
-    OR:        { w: 80, h: 60, inputs: 2, outputs: 1, color: '#b8e986', label: '≥1', textColor: 'black' },
-    NOT:       { w: 60, h: 40, inputs: 1, outputs: 1, color: '#bd10e0', label: '1', shape: 'triangle' },
-    XOR:       { w: 80, h: 60, inputs: 2, outputs: 1, color: '#9013fe', label: '=1' },
-    
-    LATCH:     { w: 80, h: 60, inputs: 2, outputs: 1, color: '#d35400', label: 'SR' }, 
-    RS_LATCH:  { w: 80, h: 60, inputs: 2, outputs: 1, color: '#d35400', label: 'RS' }, 
-    
-    SHIFT_REG: { w: 100, h: 180, inputs: 3, outputs: 8, color: '#8e44ad', label: 'SHIFT' },
-    
-    TON:       { w: 80, h: 60, inputs: 1, outputs: 1, color: '#417505', label: 'TON' }, 
-    TOF:       { w: 80, h: 60, inputs: 1, outputs: 1, color: '#d0021b', label: 'TOF' }, 
+    // Complex
+    SHIFT_REG: { w: 100, inputs: 3, outputs: 8, color: '#8e44ad', label: 'SHIFT' },
+    SEVEN_SEG: { w: 90, inputs: 8, outputs: 0, color: '#000000', label: '' }, 
+    TON:       { w: 60, inputs: 1, outputs: 1, color: '#417505', label: 'TON' }, 
+    TOF:       { w: 60, inputs: 1, outputs: 1, color: '#d0021b', label: 'TOF' }, 
 };
 
 class Component {
-    constructor(type, x, y) {
+    constructor(type, x, y, inputCountOverride) {
         this.id = Math.random().toString(36).substr(2, 9);
         this.type = type;
-        this.def = COMP_TYPES[type];
+        
+        // Is it an LED?
+        this.isLed = LED_PALETTE[type] !== undefined;
+        this.def = this.isLed ? { w:20, inputs:1, outputs:0 } : COMP_DEFS[type];
+        
         this.x = x;
         this.y = y;
         this.w = this.def.w;
-        this.h = this.def.h;
         
-        // State Management
+        // Initialize Inputs/Outputs based on definition or override
+        let initialInputs = this.def.inputs;
+        if (inputCountOverride) initialInputs = inputCountOverride;
+        
+        this.inputStates = new Array(initialInputs).fill(false);
         this.outputStates = new Array(this.def.outputs).fill(false);
-        this.inputStates = new Array(this.def.inputs).fill(false);
         
-        // Timer/Clock specifics
+        // Calculate Height Dynamically
+        this.resize();
+
+        // Internal State
         this.timerValue = 0; 
         this.timeSetting = 0.5; 
         this.timeBase = 1.0; 
         this.dutyCycle = 50; 
         this.updateTimerLimit();
-        
-        // Shift Register Specifics
         this.prevClockState = false;
     }
 
-    updateConfig(val, base, duty) {
-        this.timeSetting = parseFloat(val);
-        this.timeBase = parseFloat(base);
-        if(duty !== undefined) this.dutyCycle = parseInt(duty);
+    resize() {
+        // Height calculation: 20px per max(input, output). Min 40px (2 units)
+        const maxPins = Math.max(this.inputStates.length, this.outputStates.length);
+        // Ensure at least 40px high for simple blocks, except LEDs
+        if (this.isLed) {
+            this.h = 20; 
+        } else if (this.type === 'SEVEN_SEG') {
+            this.h = 180; // Fixed height for visual consistency
+        } else {
+            this.h = Math.max(40, maxPins * 20);
+        }
+    }
+
+    updateConfig(config) {
+        if (config.timeSetting) this.timeSetting = parseFloat(config.timeSetting);
+        if (config.timeBase) this.timeBase = parseFloat(config.timeBase);
+        if (config.dutyCycle) this.dutyCycle = parseInt(config.dutyCycle);
+        
+        if (config.inputCount && this.def.resizable) {
+            const count = parseInt(config.inputCount);
+            // Resize input array preserving existing states where possible
+            const newInputs = new Array(count).fill(false);
+            for(let i=0; i<Math.min(this.inputStates.length, count); i++) {
+                newInputs[i] = this.inputStates[i];
+            }
+            this.inputStates = newInputs;
+            this.resize();
+        }
         this.updateTimerLimit();
     }
 
     updateTimerLimit() {
-        // Updated to account for SUB_STEPS so real-time remains correct
         this.timerLimit = Math.max(1, Math.round(this.timeSetting * this.timeBase * FPS * SUB_STEPS));
     }
 
+    // Logic Update Tick
     update() {
-        if (this.type === 'AND') this.outputStates[0] = this.inputStates[0] && this.inputStates[1];
-        else if (this.type === 'OR') this.outputStates[0] = this.inputStates[0] || this.inputStates[1];
+        if (this.type === 'AND') this.outputStates[0] = this.inputStates.every(Boolean);
+        else if (this.type === 'OR') this.outputStates[0] = this.inputStates.some(Boolean);
         else if (this.type === 'NOT') this.outputStates[0] = !this.inputStates[0];
-        else if (this.type === 'XOR') this.outputStates[0] = (this.inputStates[0] ? 1 : 0) ^ (this.inputStates[1] ? 1 : 0);
+        else if (this.type === 'XOR') {
+            // XOR for >2 inputs usually means parity (odd number of true inputs = true)
+            const trueCount = this.inputStates.filter(Boolean).length;
+            this.outputStates[0] = (trueCount % 2) === 1;
+        }
         
-        else if (this.type === 'LATCH') { // SR Set Dominant
-            const set = this.inputStates[0];
-            const rst = this.inputStates[1];
-            if (set) this.outputStates[0] = true;
-            else if (rst) this.outputStates[0] = false;
-        } else if (this.type === 'RS_LATCH') { // RS Reset Dominant
-            const rst = this.inputStates[0];
-            const set = this.inputStates[1];
-            if (rst) this.outputStates[0] = false;
-            else if (set) this.outputStates[0] = true;
+        else if (this.type === 'LATCH') { 
+            if (this.inputStates[0]) this.outputStates[0] = true;
+            else if (this.inputStates[1]) this.outputStates[0] = false;
+        } else if (this.type === 'RS_LATCH') { 
+            if (this.inputStates[0]) this.outputStates[0] = false;
+            else if (this.inputStates[1]) this.outputStates[0] = true;
         } 
         
-        else if (this.type.startsWith('LIGHT')) {
-            this.outputStates[0] = this.inputStates[0];
+        else if (this.isLed) {
+            this.outputStates[0] = this.inputStates[0]; // State used for coloring
         } 
         
         else if (this.type === 'TON') {
@@ -563,24 +578,27 @@ class Component {
             }
             this.prevClockState = clk;
         }
-        
-        // SEVEN_SEG logic handled in Draw directly from inputs
     }
 
+    // New Standard: Start from top, 20px steps
+    // Offset Y by 10 to center pin in the 20px grid row
     getInputPos(index) {
-        const spacing = this.h / (this.def.inputs + 1);
-        return { x: this.x, y: this.y + spacing * (index + 1) };
+        return { x: this.x, y: this.y + (index * 20) + 10 };
     }
 
     getOutputPos(index) {
-        const spacing = this.h / (this.def.outputs + 1);
-        return { x: this.x + this.w, y: this.y + spacing * (index + 1) };
+        return { x: this.x + this.w, y: this.y + (index * 20) + 10 };
     }
 
     draw(ctx) {
         let fillColor = this.def.color;
-        if (this.type.startsWith('LIGHT') && this.outputStates[0]) fillColor = this.def.onColor;
-        if (this.type === 'PUSH_BTN' && this.outputStates[0]) fillColor = '#2ecc71';
+        
+        // LEDs
+        if (this.isLed) {
+            const colors = LED_PALETTE[this.type];
+            fillColor = this.inputStates[0] ? colors.on : colors.off;
+        }
+        else if (this.type === 'PUSH_BTN' && this.outputStates[0]) fillColor = '#2ecc71';
 
         ctx.fillStyle = fillColor;
         
@@ -589,157 +607,115 @@ class Component {
             ctx.shadowBlur = 10;
         }
 
-        // Body Shape
-        ctx.beginPath();
-        if (this.type === 'NOT') {
-            ctx.moveTo(this.x, this.y);
-            ctx.lineTo(this.x + this.w, this.y + this.h/2);
-            ctx.lineTo(this.x, this.y + this.h);
-            ctx.closePath();
+        // Draw Body
+        if (this.isLed) {
+            // Draw Circle
+            ctx.beginPath();
+            ctx.arc(this.x + 10, this.y + 10, 8, 0, Math.PI*2);
             ctx.fill();
+            if (this.inputStates[0]) {
+                ctx.shadowColor = fillColor;
+                ctx.shadowBlur = 15;
+                ctx.fill(); // re-fill for glow intensity
+                ctx.shadowBlur = 0;
+            }
         } else {
+            // Draw Block
             roundRect(ctx, this.x, this.y, this.w, this.h, 6);
             ctx.fill();
         }
         ctx.shadowBlur = 0;
 
-        // Label
-        ctx.fillStyle = this.def.textColor || 'white';
-        ctx.font = "bold 16px sans-serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        
-        if (this.type === 'TON' || this.type === 'TOF' || this.type === 'CLOCK') {
-            let pct = this.timerValue / this.timerLimit;
-            const barW = this.w - 20;
-            const barX = this.x + 10;
-            const barY = this.y + 40;
+        // Label (Top Header)
+        if (!this.isLed) {
+            ctx.fillStyle = this.def.textColor || 'white';
+            ctx.font = "bold 14px sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "top";
             
-            ctx.fillText(this.def.label, this.x + this.w/2, this.y + 20);
-            ctx.fillStyle = 'rgba(0,0,0,0.3)';
-            ctx.fillRect(barX, barY, barW, 6);
-            ctx.fillStyle = 'white';
-            ctx.fillRect(barX, barY, barW * pct, 6);
+            if (this.type === 'TON' || this.type === 'TOF' || this.type === 'CLOCK') {
+                // Timer Progress Bar
+                let pct = this.timerValue / this.timerLimit;
+                const barW = this.w - 10;
+                ctx.fillText(this.def.label, this.x + this.w/2, this.y + 5);
+                
+                // Bar at bottom
+                const barY = this.y + this.h - 20;
+                ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                ctx.fillRect(this.x + 5, barY, barW, 6);
+                ctx.fillStyle = 'white';
+                ctx.fillRect(this.x + 5, barY, barW * pct, 6);
+                
+                // Time Text
+                ctx.font = "10px sans-serif";
+                const totalSec = (this.timeSetting * this.timeBase).toFixed(1) + "s";
+                ctx.fillText(totalSec, this.x + this.w/2, this.y + this.h - 12);
 
-            ctx.font = "10px sans-serif";
-            const totalSec = (this.timeSetting * this.timeBase).toFixed(2) + "s";
-            ctx.fillText(totalSec, this.x + this.w/2, this.y + 55);
-        } else if (this.type === 'SHIFT_REG') {
-            ctx.save();
-            ctx.translate(this.x + this.w/2, this.y + this.h/2);
-            ctx.rotate(-Math.PI/2);
-            ctx.fillText("SHIFT REG", 0, 0);
-            ctx.restore();
-        } else if (this.type === 'SEVEN_SEG') {
-            // Draw 7-Segment Display
-            const segW = 6;
-            const segL = 35;
-            const cx = this.x + 45; // Center X
-            const cy = this.y + 75; // Center Y
-            
-            // Helper to draw segment
-            const drawSeg = (id, x, y, w, h) => {
-                ctx.fillStyle = this.inputStates[id] ? '#ff0000' : '#220000'; // Neon Red vs Very Dark Red
-                if(this.inputStates[id]) {
-                    ctx.shadowColor = '#ff0000';
-                    ctx.shadowBlur = 10;
-                } else {
-                    ctx.shadowBlur = 0;
-                }
-                roundRect(ctx, x, y, w, h, 2);
-                ctx.fill();
-                ctx.shadowBlur = 0;
-            };
-
-            // Segment Positions
-            // a: top
-            drawSeg(0, cx - segL/2, cy - segL - segW, segL, segW);
-            // b: top right
-            drawSeg(1, cx + segL/2, cy - segL, segW, segL);
-            // c: bottom right
-            drawSeg(2, cx + segL/2, cy + segW, segW, segL);
-            // d: bottom
-            drawSeg(3, cx - segL/2, cy + segL + segW, segL, segW);
-            // e: bottom left
-            drawSeg(4, cx - segL/2 - segW, cy + segW, segW, segL);
-            // f: top left
-            drawSeg(5, cx - segL/2 - segW, cy - segL, segW, segL);
-            // g: middle
-            drawSeg(6, cx - segL/2, cy, segL, segW);
-            // dp: decimal point
-            ctx.fillStyle = this.inputStates[7] ? '#ff0000' : '#220000';
-            if(this.inputStates[7]) { ctx.shadowColor = '#ff0000'; ctx.shadowBlur = 10; }
-            ctx.beginPath();
-            ctx.arc(cx + segL/2 + 10, cy + segL + segW + 2, 3, 0, Math.PI*2);
-            ctx.fill();
-            ctx.shadowBlur = 0;
-
-        } else {
-            let label = this.def.label;
-            if (this.type === 'SWITCH') label = this.outputStates[0] ? 'ON' : 'OFF';
-            ctx.fillText(label, this.x + this.w/2, this.y + this.h/2);
+            } else if (this.type === 'SHIFT_REG') {
+                ctx.fillText("SHIFT", this.x + this.w/2, this.y + 5);
+                ctx.font = "10px sans-serif";
+                ctx.fillText("8-BIT", this.x + this.w/2, this.y + 20);
+            } else if (this.type === 'SEVEN_SEG') {
+                this.drawSevenSeg(ctx);
+            } else {
+                let label = this.def.label;
+                if (this.type === 'SWITCH') label = this.outputStates[0] ? 'ON' : 'OFF';
+                ctx.fillText(label, this.x + this.w/2, this.y + 5);
+            }
         }
 
-        // Visual Indicator (LED)
-        if (['SWITCH', 'PUSH_BTN', 'LATCH', 'RS_LATCH', 'CLOCK'].includes(this.type) || this.type.startsWith('LIGHT')) {
+        // Indicator Light for Switches
+        if (['SWITCH', 'PUSH_BTN', 'CLOCK'].includes(this.type)) {
             ctx.beginPath();
-            ctx.arc(this.x + this.w/2, this.y - 10, 6, 0, Math.PI*2);
-            let ledColor = '#333';
-            if (this.type.startsWith('LIGHT')) ledColor = this.outputStates[0] ? this.def.onColor : '#222';
-            else ledColor = this.outputStates[0] ? WIRE_COLOR_ON : '#333';
-            
-            ctx.fillStyle = ledColor;
+            ctx.arc(this.x + this.w/2, this.y + 35, 6, 0, Math.PI*2);
+            ctx.fillStyle = this.outputStates[0] ? WIRE_COLOR_ON : '#333';
             ctx.fill();
-            ctx.strokeStyle = '#fff';
             ctx.stroke();
         }
 
-        // Input Pins
+        // Pins
         ctx.fillStyle = '#fff';
-        for(let i=0; i<this.def.inputs; i++) {
+        ctx.strokeStyle = '#fff';
+        
+        // Inputs
+        for(let i=0; i<this.inputStates.length; i++) {
             const pos = this.getInputPos(i);
             ctx.fillRect(pos.x - 5, pos.y - 5, 10, 10);
             if (isHoveringPin(pos)) {
                 ctx.strokeStyle = WIRE_COLOR_ON;
                 ctx.strokeRect(pos.x - 7, pos.y - 7, 14, 14);
+                ctx.strokeStyle = '#fff';
             }
             
-            // Labels
-            let label = "";
-            ctx.fillStyle = 'rgba(255,255,255,0.7)';
-            ctx.font = "bold 10px monospace";
-            ctx.textAlign = "left";
-            ctx.textBaseline = "middle";
-
-            if (this.type === 'LATCH') label = (i===0) ? "S" : "R";
-            if (this.type === 'RS_LATCH') label = (i===0) ? "R" : "S";
-            if (this.type === 'SHIFT_REG') {
-                if(i===0) label = "D";
-                if(i===1) label = ">";
-                if(i===2) label = "R";
+            // Labels for complex parts
+            if(this.type === 'LATCH' || this.type === 'RS_LATCH' || this.type === 'SHIFT_REG') {
+                ctx.fillStyle = 'rgba(255,255,255,0.7)';
+                ctx.font = "bold 10px monospace";
+                ctx.textAlign = "left";
+                ctx.textBaseline = "middle";
+                let t = "";
+                if(this.type.includes('LATCH')) t = (this.type==='LATCH' ? (i===0?'S':'R') : (i===0?'R':'S'));
+                if(this.type==='SHIFT_REG') t = (i===0?'D': (i===1?'>':'R'));
+                if(t) ctx.fillText(t, pos.x + 12, pos.y);
+                ctx.fillStyle = '#fff';
             }
-            if (this.type === 'SEVEN_SEG') {
-                const segLabels = ['a','b','c','d','e','f','g','dp'];
-                label = segLabels[i];
-            }
-
-            if (label) ctx.fillText(label, pos.x + 10, pos.y);
-            ctx.fillStyle = '#fff';
         }
 
-        // Output Pins
-        for(let i=0; i<this.def.outputs; i++) {
+        // Outputs
+        for(let i=0; i<this.outputStates.length; i++) {
             const pos = this.getOutputPos(i);
-            ctx.beginPath();
-            ctx.arc(pos.x, pos.y, 5, 0, Math.PI*2);
-            ctx.fill();
-            if (isHoveringPin(pos)) {
-                ctx.strokeStyle = WIRE_COLOR_ON;
+            if (!this.isLed && this.type !== 'SEVEN_SEG') {
                 ctx.beginPath();
-                ctx.arc(pos.x, pos.y, 8, 0, Math.PI*2);
-                ctx.stroke();
+                ctx.arc(pos.x, pos.y, 5, 0, Math.PI*2);
+                ctx.fill();
+                if (isHoveringPin(pos)) {
+                    ctx.strokeStyle = WIRE_COLOR_ON;
+                    ctx.beginPath();
+                    ctx.arc(pos.x, pos.y, 8, 0, Math.PI*2);
+                    ctx.stroke();
+                    ctx.strokeStyle = '#fff';
+                }
             }
-            
             if (this.type === 'SHIFT_REG') {
                 ctx.fillStyle = 'rgba(255,255,255,0.7)';
                 ctx.font = "bold 10px monospace";
@@ -749,6 +725,41 @@ class Component {
                 ctx.fillStyle = '#fff';
             }
         }
+    }
+
+    drawSevenSeg(ctx) {
+        const segW = 6;
+        const segL = 35;
+        const cx = this.x + 45;
+        const cy = this.y + 90;
+        
+        const drawSeg = (id, x, y, w, h) => {
+            const on = this.inputStates[id];
+            ctx.fillStyle = on ? '#ff0000' : '#2a0000'; // Neon vs Dark
+            if(on) { ctx.shadowColor = '#ff0000'; ctx.shadowBlur = 10; }
+            roundRect(ctx, x, y, w, h, 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        };
+
+        // Segments: 0=a, 1=b, 2=c, 3=d, 4=e, 5=f, 6=g, 7=dp
+        // Positions calculated relative to center
+        drawSeg(0, cx - segL/2, cy - segL - segW, segL, segW); // a
+        drawSeg(1, cx + segL/2, cy - segL, segW, segL); // b
+        drawSeg(2, cx + segL/2, cy + segW, segW, segL); // c
+        drawSeg(3, cx - segL/2, cy + segL + segW, segL, segW); // d
+        drawSeg(4, cx - segL/2 - segW, cy + segW, segW, segL); // e
+        drawSeg(5, cx - segL/2 - segW, cy - segL, segW, segL); // f
+        drawSeg(6, cx - segL/2, cy, segL, segW); // g
+        
+        // DP
+        const on = this.inputStates[7];
+        ctx.fillStyle = on ? '#ff0000' : '#2a0000';
+        if(on) { ctx.shadowColor = '#ff0000'; ctx.shadowBlur = 10; }
+        ctx.beginPath();
+        ctx.arc(cx + segL/2 + 12, cy + segL + segW + 2, 4, 0, Math.PI*2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
     }
 }
 
@@ -797,36 +808,23 @@ function isHoveringPin(worldPos) {
  * MAIN LOOP
  */
 function updateLogic() {
-    // 1. Reset Inputs
-    components.forEach(c => {
-        for(let i=0; i<c.def.inputs; i++) c.inputStates[i] = false;
-    });
-
-    // 2. Propagate Logic (Wires)
+    components.forEach(c => c.inputStates.fill(false));
     wires.forEach(w => {
-        // Source Component output state
         if (w.from.comp.outputStates[w.from.pinIdx]) {
             w.to.comp.inputStates[w.to.pinIdx] = true;
         }
     });
-
-    // 3. Update Components
     components.forEach(c => c.update());
 }
 
 function gameLoop() {
-    // Run Logic Update multiple times per frame to settle feedback loops (Sub-stepping)
-    for(let i=0; i<SUB_STEPS; i++) {
-        updateLogic();
-    }
-
-    // Render Once
+    for(let i=0; i<SUB_STEPS; i++) updateLogic();
     draw();
     requestAnimationFrame(gameLoop);
 }
 
 function draw() {
-    ctx.fillStyle = '#2c2c2c'; // Dark Grey
+    ctx.fillStyle = '#2c2c2c';
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     // Background Grid
@@ -839,27 +837,23 @@ function draw() {
             ctx.fillRect(x, y, 1, 1);
         }
     }
-    ctx.fillStyle = 'rgba(255, 0, 0, 0.5)';
-    ctx.fillRect(viewX - 2, viewY - 2, 4, 4);
+    // Origin marker
+    ctx.fillStyle = 'rgba(255,0,0,0.3)';
+    ctx.fillRect(viewX-2, viewY-2, 4, 4);
     ctx.restore();
 
-    // World Content
     ctx.save();
     ctx.translate(viewX, viewY);
 
-    // Wires
     wires.forEach(w => {
         const start = w.from.comp.getOutputPos(w.from.pinIdx);
         const end = w.to.comp.getInputPos(w.to.pinIdx);
-        // Visual state check
         drawWire(start, end, w.from.comp.outputStates[w.from.pinIdx]);
     });
 
-    // Temp Wire
     if (wiringStart) {
         let startPos, endPos, isActive;
         const mouseWorld = getWorldPos(mousePos);
-        
         if (wiringStart.pinType === 'output') {
             startPos = wiringStart.comp.getOutputPos(wiringStart.pinIndex);
             endPos = mouseWorld;
@@ -884,7 +878,6 @@ function drawWire(p1, p2, active) {
     const cp2 = { x: p2.x - 50, y: p2.y };
     ctx.moveTo(p1.x, p1.y);
     ctx.bezierCurveTo(cp1.x, cp1.y, cp2.x, cp2.y, p2.x, p2.y);
-    
     if (active) {
         ctx.shadowColor = WIRE_COLOR_ON;
         ctx.shadowBlur = 10;
@@ -911,9 +904,12 @@ container.addEventListener('drop', (e) => {
     const type = e.dataTransfer.getData('type');
     const rect = canvas.getBoundingClientRect();
     const worldX = e.clientX - rect.left - 30 - viewX;
-    const worldY = e.clientY - rect.top - 30 - viewY;
+    const worldY = e.clientY - rect.top - 10 - viewY;
+    
+    // Snap to grid
     const snapX = Math.round(worldX / GRID_SIZE) * GRID_SIZE;
     const snapY = Math.round(worldY / GRID_SIZE) * GRID_SIZE;
+    
     components.push(new Component(type, snapX, snapY));
 });
 
@@ -926,20 +922,17 @@ canvas.addEventListener('contextmenu', (e) => {
     mousePos = getMousePos(e);
     const mouseWorld = getWorldPos(mousePos);
     
+    // Wire Deletion (Right click pin)
     let pinClicked = false;
     components.forEach(c => {
-        // Inputs
-        for(let i=0; i<c.def.inputs; i++) {
-            const pos = c.getInputPos(i);
-            if(Math.hypot(mouseWorld.x - pos.x, mouseWorld.y - pos.y) < SNAP_DIST) {
+        for(let i=0; i<c.inputStates.length; i++) {
+            if(isHoveringPin(c.getInputPos(i))) {
                 wires = wires.filter(w => !(w.to.comp === c && w.to.pinIdx === i));
                 pinClicked = true;
             }
         }
-        // Outputs
-        for(let i=0; i<c.def.outputs; i++) {
-             const pos = c.getOutputPos(i);
-             if(Math.hypot(mouseWorld.x - pos.x, mouseWorld.y - pos.y) < SNAP_DIST) {
+        for(let i=0; i<c.outputStates.length; i++) {
+             if(isHoveringPin(c.getOutputPos(i))) {
                  wires = wires.filter(w => !(w.from.comp === c && w.from.pinIdx === i));
                  pinClicked = true;
              }
@@ -947,6 +940,7 @@ canvas.addEventListener('contextmenu', (e) => {
     });
     if (pinClicked) return;
 
+    // Component Config / Delete
     const clickedComp = components.find(c => 
         mouseWorld.x >= c.x && mouseWorld.x <= c.x + c.w &&
         mouseWorld.y >= c.y && mouseWorld.y <= c.y + c.h
@@ -954,6 +948,7 @@ canvas.addEventListener('contextmenu', (e) => {
 
     if (clickedComp) {
         const now = Date.now();
+        // Double Click Check
         if (lastRightClickId === clickedComp.id && (now - lastRightClickTime < 300)) {
             wires = wires.filter(w => w.from.comp !== clickedComp && w.to.comp !== clickedComp);
             components = components.filter(c => c !== clickedComp);
@@ -964,7 +959,8 @@ canvas.addEventListener('contextmenu', (e) => {
         lastRightClickId = clickedComp.id;
         lastRightClickTime = now;
 
-        if (clickedComp.type === 'TON' || clickedComp.type === 'TOF' || clickedComp.type === 'CLOCK') {
+        // Open Config
+        if (clickedComp.type === 'TON' || clickedComp.type === 'TOF' || clickedComp.type === 'CLOCK' || clickedComp.def.resizable) {
             openConfig(clickedComp);
         }
     }
@@ -977,16 +973,14 @@ function handleInputStart(e) {
     
     // Check Pins
     for (let c of components) {
-        for(let i=0; i<c.def.outputs; i++) {
-            const pos = c.getOutputPos(i);
-            if (Math.hypot(mouseWorld.x - pos.x, mouseWorld.y - pos.y) < SNAP_DIST) {
+        for(let i=0; i<c.outputStates.length; i++) {
+            if (isHoveringPin(c.getOutputPos(i))) {
                 wiringStart = { comp: c, pinType: 'output', pinIndex: i };
                 return;
             }
         }
-        for(let i=0; i<c.def.inputs; i++) {
-            const pos = c.getInputPos(i);
-            if (Math.hypot(mouseWorld.x - pos.x, mouseWorld.y - pos.y) < SNAP_DIST) {
+        for(let i=0; i<c.inputStates.length; i++) {
+            if (isHoveringPin(c.getInputPos(i))) {
                 wiringStart = { comp: c, pinType: 'input', pinIndex: i };
                 return;
             }
@@ -999,7 +993,6 @@ function handleInputStart(e) {
         if (mouseWorld.x >= c.x && mouseWorld.x <= c.x + c.w &&
             mouseWorld.y >= c.y && mouseWorld.y <= c.y + c.h) {
             
-            // Push Button Logic
             if (c.type === 'PUSH_BTN') {
                 c.outputStates[0] = true;
                 pressedButtonId = c.id;
@@ -1038,7 +1031,6 @@ function handleInputMove(e) {
 }
 
 function handleInputEnd(e) {
-    // Release Push Button
     if (pressedButtonId) {
         const btn = components.find(c => c.id === pressedButtonId);
         if (btn) btn.outputStates[0] = false;
@@ -1053,20 +1045,14 @@ function handleInputEnd(e) {
         const mouseWorld = getWorldPos(mousePos);
         for (let c of components) {
             if (wiringStart.pinType === 'output') {
-                for(let i=0; i<c.def.inputs; i++) {
-                    const pos = c.getInputPos(i);
-                    if (Math.hypot(mouseWorld.x - pos.x, mouseWorld.y - pos.y) < SNAP_DIST) {
-                        // REMOVED CHECK: if (c === wiringStart.comp) continue; (Allows Feedback)
-                        // REMOVED FILTER: wires.filter... (Allows Many-to-One)
+                for(let i=0; i<c.inputStates.length; i++) {
+                    if (isHoveringPin(c.getInputPos(i))) {
                         wires.push({ from: { comp: wiringStart.comp, pinIdx: wiringStart.pinIndex }, to: { comp: c, pinIdx: i } });
                     }
                 }
             } else {
-                 for(let i=0; i<c.def.outputs; i++) {
-                    const pos = c.getOutputPos(i);
-                    if (Math.hypot(mouseWorld.x - pos.x, mouseWorld.y - pos.y) < SNAP_DIST) {
-                        // REMOVED CHECK: if (c === wiringStart.comp) continue;
-                        // REMOVED FILTER: wires.filter...
+                 for(let i=0; i<c.outputStates.length; i++) {
+                    if (isHoveringPin(c.getOutputPos(i))) {
                         wires.push({ from: { comp: c, pinIdx: i }, to: { comp: wiringStart.comp, pinIdx: wiringStart.pinIndex } });
                     }
                 }
@@ -1081,53 +1067,65 @@ function handleInputEnd(e) {
     container.style.cursor = "crosshair";
 }
 
-// CONFIG UI LOGIC
+// --- CONFIGURATION ---
 function openConfig(comp) {
     editingComponent = comp;
     const panel = document.getElementById('configPanel');
-    const slider = document.getElementById('timerSlider');
-    const valDisplay = document.getElementById('valDisplay');
-    const dutyRow = document.getElementById('dutyRow');
-    const dutySlider = document.getElementById('dutySlider');
-    const dutyDisplay = document.getElementById('dutyDisplay');
+    const timerControls = document.getElementById('timerControls');
+    const gateControls = document.getElementById('gateControls');
     
-    slider.value = comp.timeSetting;
-    valDisplay.textContent = comp.timeSetting;
-    
-    const radios = document.getElementsByName('timebase');
-    for(let r of radios) {
-        if(parseFloat(r.value) === comp.timeBase) r.checked = true;
-    }
+    timerControls.style.display = 'none';
+    gateControls.style.display = 'none';
 
-    if (comp.type === 'CLOCK') {
-        dutyRow.style.display = 'block';
-        dutySlider.value = comp.dutyCycle;
-        dutyDisplay.textContent = comp.dutyCycle;
-    } else {
-        dutyRow.style.display = 'none';
+    if (['TON', 'TOF', 'CLOCK'].includes(comp.type)) {
+        timerControls.style.display = 'block';
+        document.getElementById('timerSlider').value = comp.timeSetting;
+        updateValDisplay(comp.timeSetting);
+        
+        // Radio
+        const radios = document.getElementsByName('timebase');
+        for(let r of radios) { if(parseFloat(r.value) === comp.timeBase) r.checked = true; }
+
+        // Duty
+        if (comp.type === 'CLOCK') {
+            document.getElementById('dutyRow').style.display = 'block';
+            document.getElementById('dutySlider').value = comp.dutyCycle;
+            updateDutyDisplay(comp.dutyCycle);
+        } else {
+            document.getElementById('dutyRow').style.display = 'none';
+        }
+    }
+    
+    if (comp.def.resizable) {
+        gateControls.style.display = 'block';
+        document.getElementById('inputCountSlider').value = comp.inputStates.length;
+        updateInputCountDisplay(comp.inputStates.length);
     }
 
     panel.style.display = 'block';
 }
 
-function updateValDisplay(val) {
-    document.getElementById('valDisplay').textContent = val;
-}
-function updateDutyDisplay(val) {
-    document.getElementById('dutyDisplay').textContent = val;
-}
+function updateValDisplay(val) { document.getElementById('valDisplay').textContent = val; }
+function updateDutyDisplay(val) { document.getElementById('dutyDisplay').textContent = val; }
+function updateInputCountDisplay(val) { document.getElementById('inputCountDisplay').textContent = val; }
 
 function saveConfig() {
     if (!editingComponent) return;
-    const sliderVal = document.getElementById('timerSlider').value;
-    const dutyVal = document.getElementById('dutySlider').value;
-    const radios = document.getElementsByName('timebase');
-    let baseVal = 1;
-    for(let r of radios) {
-        if (r.checked) baseVal = r.value;
+    
+    const config = {};
+    
+    if (['TON', 'TOF', 'CLOCK'].includes(editingComponent.type)) {
+        config.timeSetting = document.getElementById('timerSlider').value;
+        config.dutyCycle = document.getElementById('dutySlider').value;
+        const radios = document.getElementsByName('timebase');
+        for(let r of radios) { if (r.checked) config.timeBase = r.value; }
     }
     
-    editingComponent.updateConfig(sliderVal, baseVal, dutyVal);
+    if (editingComponent.def.resizable) {
+        config.inputCount = document.getElementById('inputCountSlider').value;
+    }
+    
+    editingComponent.updateConfig(config);
     closeConfig();
 }
 
@@ -1136,13 +1134,85 @@ function closeConfig() {
     editingComponent = null;
 }
 
+// --- SAVE / LOAD ---
+function saveProject() {
+    // Simplify objects for JSON
+    const data = {
+        components: components.map(c => ({
+            type: c.type,
+            x: c.x,
+            y: c.y,
+            id: c.id,
+            inputCount: c.inputStates.length, // Save configured inputs
+            timerSettings: {
+                timeSetting: c.timeSetting,
+                timeBase: c.timeBase,
+                dutyCycle: c.dutyCycle
+            }
+        })),
+        wires: wires.map(w => ({
+            fromId: w.from.comp.id,
+            fromPin: w.from.pinIdx,
+            toId: w.to.comp.id,
+            toPin: w.to.pinIdx
+        }))
+    };
+    
+    const blob = new Blob([JSON.stringify(data)], {type: "application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = "logic_lab_circuit.json";
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function loadProject(input) {
+    const file = input.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = JSON.parse(e.target.result);
+            clearBoard();
+            
+            // Recreate Components
+            data.components.forEach(c => {
+                const comp = new Component(c.type, c.x, c.y, c.inputCount);
+                comp.id = c.id; // Restore ID for wiring
+                if (c.timerSettings) comp.updateConfig(c.timerSettings);
+                components.push(comp);
+            });
+            
+            // Recreate Wires
+            data.wires.forEach(w => {
+                const fromComp = components.find(c => c.id === w.fromId);
+                const toComp = components.find(c => c.id === w.toId);
+                if (fromComp && toComp) {
+                    wires.push({
+                        from: { comp: fromComp, pinIdx: w.fromPin },
+                        to: { comp: toComp, pinIdx: w.toPin }
+                    });
+                }
+            });
+            
+        } catch (err) {
+            alert("Error loading file: " + err);
+        }
+    };
+    reader.readAsText(file);
+    input.value = ''; // Reset input
+}
+
 function clearBoard() {
-    if(confirm("Clear all components?")) {
-        components = [];
-        wires = [];
-        viewX = 0;
-        viewY = 0;
+    if(wires.length > 0 || components.length > 0) { // Only prompt if not empty (helper for load)
+       // logic mostly handled by callsite
     }
+    components = [];
+    wires = [];
+    viewX = 0;
+    viewY = 0;
 }
 
 function toggleHelp() {
@@ -1155,12 +1225,11 @@ requestAnimationFrame(gameLoop);
 function loadDemo() {
     const clk = new Component('CLOCK', 100, 100);
     const sreg = new Component('SHIFT_REG', 300, 100);
-    const sw = new Component('SWITCH', 100, 200);
+    const sw = new Component('SWITCH', 100, 240);
     
     components.push(clk, sreg, sw);
-    
-    wires.push({ from: {comp: clk, pinIdx: 0}, to: {comp: sreg, pinIdx: 1} }); // Clock to Clock
-    wires.push({ from: {comp: sw, pinIdx: 0}, to: {comp: sreg, pinIdx: 0} });  // Switch to Data
+    wires.push({ from: {comp: clk, pinIdx: 0}, to: {comp: sreg, pinIdx: 1} });
+    wires.push({ from: {comp: sw, pinIdx: 0}, to: {comp: sreg, pinIdx: 0} }); 
 }
 setTimeout(loadDemo, 100);
 
