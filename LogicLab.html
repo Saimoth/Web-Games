@@ -482,8 +482,8 @@ class Component {
             this.h = Math.max(20, this.inputStates.length * 20);
         } else if (this.type === 'SEVEN_SEG') {
             this.h = 180;
-        } else if (this.type === 'CLOCK') {
-            this.h = 60; // Give Clock enough room for UI
+        } else if (this.type === 'CLOCK' || this.type === 'SWITCH') {
+            this.h = 60; // Give Clock and Switch enough room for UI
         } else {
             this.h = Math.max(40, maxPins * 20);
         }
@@ -622,25 +622,30 @@ class Component {
             if(pressed) { ctx.shadowColor = '#ff0000'; ctx.shadowBlur = 20; ctx.fill(); ctx.shadowBlur = 0; }
         }
         else if (this.type === 'SWITCH') {
-             roundRect(ctx, this.x, this.y, this.w, this.h, 4);
+             // Base plate
+             roundRect(ctx, this.x, this.y, this.w, this.h, 6);
              ctx.fillStyle = '#7f8c8d'; ctx.fill();
              
+             // Toggle Slot background
              ctx.fillStyle = '#2c3e50';
-             roundRect(ctx, this.x+20, this.y+5, 20, this.h-10, 10); ctx.fill();
+             roundRect(ctx, this.x+20, this.y+10, 20, 25, 10);
+             ctx.fill();
              
-             if(this.outputStates[0]) {
-                 ctx.fillStyle = WIRE_COLOR_ON; ctx.shadowColor = WIRE_COLOR_ON; ctx.shadowBlur = 5;
-                 ctx.fillRect(this.x+25, this.y+8, 10, 5); ctx.shadowBlur = 0;
-             }
-
-             const leverY = this.outputStates[0] ? this.y + 15 : this.y + this.h - 15;
+             // Lever Handle
+             const leverY = this.outputStates[0] ? this.y + 18 : this.y + 28;
              const grad = ctx.createLinearGradient(this.x, this.y, this.x+60, this.y);
              grad.addColorStop(0, '#bdc3c7'); grad.addColorStop(1, '#ecf0f1');
              ctx.fillStyle = grad;
-             ctx.beginPath(); ctx.arc(this.x+30, leverY, 12, 0, Math.PI*2); ctx.fill();
+             ctx.beginPath(); ctx.arc(this.x+30, leverY, 10, 0, Math.PI*2); ctx.fill();
              
-             ctx.strokeStyle = '#bdc3c7'; ctx.lineWidth = 6; ctx.beginPath();
-             ctx.moveTo(this.x+30, this.y + this.h/2); ctx.lineTo(this.x+30, leverY); ctx.stroke();
+             // Lever shaft (visual only)
+             
+             // Indicator LED (Bottom Left - Matching Clock)
+             const bottomY = this.y + this.h - 12;
+             ctx.beginPath(); 
+             ctx.arc(this.x + 10, bottomY, 4, 0, Math.PI*2);
+             ctx.fillStyle = this.outputStates[0] ? WIRE_COLOR_ON : '#222'; 
+             ctx.fill();
         }
         else if (this.type === 'CLOCK') {
             roundRect(ctx, this.x, this.y, this.w, this.h, 6);
@@ -716,13 +721,11 @@ class Component {
         }
 
         // 5. Indicator LEDs (Small lights on body)
-        if (['SWITCH', 'PUSH_BTN'].includes(this.type) || this.type.startsWith('LIGHT')) {
+        // Updated to exclude SWITCH and PUSH_BTN which now handle their own visuals
+        if (this.type.startsWith('LIGHT')) {
             ctx.beginPath();
             ctx.arc(this.x + this.w/2, this.y + 35, 6, 0, Math.PI*2);
-            let ledColor = '#333';
-            if (this.type.startsWith('LIGHT')) ledColor = this.outputStates[0] ? this.def.onColor : '#222';
-            else ledColor = this.outputStates[0] ? WIRE_COLOR_ON : '#333';
-            
+            let ledColor = this.outputStates[0] ? this.def.onColor : '#222';
             ctx.fillStyle = ledColor;
             ctx.fill();
             ctx.strokeStyle = '#fff';
@@ -1187,6 +1190,7 @@ setTimeout(loadDemo, 100);
 </script>
 </body>
 </html>
+
 
 
 
