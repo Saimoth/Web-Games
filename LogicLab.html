@@ -245,6 +245,14 @@
             </div>
 
             <div class="category-label">Complex Output</div>
+            <div class="tool-item" draggable="true" data-type="TRAFFIC_LIGHT">
+                <div class="tool-icon" style="background:#000; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;">
+                    <div style="width:6px; height:6px; background:red; border-radius:50%"></div>
+                    <div style="width:6px; height:6px; background:orange; border-radius:50%"></div>
+                    <div style="width:6px; height:6px; background:green; border-radius:50%"></div>
+                </div>
+                <span>Traffic Light</span>
+            </div>
             <div class="tool-item" draggable="true" data-type="SEVEN_SEG">
                 <div class="tool-icon" style="background:#000; color:red; border:1px solid #444;">8.</div>
                 <span>7-Seg Display</span>
@@ -294,7 +302,7 @@
         <div class="controls">
             <div style="font-size: 0.75rem; color:#888; text-align:center; margin-bottom:5px;">
                 <strong>Double Right-Click</strong> Comp to Delete.<br>
-                <strong>Right-Click</strong> to Configure.<br>
+                <strong>Right-Click</strong> to Config.<br>
                 Drag BG to Pan.
             </div>
             <div class="btn-group">
@@ -310,23 +318,17 @@
     <!-- Main Canvas -->
     <div id="canvas-container">
         <canvas id="circuitCanvas"></canvas>
-        
-        <!-- Context Menu / Config Panel -->
         <div id="configPanel">
             <h3 id="configTitle">Settings</h3>
-            
-            <!-- Timers/Clock -->
             <div id="timerControls">
                 <div class="config-row">
                     <div class="config-label">Period/Duration: <span id="valDisplay" style="color:var(--wire-on); font-weight:bold;">0.5</span></div>
                     <input type="range" id="timerSlider" min="0" max="1" step="0.01" value="0.5" oninput="updateValDisplay(this.value)">
                 </div>
-                
                 <div class="config-row" id="dutyRow" style="display:none;">
                     <div class="config-label">Duty Cycle %: <span id="dutyDisplay" style="color:var(--wire-on); font-weight:bold;">50</span></div>
                     <input type="range" id="dutySlider" min="0" max="100" step="5" value="50" oninput="updateDutyDisplay(this.value)">
                 </div>
-
                 <div class="config-row">
                     <div class="config-label">Time Base</div>
                     <div class="radio-group">
@@ -336,15 +338,12 @@
                     </div>
                 </div>
             </div>
-
-            <!-- Gate/LED Inputs -->
             <div id="inputCountControls" style="display:none;">
                 <div class="config-row">
                     <div class="config-label">Count / Inputs: <span id="inputCountDisplay" style="color:var(--wire-on); font-weight:bold;">2</span></div>
                     <input type="range" id="inputCountSlider" min="1" max="8" step="1" value="2" oninput="updateInputCountDisplay(this.value)">
                 </div>
             </div>
-
             <div class="panel-actions">
                 <button class="btn-cancel" onclick="closeConfig()">Cancel</button>
                 <button class="btn-save" onclick="saveConfig()">Apply</button>
@@ -358,8 +357,8 @@
             <span class="close-modal" onclick="toggleHelp()">&times;</span>
             <h2>How to Use Logic Lab</h2>
             <p>1. <strong>Wiring:</strong> Drag from Circle (Out) to Square (In).</p>
-            <p>2. <strong>Config:</strong> Right-Click a Gate or LED to change count (1-8).</p>
-            <p>3. <strong>LEDs:</strong> Dim color = OFF, Bright Neon = ON.</p>
+            <p>2. <strong>Traffic Light:</strong> 3 Inputs (Red, Amber, Green).</p>
+            <p>3. <strong>Config:</strong> Right-Click a Gate or LED to change count (1-8).</p>
             <p>4. <strong>Controls:</strong>
                 <br>- Double Right-Click Component: Delete
                 <br>- Right-Click Pin: Clear Wires
@@ -388,33 +387,14 @@ const ctx = canvas.getContext('2d');
 const container = document.getElementById('canvas-container');
 
 // View State
-let viewX = 0;
-let viewY = 0;
-let isPanning = false;
-let panStart = { x: 0, y: 0 };
+let viewX = 0; let viewY = 0; let isPanning = false; let panStart = { x: 0, y: 0 };
+let components = []; let wires = []; 
+let draggingComponent = null; let dragOffset = { x: 0, y: 0 }; let isDraggingComp = false; 
+let dragStartPos = {x:0, y:0}; let pressedButtonId = null; 
+let wiringStart = null; let mousePos = { x: 0, y: 0 };
+let editingComponent = null; let lastRightClickTime = 0; let lastRightClickId = null;
 
-let components = [];
-let wires = []; 
-
-let draggingComponent = null;
-let dragOffset = { x: 0, y: 0 };
-let isDraggingComp = false; 
-let dragStartPos = {x:0, y:0};
-let pressedButtonId = null; 
-
-let wiringStart = null; 
-let mousePos = { x: 0, y: 0 };
-
-// Config Panel State
-let editingComponent = null;
-
-// Double Right Click Logic
-let lastRightClickTime = 0;
-let lastRightClickId = null;
-
-/**
- * COMPONENT DEFINITIONS & FACTORY
- */
+// Component Definitions
 const LED_PALETTE = {
     LED_R: { on: '#ff0000', off: '#440000', label: 'RED' },
     LED_O: { on: '#ff7f00', off: '#442200', label: 'ORG' },
@@ -426,90 +406,59 @@ const LED_PALETTE = {
 };
 
 const COMP_DEFS = {
-    // Inputs (Labels removed for custom drawing)
-    SWITCH:    { w: 60, inputs: 0, outputs: 1, color: '#7f8c8d', label: '' }, // Grey body
-    PUSH_BTN:  { w: 60, inputs: 0, outputs: 1, color: '#95a5a6', label: '' }, // Silvery body
-    CLOCK:     { w: 60, inputs: 0, outputs: 1, color: '#34495e', label: '' },
-    
-    // Gates (Default 2 inputs, Resizable)
-    AND:       { w: 60, inputs: 2, outputs: 1, color: '#50e3c2', label: 'AND', textColor: 'black', resizable: true },
-    OR:        { w: 60, inputs: 2, outputs: 1, color: '#b8e986', label: 'OR', textColor: 'black', resizable: true },
-    NOT:       { w: 60, inputs: 1, outputs: 1, color: '#bd10e0', label: 'NOT', textColor: 'white' },
-    XOR:       { w: 60, inputs: 2, outputs: 1, color: '#9013fe', label: 'XOR', resizable: true },
-    
-    // Latches
-    LATCH:     { w: 60, inputs: 2, outputs: 1, color: '#d35400', label: 'SR' }, 
-    RS_LATCH:  { w: 60, inputs: 2, outputs: 1, color: '#d35400', label: 'RS' }, 
-    
-    // Complex
+    SWITCH: { w: 60, inputs: 0, outputs: 1, color: '#7f8c8d', label: '' }, 
+    PUSH_BTN: { w: 60, inputs: 0, outputs: 1, color: '#95a5a6', label: '' }, 
+    CLOCK: { w: 60, inputs: 0, outputs: 1, color: '#34495e', label: '' },
+    AND: { w: 60, inputs: 2, outputs: 1, color: '#50e3c2', label: 'AND', textColor: 'black', resizable: true },
+    OR: { w: 60, inputs: 2, outputs: 1, color: '#b8e986', label: 'OR', textColor: 'black', resizable: true },
+    NOT: { w: 60, inputs: 1, outputs: 1, color: '#bd10e0', label: 'NOT', textColor: 'white' },
+    XOR: { w: 60, inputs: 2, outputs: 1, color: '#9013fe', label: 'XOR', resizable: true },
+    LATCH: { w: 60, inputs: 2, outputs: 1, color: '#d35400', label: 'SR' }, 
+    RS_LATCH: { w: 60, inputs: 2, outputs: 1, color: '#d35400', label: 'RS' }, 
     SHIFT_REG: { w: 100, inputs: 3, outputs: 8, color: '#8e44ad', label: 'SHIFT' },
     SEVEN_SEG: { w: 90, inputs: 8, outputs: 0, color: '#000000', label: '' }, 
-    TON:       { w: 60, inputs: 1, outputs: 1, color: '#417505', label: 'TON' }, 
-    TOF:       { w: 60, inputs: 1, outputs: 1, color: '#d0021b', label: 'TOF' }, 
+    TRAFFIC_LIGHT: { w: 60, inputs: 3, outputs: 0, color: '#111', label: '' },
+    TON: { w: 60, inputs: 1, outputs: 1, color: '#417505', label: 'TON' }, 
+    TOF: { w: 60, inputs: 1, outputs: 1, color: '#d0021b', label: 'TOF' }, 
 };
 
 class Component {
     constructor(type, x, y, inputCountOverride) {
         this.id = Math.random().toString(36).substr(2, 9);
         this.type = type;
-        
         this.isLed = LED_PALETTE[type] !== undefined;
         this.def = this.isLed ? { w:20, inputs:1, outputs:0, resizable:true } : COMP_DEFS[type];
-        
-        this.x = x;
-        this.y = y;
-        this.w = this.def.w;
-        
+        this.x = x; this.y = y; this.w = this.def.w;
         let initialInputs = this.def.inputs;
         if (inputCountOverride) initialInputs = inputCountOverride;
-        
         this.inputStates = new Array(initialInputs).fill(false);
         this.outputStates = new Array(this.def.outputs).fill(false);
-        
         this.resize();
-
-        this.timerValue = 0; 
-        this.timeSetting = 0.5; 
-        this.timeBase = 1.0; 
-        this.dutyCycle = 50; 
-        this.updateTimerLimit();
-        this.prevClockState = false;
+        this.timerValue = 0; this.timeSetting = 0.5; this.timeBase = 1.0; this.dutyCycle = 50; 
+        this.updateTimerLimit(); this.prevClockState = false;
     }
-
     resize() {
         const maxPins = Math.max(this.inputStates.length, this.outputStates.length);
-        if (this.isLed) {
-            this.h = Math.max(20, this.inputStates.length * 20);
-        } else if (this.type === 'SEVEN_SEG') {
-            this.h = 180;
-        } else if (this.type === 'CLOCK' || this.type === 'SWITCH') {
-            this.h = 60; // Give Clock and Switch enough room for UI
-        } else {
-            this.h = Math.max(40, maxPins * 20);
-        }
+        if (this.isLed) this.h = Math.max(20, this.inputStates.length * 20);
+        else if (this.type === 'SEVEN_SEG') this.h = 180;
+        else if (this.type === 'TRAFFIC_LIGHT') this.h = 80;
+        else if (this.type === 'CLOCK' || this.type === 'SWITCH') this.h = 60; 
+        else this.h = Math.max(40, maxPins * 20);
     }
-
     updateConfig(config) {
         if (config.timeSetting) this.timeSetting = parseFloat(config.timeSetting);
         if (config.timeBase) this.timeBase = parseFloat(config.timeBase);
         if (config.dutyCycle) this.dutyCycle = parseInt(config.dutyCycle);
-        
         if (config.inputCount && this.def.resizable) {
             const count = parseInt(config.inputCount);
             const newInputs = new Array(count).fill(false);
-            for(let i=0; i<Math.min(this.inputStates.length, count); i++) {
-                newInputs[i] = this.inputStates[i];
-            }
+            for(let i=0; i<Math.min(this.inputStates.length, count); i++) newInputs[i] = this.inputStates[i];
             this.inputStates = newInputs;
             this.resize();
         }
         this.updateTimerLimit();
     }
-
-    updateTimerLimit() {
-        this.timerLimit = Math.max(1, Math.round(this.timeSetting * this.timeBase * FPS * SUB_STEPS));
-    }
-
+    updateTimerLimit() { this.timerLimit = Math.max(1, Math.round(this.timeSetting * this.timeBase * FPS * SUB_STEPS)); }
     update() {
         if (this.type === 'AND') this.outputStates[0] = this.inputStates.every(Boolean);
         else if (this.type === 'OR') this.outputStates[0] = this.inputStates.some(Boolean);
@@ -519,7 +468,6 @@ class Component {
             const allOff = this.inputStates.every(s => !s);
             this.outputStates[0] = !(allOn || allOff);
         }
-        
         else if (this.type === 'LATCH') { 
             if (this.inputStates[0]) this.outputStates[0] = true;
             else if (this.inputStates[1]) this.outputStates[0] = false;
@@ -527,189 +475,125 @@ class Component {
             if (this.inputStates[0]) this.outputStates[0] = false;
             else if (this.inputStates[1]) this.outputStates[0] = true;
         } 
-        
-        else if (this.isLed) { } 
-        
         else if (this.type === 'TON') {
             if (this.inputStates[0]) {
                 if (this.timerValue < this.timerLimit) this.timerValue++;
-            } else {
-                this.timerValue = 0;
-            }
+            } else { this.timerValue = 0; }
             this.outputStates[0] = (this.timerValue >= this.timerLimit);
         } else if (this.type === 'TOF') {
             if (this.inputStates[0]) {
-                this.outputStates[0] = true;
-                this.timerValue = this.timerLimit;
+                this.outputStates[0] = true; this.timerValue = this.timerLimit;
             } else {
-                if (this.timerValue > 0) {
-                    this.timerValue--;
-                    this.outputStates[0] = true;
-                } else {
-                    this.outputStates[0] = false;
-                }
+                if (this.timerValue > 0) { this.timerValue--; this.outputStates[0] = true; }
+                else { this.outputStates[0] = false; }
             }
         } 
-        
         else if (this.type === 'CLOCK') {
             this.timerValue++;
             if (this.timerValue >= this.timerLimit) this.timerValue = 0;
             const threshold = (this.dutyCycle / 100) * this.timerLimit;
             this.outputStates[0] = (this.timerValue < threshold);
         }
-
         else if (this.type === 'SHIFT_REG') {
-            const data = this.inputStates[0];
-            const clk = this.inputStates[1];
-            const rst = this.inputStates[2];
-            if (rst) {
-                this.outputStates.fill(false);
-            } else if (clk && !this.prevClockState) {
+            const data = this.inputStates[0]; const clk = this.inputStates[1]; const rst = this.inputStates[2];
+            if (rst) { this.outputStates.fill(false); } 
+            else if (clk && !this.prevClockState) {
                 for (let i = 7; i > 0; i--) this.outputStates[i] = this.outputStates[i-1];
                 this.outputStates[0] = data;
             }
             this.prevClockState = clk;
         }
     }
-
-    getInputPos(index) {
-        const xOff = this.isLed ? -5 : 0;
-        return { x: this.x + xOff, y: this.y + (index * 20) + 10 };
-    }
-
-    getOutputPos(index) {
-        return { x: this.x + this.w, y: this.y + (index * 20) + 10 };
-    }
-
+    getInputPos(index) { const xOff = this.isLed ? -5 : 0; return { x: this.x + xOff, y: this.y + (index * 20) + 10 }; }
+    getOutputPos(index) { return { x: this.x + this.w, y: this.y + (index * 20) + 10 }; }
+    
     draw(ctx) {
-        // 1. Determine base color
         let bodyColor = this.def.color;
         if (this.type === 'PUSH_BTN' && this.outputStates[0]) bodyColor = '#2ecc71';
-        
-        // 2. Dragging Shadow
-        if (this === draggingComponent) {
-            ctx.shadowColor = 'rgba(255,255,255,0.5)';
-            ctx.shadowBlur = 10;
-        }
+        if (this === draggingComponent) { ctx.shadowColor = 'rgba(255,255,255,0.5)'; ctx.shadowBlur = 10; }
 
-        // 3. Draw Component Body
         if (this.isLed) {
             const colors = LED_PALETTE[this.type];
             for (let i = 0; i < this.inputStates.length; i++) {
                 const on = this.inputStates[i];
                 ctx.fillStyle = on ? colors.on : colors.off;
-                ctx.beginPath();
-                ctx.arc(this.x + 10, this.y + (i * 20) + 10, 8, 0, Math.PI*2);
-                ctx.fill();
-                if (on) {
-                    ctx.shadowColor = colors.on; ctx.shadowBlur = 15; ctx.fill(); ctx.shadowBlur = 0;
-                }
+                ctx.beginPath(); ctx.arc(this.x + 10, this.y + (i * 20) + 10, 8, 0, Math.PI*2); ctx.fill();
+                if (on) { ctx.shadowColor = colors.on; ctx.shadowBlur = 15; ctx.fill(); ctx.shadowBlur = 0; }
             }
         } 
         else if (this.type === 'PUSH_BTN') {
             const grad = ctx.createRadialGradient(this.x+30, this.y+30, 10, this.x+30, this.y+30, 30);
             grad.addColorStop(0, '#bdc3c7'); grad.addColorStop(1, '#7f8c8d');
-            ctx.fillStyle = grad;
-            ctx.beginPath(); ctx.arc(this.x+30, this.y+30, 28, 0, Math.PI*2); ctx.fill();
-
+            ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(this.x+30, this.y+30, 28, 0, Math.PI*2); ctx.fill();
             const pressed = this.outputStates[0];
             const btnColor = pressed ? '#e74c3c' : '#c0392b'; 
             const inset = pressed ? 2 : 0;
-            ctx.fillStyle = btnColor;
-            ctx.beginPath(); 
-            ctx.arc(this.x+30, this.y+30 + inset, 20 - inset/2, 0, Math.PI*2); 
-            ctx.fill();
+            ctx.fillStyle = btnColor; ctx.beginPath(); ctx.arc(this.x+30, this.y+30 + inset, 20 - inset/2, 0, Math.PI*2); ctx.fill();
             if(pressed) { ctx.shadowColor = '#ff0000'; ctx.shadowBlur = 20; ctx.fill(); ctx.shadowBlur = 0; }
         }
         else if (this.type === 'SWITCH') {
-             // Base plate
              roundRect(ctx, this.x, this.y, this.w, this.h, 6);
              ctx.fillStyle = '#7f8c8d'; ctx.fill();
-             
-             // Toggle Slot background
-             ctx.fillStyle = '#2c3e50';
-             roundRect(ctx, this.x+20, this.y+10, 20, 25, 10);
-             ctx.fill();
-             
-             // Lever Handle
+             ctx.fillStyle = '#2c3e50'; roundRect(ctx, this.x+20, this.y+10, 20, 25, 10); ctx.fill();
              const leverY = this.outputStates[0] ? this.y + 18 : this.y + 28;
              const grad = ctx.createLinearGradient(this.x, this.y, this.x+60, this.y);
              grad.addColorStop(0, '#bdc3c7'); grad.addColorStop(1, '#ecf0f1');
-             ctx.fillStyle = grad;
-             ctx.beginPath(); ctx.arc(this.x+30, leverY, 10, 0, Math.PI*2); ctx.fill();
-             
-             // Lever shaft (visual only)
-             
-             // Indicator LED (Bottom Left - Matching Clock)
+             ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(this.x+30, leverY, 10, 0, Math.PI*2); ctx.fill();
              const bottomY = this.y + this.h - 12;
-             ctx.beginPath(); 
-             ctx.arc(this.x + 10, bottomY, 4, 0, Math.PI*2);
-             ctx.fillStyle = this.outputStates[0] ? WIRE_COLOR_ON : '#222'; 
-             ctx.fill();
+             ctx.beginPath(); ctx.arc(this.x + 10, bottomY, 4, 0, Math.PI*2);
+             ctx.fillStyle = this.outputStates[0] ? WIRE_COLOR_ON : '#222'; ctx.fill();
         }
         else if (this.type === 'CLOCK') {
-            roundRect(ctx, this.x, this.y, this.w, this.h, 6);
-            ctx.fillStyle = bodyColor; ctx.fill();
-            
+            roundRect(ctx, this.x, this.y, this.w, this.h, 6); ctx.fillStyle = bodyColor; ctx.fill();
             ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath();
-            const cx = this.x + this.w/2;
-            const cy = this.y + 20; 
+            const cx = this.x + this.w/2; const cy = this.y + 20; 
             ctx.moveTo(cx-12, cy+5); ctx.lineTo(cx-5, cy+5); ctx.lineTo(cx-5, cy-8);
-            ctx.lineTo(cx+5, cy-8); ctx.lineTo(cx+5, cy+5); ctx.lineTo(cx+12, cy+5);
-            ctx.stroke();
-
+            ctx.lineTo(cx+5, cy-8); ctx.lineTo(cx+5, cy+5); ctx.lineTo(cx+12, cy+5); ctx.stroke();
             const bottomY = this.y + this.h - 12;
-            
             ctx.beginPath(); ctx.arc(this.x + 10, bottomY, 4, 0, Math.PI*2);
             ctx.fillStyle = this.outputStates[0] ? WIRE_COLOR_ON : '#222'; ctx.fill();
-
-            ctx.fillStyle = '#bdc3c7'; ctx.font = "bold 9px sans-serif"; 
-            ctx.textAlign = "right"; ctx.textBaseline = "middle";
+            ctx.fillStyle = '#bdc3c7'; ctx.font = "bold 9px sans-serif"; ctx.textAlign = "right"; ctx.textBaseline = "middle";
             const totalSec = (this.timeSetting * this.timeBase).toFixed(1) + "s";
             ctx.fillText(totalSec, this.x + this.w - 5, bottomY);
-
-            const ledEnd = this.x + 18;
-            const textStart = this.x + this.w - 28; 
-            const barX = ledEnd;
-            const barW = textStart - barX;
-            const barH = 4;
-            const barY = bottomY - 2;
-
+            const ledEnd = this.x + 18; const textStart = this.x + this.w - 28; 
+            const barX = ledEnd; const barW = textStart - barX; const barH = 4; const barY = bottomY - 2;
             if (barW > 5) {
                 ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(barX, barY, barW, barH);
                 let pct = this.timerValue / this.timerLimit;
                 ctx.fillStyle = '#3498db'; ctx.fillRect(barX, barY, barW * pct, barH);
             }
         }
+        else if (this.type === 'TRAFFIC_LIGHT') {
+            roundRect(ctx, this.x, this.y, this.w, this.h, 6); ctx.fillStyle = '#111'; ctx.fill();
+            const lights = [
+                {color: '#ff0000', off: '#440000', val: this.inputStates[0]},
+                {color: '#ffbf00', off: '#443300', val: this.inputStates[1]},
+                {color: '#00ff00', off: '#004400', val: this.inputStates[2]}
+            ];
+            const cx = this.x + this.w/2;
+            for(let i=0; i<3; i++) {
+                ctx.beginPath(); ctx.arc(cx, this.y + 15 + (i*25), 8, 0, Math.PI*2);
+                ctx.fillStyle = lights[i].val ? lights[i].color : lights[i].off; ctx.fill();
+                if(lights[i].val) { ctx.shadowColor = lights[i].color; ctx.shadowBlur = 15; ctx.fill(); ctx.shadowBlur = 0; }
+            }
+        }
         else {
-            // Generic Block Drawing (Gates, Timers, Latches)
-            roundRect(ctx, this.x, this.y, this.w, this.h, 6);
-            ctx.fillStyle = bodyColor; // Explicitly set fill style here
-            ctx.fill();
+            roundRect(ctx, this.x, this.y, this.w, this.h, 6); ctx.fillStyle = bodyColor; ctx.fill();
         }
         ctx.shadowBlur = 0;
 
-        // 4. Labels and Text
-        if (!this.isLed && !['SWITCH','PUSH_BTN','CLOCK'].includes(this.type)) {
-            ctx.fillStyle = this.def.textColor || 'white'; // Explicitly set text color
-            ctx.font = "bold 14px sans-serif";
-            ctx.textAlign = "center";
-            ctx.textBaseline = "top";
-            
+        if (!this.isLed && !['SWITCH','PUSH_BTN','CLOCK','TRAFFIC_LIGHT'].includes(this.type)) {
+            ctx.fillStyle = this.def.textColor || 'white'; ctx.font = "bold 14px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
             if (this.type === 'TON' || this.type === 'TOF') {
                 let pct = this.timerValue / this.timerLimit;
                 const barW = this.w - 10;
                 ctx.fillText(this.def.label, this.x + this.w/2, this.y + 5);
-                
                 const barY = this.y + this.h - 20;
                 ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(this.x + 5, barY, barW, 6);
                 ctx.fillStyle = 'white'; ctx.fillRect(this.x + 5, barY, barW * pct, 6);
-                
-                ctx.fillStyle = 'white'; // Reset for text
-                ctx.font = "10px sans-serif";
+                ctx.fillStyle = 'white'; ctx.font = "10px sans-serif";
                 const totalSec = (this.timeSetting * this.timeBase).toFixed(1) + "s";
                 ctx.fillText(totalSec, this.x + this.w/2, this.y + this.h - 12);
-
             } else if (this.type === 'SHIFT_REG') {
                 ctx.fillText("SHIFT", this.x + this.w/2, this.y + 5);
                 ctx.font = "10px sans-serif"; ctx.fillText("8-BIT", this.x + this.w/2, this.y + 20);
@@ -720,30 +604,19 @@ class Component {
             }
         }
 
-        // 5. Indicator LEDs (Small lights on body)
-        // Updated to exclude SWITCH and PUSH_BTN which now handle their own visuals
         if (this.type.startsWith('LIGHT')) {
-            ctx.beginPath();
-            ctx.arc(this.x + this.w/2, this.y + 35, 6, 0, Math.PI*2);
+            ctx.beginPath(); ctx.arc(this.x + this.w/2, this.y + 35, 6, 0, Math.PI*2);
             let ledColor = this.outputStates[0] ? this.def.onColor : '#222';
-            ctx.fillStyle = ledColor;
-            ctx.fill();
-            ctx.strokeStyle = '#fff';
-            ctx.stroke();
+            ctx.fillStyle = ledColor; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.stroke();
         }
 
-        // 6. Pins
-        ctx.fillStyle = '#fff';
-        ctx.strokeStyle = '#fff';
-        
-        // Input Pins
+        ctx.fillStyle = '#fff'; ctx.strokeStyle = '#fff';
         for(let i=0; i<this.inputStates.length; i++) {
             const pos = this.getInputPos(i);
             ctx.fillRect(pos.x - 5, pos.y - 5, 10, 10);
             if (isHoveringPin(pos)) {
                 ctx.strokeStyle = WIRE_COLOR_ON; ctx.strokeRect(pos.x - 7, pos.y - 7, 14, 14); ctx.strokeStyle = '#fff';
             }
-            
             if(this.type === 'LATCH' || this.type === 'RS_LATCH' || this.type === 'SHIFT_REG') {
                 ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.font = "bold 10px monospace";
                 ctx.textAlign = "left"; ctx.textBaseline = "middle";
@@ -754,15 +627,25 @@ class Component {
                 ctx.fillStyle = '#fff';
             }
         }
-
-        // Output Pins
         for(let i=0; i<this.outputStates.length; i++) {
             const pos = this.getOutputPos(i);
-            if (!this.isLed && this.type !== 'SEVEN_SEG') {
-                ctx.beginPath(); ctx.arc(pos.x, pos.y, 5, 0, Math.PI*2); ctx.fill();
+            if (!this.isLed && this.type !== 'SEVEN_SEG' && this.type !== 'TRAFFIC_LIGHT') {
+                ctx.beginPath(); ctx.arc(pos.x, pos.y, 5, 0, Math.PI*2); 
+                if(this.outputStates[i]) {
+                    ctx.fillStyle = WIRE_COLOR_ON;
+                    ctx.shadowColor = WIRE_COLOR_ON;
+                    ctx.shadowBlur = 10;
+                } else {
+                    ctx.fillStyle = '#fff';
+                    ctx.shadowBlur = 0;
+                }
+                ctx.fill();
+                ctx.shadowBlur = 0;
+
                 if (isHoveringPin(pos)) {
                     ctx.strokeStyle = WIRE_COLOR_ON; ctx.beginPath(); ctx.arc(pos.x, pos.y, 8, 0, Math.PI*2); ctx.stroke(); ctx.strokeStyle = '#fff';
                 }
+                ctx.fillStyle = '#fff';
             }
             if (this.type === 'SHIFT_REG') {
                 ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.font = "bold 10px monospace";
@@ -771,28 +654,22 @@ class Component {
             }
         }
     }
-
+    
     drawSevenSeg(ctx) {
-        const segW = 6; const segL = 35;
-        const cx = this.x + 45; const cy = this.y + 90;
-        
+        const segW = 6; const segL = 35; const cx = this.x + 45; const cy = this.y + 90;
         const drawSeg = (id, x, y, w, h) => {
-            const on = this.inputStates[id];
-            ctx.fillStyle = on ? '#ff0000' : '#2a0000';
+            const on = this.inputStates[id]; ctx.fillStyle = on ? '#ff0000' : '#2a0000'; 
             if(on) { ctx.shadowColor = '#ff0000'; ctx.shadowBlur = 10; }
             roundRect(ctx, x, y, w, h, 2); ctx.fill(); ctx.shadowBlur = 0;
         };
-
-        drawSeg(0, cx - segL/2, cy - segL - segW, segL, segW); // a
-        drawSeg(1, cx + segL/2, cy - segL, segW, segL); // b
-        drawSeg(2, cx + segL/2, cy + segW, segW, segL); // c
-        drawSeg(3, cx - segL/2, cy + segL + segW, segL, segW); // d
-        drawSeg(4, cx - segL/2 - segW, cy + segW, segW, segL); // e
-        drawSeg(5, cx - segL/2 - segW, cy - segL, segW, segL); // f
-        drawSeg(6, cx - segL/2, cy, segL, segW); // g
-        
-        const on = this.inputStates[7];
-        ctx.fillStyle = on ? '#ff0000' : '#2a0000';
+        drawSeg(0, cx - segL/2, cy - segL - segW, segL, segW);
+        drawSeg(1, cx + segL/2, cy - segL, segW, segL);
+        drawSeg(2, cx + segL/2, cy + segW, segW, segL);
+        drawSeg(3, cx - segL/2, cy + segL + segW, segL, segW);
+        drawSeg(4, cx - segL/2 - segW, cy + segW, segW, segL);
+        drawSeg(5, cx - segL/2 - segW, cy - segL, segW, segL);
+        drawSeg(6, cx - segL/2, cy, segL, segW);
+        const on = this.inputStates[7]; ctx.fillStyle = on ? '#ff0000' : '#2a0000';
         if(on) { ctx.shadowColor = '#ff0000'; ctx.shadowBlur = 10; }
         ctx.beginPath(); ctx.arc(cx + segL/2 + 12, cy + segL + segW + 2, 4, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur = 0;
     }
@@ -858,10 +735,11 @@ function draw() {
 
     ctx.save(); ctx.translate(viewX, viewY);
 
-    wires.forEach(w => {
+    // Draw Smooth Bezier Wires
+    wires.forEach((w) => {
         const start = w.from.comp.getOutputPos(w.from.pinIdx);
         const end = w.to.comp.getInputPos(w.to.pinIdx);
-        drawWire(start, end, w.from.comp.outputStates[w.from.pinIdx]);
+        drawWire(ctx, start, end, w.from.comp.outputStates[w.from.pinIdx]);
     });
 
     if (wiringStart) {
@@ -876,19 +754,37 @@ function draw() {
             endPos = wiringStart.comp.getInputPos(wiringStart.pinIndex);
             isActive = false; 
         }
-        drawWire(startPos, endPos, isActive);
+        drawWire(ctx, startPos, endPos, isActive);
     }
 
     components.forEach(c => c.draw(ctx));
     ctx.restore();
 }
 
-function drawWire(p1, p2, active) {
-    ctx.beginPath(); ctx.strokeStyle = active ? WIRE_COLOR_ON : WIRE_COLOR_OFF;
-    ctx.lineWidth = 3;
-    const cp1 = { x: p1.x + 50, y: p1.y }; const cp2 = { x: p2.x - 50, y: p2.y };
-    ctx.moveTo(p1.x, p1.y); ctx.bezierCurveTo(cp1.x, cp1.y, cp2.x, cp2.y, p2.x, p2.y);
-    if (active) { ctx.shadowColor = WIRE_COLOR_ON; ctx.shadowBlur = 10; } else { ctx.shadowBlur = 0; }
+function drawWire(ctx, p1, p2, active) {
+    ctx.beginPath(); 
+    ctx.strokeStyle = active ? WIRE_COLOR_ON : WIRE_COLOR_OFF; 
+    ctx.lineWidth = 3; 
+    
+    // 1. Define rigid straight segments (stubs)
+    const stub = 10;
+    const s1 = { x: p1.x + stub, y: p1.y };
+    const s2 = { x: p2.x - stub, y: p2.y };
+    
+    // 2. Control points for the bezier curve start AFTER the stubs
+    // We adjust the tension (40px) to maintain a smooth flow
+    const cp1 = { x: s1.x + 40, y: s1.y };
+    const cp2 = { x: s2.x - 40, y: s2.y };
+    
+    // 3. Draw the path: Line -> Curve -> Line
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(s1.x, s1.y); // Straight out
+    ctx.bezierCurveTo(cp1.x, cp1.y, cp2.x, cp2.y, s2.x, s2.y); // Smooth curve
+    ctx.lineTo(p2.x, p2.y); // Straight in
+    
+    if (active) { ctx.shadowColor = WIRE_COLOR_ON; ctx.shadowBlur = 10; } 
+    else { ctx.shadowBlur = 0; }
+    
     ctx.stroke(); ctx.shadowBlur = 0;
 }
 
@@ -909,8 +805,10 @@ container.addEventListener('drop', (e) => {
     const rect = canvas.getBoundingClientRect();
     const worldX = e.clientX - rect.left - 30 - viewX;
     const worldY = e.clientY - rect.top - 10 - viewY;
+    
     const snapX = Math.round(worldX / GRID_SIZE) * GRID_SIZE;
     const snapY = Math.round(worldY / GRID_SIZE) * GRID_SIZE;
+    
     components.push(new Component(type, snapX, snapY));
 });
 
@@ -956,7 +854,6 @@ canvas.addEventListener('contextmenu', (e) => {
         }
         lastRightClickId = clickedComp.id;
         lastRightClickTime = now;
-
         if (clickedComp.type === 'TON' || clickedComp.type === 'TOF' || clickedComp.type === 'CLOCK' || clickedComp.def.resizable) {
             openConfig(clickedComp);
         }
@@ -988,12 +885,10 @@ function handleInputStart(e) {
         let c = components[i];
         if (mouseWorld.x >= c.x && mouseWorld.x <= c.x + c.w &&
             mouseWorld.y >= c.y && mouseWorld.y <= c.y + c.h) {
-            
             if (c.type === 'PUSH_BTN') {
                 c.outputStates[0] = true;
                 pressedButtonId = c.id;
             }
-            
             draggingComponent = c;
             dragOffset = { x: mouseWorld.x - c.x, y: mouseWorld.y - c.y };
             dragStartPos = { x: mouseWorld.x, y: mouseWorld.y };
@@ -1003,7 +898,6 @@ function handleInputStart(e) {
             return;
         }
     }
-
     isPanning = true;
     panStart = { x: mousePos.x - viewX, y: mousePos.y - viewY };
     container.style.cursor = "grabbing";
@@ -1012,7 +906,6 @@ function handleInputStart(e) {
 function handleInputMove(e) {
     mousePos = getMousePos(e);
     const mouseWorld = getWorldPos(mousePos);
-    
     if (draggingComponent) {
         const dist = Math.hypot(mouseWorld.x - dragStartPos.x, mouseWorld.y - dragStartPos.y);
         if (dist > 5) {
@@ -1032,11 +925,9 @@ function handleInputEnd(e) {
         if (btn) btn.outputStates[0] = false;
         pressedButtonId = null;
     }
-
     if (draggingComponent && draggingComponent.type === 'SWITCH' && !isDraggingComp) {
         draggingComponent.outputStates[0] = !draggingComponent.outputStates[0];
     }
-
     if (wiringStart) {
         const mouseWorld = getWorldPos(mousePos);
         for (let c of components) {
@@ -1056,30 +947,26 @@ function handleInputEnd(e) {
         }
         wiringStart = null;
     }
-    
     draggingComponent = null;
     isDraggingComp = false;
     isPanning = false;
     container.style.cursor = "crosshair";
 }
 
-// --- CONFIGURATION ---
+// ... existing configuration/save logic ...
 function openConfig(comp) {
     editingComponent = comp;
     const panel = document.getElementById('configPanel');
     const timerControls = document.getElementById('timerControls');
     const inputCountControls = document.getElementById('inputCountControls');
-    
     timerControls.style.display = 'none';
     inputCountControls.style.display = 'none';
-
     if (['TON', 'TOF', 'CLOCK'].includes(comp.type)) {
         timerControls.style.display = 'block';
         document.getElementById('timerSlider').value = comp.timeSetting;
         updateValDisplay(comp.timeSetting);
         const radios = document.getElementsByName('timebase');
         for(let r of radios) { if(parseFloat(r.value) === comp.timeBase) r.checked = true; }
-
         if (comp.type === 'CLOCK') {
             document.getElementById('dutyRow').style.display = 'block';
             document.getElementById('dutySlider').value = comp.dutyCycle;
@@ -1088,20 +975,16 @@ function openConfig(comp) {
             document.getElementById('dutyRow').style.display = 'none';
         }
     }
-    
     if (comp.def.resizable) {
         inputCountControls.style.display = 'block';
         document.getElementById('inputCountSlider').value = comp.inputStates.length;
         updateInputCountDisplay(comp.inputStates.length);
     }
-
     panel.style.display = 'block';
 }
-
 function updateValDisplay(val) { document.getElementById('valDisplay').textContent = val; }
 function updateDutyDisplay(val) { document.getElementById('dutyDisplay').textContent = val; }
 function updateInputCountDisplay(val) { document.getElementById('inputCountDisplay').textContent = val; }
-
 function saveConfig() {
     if (!editingComponent) return;
     const config = {};
@@ -1117,13 +1000,10 @@ function saveConfig() {
     editingComponent.updateConfig(config);
     closeConfig();
 }
-
 function closeConfig() {
     document.getElementById('configPanel').style.display = 'none';
     editingComponent = null;
 }
-
-// --- SAVE / LOAD ---
 function saveProject() {
     const data = {
         components: components.map(c => ({
@@ -1138,7 +1018,6 @@ function saveProject() {
     a.href = url; a.download = "logic_lab_circuit.json"; a.click();
     URL.revokeObjectURL(url);
 }
-
 function loadProject(input) {
     const file = input.files[0];
     if (!file) return;
@@ -1165,11 +1044,9 @@ function loadProject(input) {
     reader.readAsText(file);
     input.value = '';
 }
-
 function clearBoard() {
     components = []; wires = []; viewX = 0; viewY = 0;
 }
-
 function toggleHelp() {
     const modal = document.getElementById('helpModal');
     modal.style.display = modal.style.display === 'flex' ? 'none' : 'flex';
@@ -1190,8 +1067,5 @@ setTimeout(loadDemo, 100);
 </script>
 </body>
 </html>
-
-
-
 
 
