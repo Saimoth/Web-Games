@@ -257,6 +257,10 @@
                 <div class="tool-icon" style="background:#000; color:red; border:1px solid #444;">8.</div>
                 <span>7-Seg Display</span>
             </div>
+            <div class="tool-item" draggable="true" data-type="DEC_DISPLAY">
+                <div class="tool-icon" style="background:#000; color:red; border:1px solid #444; font-size:10px; display:flex; align-items:center; justify-content:center;">888</div>
+                <span>8-Bit Display</span>
+            </div>
 
             <div class="category-label">Logic Gates</div>
             <div class="tool-item" draggable="true" data-type="AND">
@@ -318,17 +322,23 @@
     <!-- Main Canvas -->
     <div id="canvas-container">
         <canvas id="circuitCanvas"></canvas>
+        
+        <!-- Context Menu / Config Panel -->
         <div id="configPanel">
             <h3 id="configTitle">Settings</h3>
+            
+            <!-- Timers/Clock -->
             <div id="timerControls">
                 <div class="config-row">
                     <div class="config-label">Period/Duration: <span id="valDisplay" style="color:var(--wire-on); font-weight:bold;">0.5</span></div>
                     <input type="range" id="timerSlider" min="0" max="1" step="0.01" value="0.5" oninput="updateValDisplay(this.value)">
                 </div>
+                
                 <div class="config-row" id="dutyRow" style="display:none;">
                     <div class="config-label">Duty Cycle %: <span id="dutyDisplay" style="color:var(--wire-on); font-weight:bold;">50</span></div>
                     <input type="range" id="dutySlider" min="0" max="100" step="5" value="50" oninput="updateDutyDisplay(this.value)">
                 </div>
+
                 <div class="config-row">
                     <div class="config-label">Time Base</div>
                     <div class="radio-group">
@@ -338,12 +348,15 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Gate/LED Inputs -->
             <div id="inputCountControls" style="display:none;">
                 <div class="config-row">
                     <div class="config-label">Count / Inputs: <span id="inputCountDisplay" style="color:var(--wire-on); font-weight:bold;">2</span></div>
                     <input type="range" id="inputCountSlider" min="1" max="8" step="1" value="2" oninput="updateInputCountDisplay(this.value)">
                 </div>
             </div>
+
             <div class="panel-actions">
                 <button class="btn-cancel" onclick="closeConfig()">Cancel</button>
                 <button class="btn-save" onclick="saveConfig()">Apply</button>
@@ -417,6 +430,7 @@ const COMP_DEFS = {
     RS_LATCH: { w: 60, inputs: 2, outputs: 1, color: '#d35400', label: 'RS' }, 
     SHIFT_REG: { w: 100, inputs: 3, outputs: 8, color: '#8e44ad', label: 'SHIFT' },
     SEVEN_SEG: { w: 90, inputs: 8, outputs: 0, color: '#000000', label: '' }, 
+    DEC_DISPLAY: { w: 160, inputs: 8, outputs: 0, color: '#000000', label: '' },
     TRAFFIC_LIGHT: { w: 60, inputs: 3, outputs: 0, color: '#111', label: '' },
     TON: { w: 60, inputs: 1, outputs: 1, color: '#417505', label: 'TON' }, 
     TOF: { w: 60, inputs: 1, outputs: 1, color: '#d0021b', label: 'TOF' }, 
@@ -436,11 +450,12 @@ class Component {
         this.resize();
         this.timerValue = 0; this.timeSetting = 0.5; this.timeBase = 1.0; this.dutyCycle = 50; 
         this.updateTimerLimit(); this.prevClockState = false;
+        this.displayValue = 0;
     }
     resize() {
         const maxPins = Math.max(this.inputStates.length, this.outputStates.length);
         if (this.isLed) this.h = Math.max(20, this.inputStates.length * 20);
-        else if (this.type === 'SEVEN_SEG') this.h = 180;
+        else if (this.type === 'SEVEN_SEG' || this.type === 'DEC_DISPLAY') this.h = 180;
         else if (this.type === 'TRAFFIC_LIGHT') this.h = 80;
         else if (this.type === 'CLOCK' || this.type === 'SWITCH') this.h = 60; 
         else this.h = Math.max(40, maxPins * 20);
@@ -502,6 +517,13 @@ class Component {
                 this.outputStates[0] = data;
             }
             this.prevClockState = clk;
+        }
+        else if (this.type === 'DEC_DISPLAY') {
+            let val = 0;
+            for(let i=0; i<8; i++) {
+                if(this.inputStates[i]) val += Math.pow(2, i);
+            }
+            this.displayValue = val;
         }
     }
     getInputPos(index) { const xOff = this.isLed ? -5 : 0; return { x: this.x + xOff, y: this.y + (index * 20) + 10 }; }
@@ -599,6 +621,8 @@ class Component {
                 ctx.font = "10px sans-serif"; ctx.fillText("8-BIT", this.x + this.w/2, this.y + 20);
             } else if (this.type === 'SEVEN_SEG') {
                 this.drawSevenSeg(ctx);
+            } else if (this.type === 'DEC_DISPLAY') {
+                this.drawDecDisplay(ctx);
             } else {
                 ctx.fillText(this.def.label, this.x + this.w/2, this.y + 5);
             }
@@ -629,7 +653,7 @@ class Component {
         }
         for(let i=0; i<this.outputStates.length; i++) {
             const pos = this.getOutputPos(i);
-            if (!this.isLed && this.type !== 'SEVEN_SEG' && this.type !== 'TRAFFIC_LIGHT') {
+            if (!this.isLed && this.type !== 'SEVEN_SEG' && this.type !== 'TRAFFIC_LIGHT' && this.type !== 'DEC_DISPLAY') {
                 ctx.beginPath(); ctx.arc(pos.x, pos.y, 5, 0, Math.PI*2); 
                 if(this.outputStates[i]) {
                     ctx.fillStyle = WIRE_COLOR_ON;
@@ -672,6 +696,42 @@ class Component {
         const on = this.inputStates[7]; ctx.fillStyle = on ? '#ff0000' : '#2a0000';
         if(on) { ctx.shadowColor = '#ff0000'; ctx.shadowBlur = 10; }
         ctx.beginPath(); ctx.arc(cx + segL/2 + 12, cy + segL + segW + 2, 4, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur = 0;
+    }
+
+    drawDecDisplay(ctx) {
+        const val = this.displayValue || 0;
+        const d1 = Math.floor(val / 100);
+        const d2 = Math.floor((val % 100) / 10);
+        const d3 = val % 10;
+        
+        const digits = [d1, d2, d3];
+        const segW = 5; const segL = 25;
+        const startX = this.x + 35; 
+        const spacingX = 40;
+        const cy = this.y + 90;
+
+        const segMap = [
+            [1,1,1,1,1,1,0], [0,1,1,0,0,0,0], [1,1,0,1,1,0,1], [1,1,1,1,0,0,1], [0,1,1,0,0,1,1],
+            [1,0,1,1,0,1,1], [1,0,1,1,1,1,1], [1,1,1,0,0,0,0], [1,1,1,1,1,1,1], [1,1,1,1,0,1,1]
+        ];
+
+        digits.forEach((digit, i) => {
+            const cx = startX + (i * spacingX);
+            const mask = segMap[digit];
+            const drawSeg = (idx, x, y, w, h) => {
+                const on = mask[idx];
+                ctx.fillStyle = on ? '#ff0000' : '#2a0000'; 
+                if(on) { ctx.shadowColor = '#ff0000'; ctx.shadowBlur = 10; }
+                roundRect(ctx, x, y, w, h, 2); ctx.fill(); ctx.shadowBlur = 0;
+            };
+            drawSeg(0, cx - segL/2, cy - segL - segW, segL, segW);
+            drawSeg(1, cx + segL/2, cy - segL, segW, segL);
+            drawSeg(2, cx + segL/2, cy + segW, segW, segL);
+            drawSeg(3, cx - segL/2, cy + segL + segW, segL, segW);
+            drawSeg(4, cx - segL/2 - segW, cy + segW, segW, segL);
+            drawSeg(5, cx - segL/2 - segW, cy - segL, segW, segL);
+            drawSeg(6, cx - segL/2, cy, segL, segW);
+        });
     }
 }
 
@@ -766,17 +826,14 @@ function drawWire(ctx, p1, p2, active) {
     ctx.strokeStyle = active ? WIRE_COLOR_ON : WIRE_COLOR_OFF; 
     ctx.lineWidth = 3; 
     
-    // 1. Define rigid straight segments (stubs)
+    // 10px rigid straight segments as requested
     const stub = 10;
     const s1 = { x: p1.x + stub, y: p1.y };
     const s2 = { x: p2.x - stub, y: p2.y };
     
-    // 2. Control points for the bezier curve start AFTER the stubs
-    // We adjust the tension (40px) to maintain a smooth flow
     const cp1 = { x: s1.x + 40, y: s1.y };
     const cp2 = { x: s2.x - 40, y: s2.y };
     
-    // 3. Draw the path: Line -> Curve -> Line
     ctx.moveTo(p1.x, p1.y);
     ctx.lineTo(s1.x, s1.y); // Straight out
     ctx.bezierCurveTo(cp1.x, cp1.y, cp2.x, cp2.y, s2.x, s2.y); // Smooth curve
