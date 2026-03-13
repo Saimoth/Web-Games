@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Atomic Explorer: Infinite Rotation</title>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --text-main: #ffffff;
+            --text-muted: #aaaaaa;
+            --accent: #00bcd4;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 10px;
+            text-align: center;
+        }
+
+        h1 { font-size: 1.5rem; margin-bottom: 10px; }
+        p.hint { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 20px; }
+
+        #table-wrapper {
+            width: 100%;
+            overflow-x: auto;
+            padding-bottom: 20px;
+        }
+
+        #table-container {
+            display: grid;
+            grid-template-columns: repeat(18, 50px);
+            grid-template-rows: repeat(10, 60px);
+            gap: 4px;
+            width: max-content;
+            margin: 0 auto;
+        }
+
+        .element-card {
+            background-color: var(--card-bg);
+            border: 1px solid #333;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: transform 0.1s, border-color 0.1s;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        .element-card:active { transform: scale(0.90); border-color: var(--accent); }
+
+        .el-num { position: absolute; top: 2px; left: 3px; font-size: 0.5rem; color: var(--text-muted); }
+        .el-sym { font-size: 1.1rem; font-weight: bold; color: var(--accent); }
+        .el-name { font-size: 0.45rem; text-transform: uppercase; margin-top: 2px; text-align: center; line-height: 1; }
+
+        #modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background-color: rgba(0, 0, 0, 0.98);
+            z-index: 1000;
+            flex-direction: column;
+        }
+
+        #modal-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 15px 20px; background-color: #111; border-bottom: 1px solid #333;
+        }
+
+        #modal-title { font-size: 1.1rem; font-weight: bold; }
+        #modal-subtitle { font-size: 0.8rem; color: var(--text-muted); font-weight: normal; margin-left: 10px;}
+
+        #close-btn { background: none; border: none; color: white; font-size: 2rem; cursor: pointer; padding: 0; line-height: 1; }
+
+        #canvas-container { flex-grow: 1; width: 100%; height: 100%; position: relative; touch-action: none; }
+        #loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--accent); display: none; }
+        #zoom-hint { position: absolute; bottom: 30px; left: 0; width: 100%; text-align: center; color: rgba(255,255,255,0.5); font-size: 0.8rem; pointer-events: none;}
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+
+    <h1>Atomic Structure Table</h1>
+    <p class="hint">Swipe table left/right. Tap an element to view the atom.</p>
+    
+    <div id="table-wrapper">
+        <div id="table-container"></div>
+    </div>
+
+    <div id="modal">
+        <div id="modal-header">
+            <div>
+                <span id="modal-title">Element</span>
+                <span id="modal-subtitle"></span>
+            </div>
+            <button id="close-btn">&times;</button>
+        </div>
+        <div id="canvas-container">
+            <div id="loading">Building Atom...</div>
+            <div id="zoom-hint">Swipe to spin freely. Pinch to zoom.</div>
+        </div>
+    </div>
+
+    <script>
+        // Generated all 118 elements
+        const eData = [{n:1,s:'H',nm:'hydrogen',p:1,ne:0,c:1,r:1},{n:2,s:'He',nm:'helium',p:2,ne:2,c:18,r:1},{n:3,s:'Li',nm:'lithium',p:3,ne:4,c:1,r:2},{n:4,s:'Be',nm:'beryllium',p:4,ne:5,c:2,r:2},{n:5,s:'B',nm:'boron',p:5,ne:6,c:13,r:2},{n:6,s:'C',nm:'carbon',p:6,ne:6,c:14,r:2},{n:7,s:'N',nm:'nitrogen',p:7,ne:7,c:15,r:2},{n:8,s:'O',nm:'oxygen',p:8,ne:8,c:16,r:2},{n:9,s:'F',nm:'fluorine',p:9,ne:10,c:17,r:2},{n:10,s:'Ne',nm:'neon',p:10,ne:10,c:18,r:2},{n:11,s:'Na',nm:'sodium',p:11,ne:12,c:1,r:3},{n:12,s:'Mg',nm:'magnesium',p:12,ne:12,c:2,r:3},{n:13,s:'Al',nm:'aluminum',p:13,ne:14,c:13,r:3},{n:14,s:'Si',nm:'silicon',p:14,ne:14,c:14,r:3},{n:15,s:'P',nm:'phosphorus',p:15,ne:16,c:15,r:3},{n:16,s:'S',nm:'sulfur',p:16,ne:16,c:16,r:3},{n:17,s:'Cl',nm:'chlorine',p:17,ne:18,c:17,r:3},{n:18,s:'Ar',nm:'argon',p:18,ne:22,c:18,r:3},{n:19,s:'K',nm:'potassium',p:19,ne:20,c:1,r:4},{n:20,s:'Ca',nm:'calcium',p:20,ne:20,c:2,r:4},{n:21,s:'Sc',nm:'scandium',p:21,ne:24,c:3,r:4},{n:22,s:'Ti',nm:'titanium',p:22,ne:26,c:4,r:4},{n:23,s:'V',nm:'vanadium',p:23,ne:28,c:5,r:4},{n:24,s:'Cr',nm:'chromium',p:24,ne:28,c:6,r:4},{n:25,s:'Mn',nm:'manganese',p:25,ne:30,c:7,r:4},{n:26,s:'Fe',nm:'iron',p:26,ne:30,c:8,r:4},{n:27,s:'Co',nm:'cobalt',p:27,ne:32,c:9,r:4},{n:28,s:'Ni',nm:'nickel',p:28,ne:31,c:10,r:4},{n:29,s:'Cu',nm:'copper',p:29,ne:35,c:11,r:4},{n:30,s:'Zn',nm:'zinc',p:30,ne:35,c:12,r:4},{n:31,s:'Ga',nm:'gallium',p:31,ne:39,c:13,r:4},{n:32,s:'Ge',nm:'germanium',p:32,ne:41,c:14,r:4},{n:33,s:'As',nm:'arsenic',p:33,ne:42,c:15,r:4},{n:34,s:'Se',nm:'selenium',p:34,ne:45,c:16,r:4},{n:35,s:'Br',nm:'bromine',p:35,ne:45,c:17,r:4},{n:36,s:'Kr',nm:'krypton',p:36,ne:48,c:18,r:4},{n:37,s:'Rb',nm:'rubidium',p:37,ne:48,c:1,r:5},{n:38,s:'Sr',nm:'strontium',p:38,ne:50,c:2,r:5},{n:39,s:'Y',nm:'yttrium',p:39,ne:50,c:3,r:5},{n:40,s:'Zr',nm:'zirconium',p:40,ne:51,c:4,r:5},{n:41,s:'Nb',nm:'niobium',p:41,ne:52,c:5,r:5},{n:42,s:'Mo',nm:'molybdenum',p:42,ne:54,c:6,r:5},{n:43,s:'Tc',nm:'technetium',p:43,ne:55,c:7,r:5},{n:44,s:'Ru',nm:'ruthenium',p:44,ne:57,c:8,r:5},{n:45,s:'Rh',nm:'rhodium',p:45,ne:58,c:9,r:5},{n:46,s:'Pd',nm:'palladium',p:46,ne:60,c:10,r:5},{n:47,s:'Ag',nm:'silver',p:47,ne:61,c:11,r:5},{n:48,s:'Cd',nm:'cadmium',p:48,ne:64,c:12,r:5},{n:49,s:'In',nm:'indium',p:49,ne:66,c:13,r:5},{n:50,s:'Sn',nm:'tin',p:50,ne:69,c:14,r:5},{n:51,s:'Sb',nm:'antimony',p:51,ne:71,c:15,r:5},{n:52,s:'Te',nm:'tellurium',p:52,ne:76,c:16,r:5},{n:53,s:'I',nm:'iodine',p:53,ne:74,c:17,r:5},{n:54,s:'Xe',nm:'xenon',p:54,ne:77,c:18,r:5},{n:55,s:'Cs',nm:'cesium',p:55,ne:78,c:1,r:6},{n:56,s:'Ba',nm:'barium',p:56,ne:81,c:2,r:6},{n:57,s:'La',nm:'lanthanum',p:57,ne:82,c:4,r:9},{n:58,s:'Ce',nm:'cerium',p:58,ne:82,c:5,r:9},{n:59,s:'Pr',nm:'praseodymium',p:59,ne:82,c:6,r:9},{n:60,s:'Nd',nm:'neodymium',p:60,ne:84,c:7,r:9},{n:61,s:'Pm',nm:'promethium',p:61,ne:84,c:8,r:9},{n:62,s:'Sm',nm:'samarium',p:62,ne:88,c:9,r:9},{n:63,s:'Eu',nm:'europium',p:63,ne:89,c:10,r:9},{n:64,s:'Gd',nm:'gadolinium',p:64,ne:93,c:11,r:9},{n:65,s:'Tb',nm:'terbium',p:65,ne:94,c:12,r:9},{n:66,s:'Dy',nm:'dysprosium',p:66,ne:97,c:13,r:9},{n:67,s:'Ho',nm:'holmium',p:67,ne:98,c:14,r:9},{n:68,s:'Er',nm:'erbium',p:68,ne:99,c:15,r:9},{n:69,s:'Tm',nm:'thulium',p:69,ne:100,c:16,r:9},{n:70,s:'Yb',nm:'ytterbium',p:70,ne:103,c:17,r:9},{n:71,s:'Lu',nm:'lutetium',p:71,ne:104,c:18,r:9},{n:72,s:'Hf',nm:'hafnium',p:72,ne:106,c:4,r:6},{n:73,s:'Ta',nm:'tantalum',p:73,ne:108,c:5,r:6},{n:74,s:'W',nm:'tungsten',p:74,ne:110,c:6,r:6},{n:75,s:'Re',nm:'rhenium',p:75,ne:111,c:7,r:6},{n:76,s:'Os',nm:'osmium',p:76,ne:114,c:8,r:6},{n:77,s:'Ir',nm:'iridium',p:77,ne:115,c:9,r:6},{n:78,s:'Pt',nm:'platinum',p:78,ne:117,c:10,r:6},{n:79,s:'Au',nm:'gold',p:79,ne:118,c:11,r:6},{n:80,s:'Hg',nm:'mercury',p:80,ne:121,c:12,r:6},{n:81,s:'Tl',nm:'thallium',p:81,ne:123,c:13,r:6},{n:82,s:'Pb',nm:'lead',p:82,ne:125,c:14,r:6},{n:83,s:'Bi',nm:'bismuth',p:83,ne:126,c:15,r:6},{n:84,s:'Po',nm:'polonium',p:84,ne:125,c:16,r:6},{n:85,s:'At',nm:'astatine',p:85,ne:125,c:17,r:6},{n:86,s:'Rn',nm:'radon',p:86,ne:136,c:18,r:6},{n:87,s:'Fr',nm:'francium',p:87,ne:136,c:1,r:7},{n:88,s:'Ra',nm:'radium',p:88,ne:138,c:2,r:7},{n:89,s:'Ac',nm:'actinium',p:89,ne:138,c:4,r:10},{n:90,s:'Th',nm:'thorium',p:90,ne:142,c:5,r:10},{n:91,s:'Pa',nm:'protactinium',p:91,ne:140,c:6,r:10},{n:92,s:'U',nm:'uranium',p:92,ne:146,c:7,r:10},{n:93,s:'Np',nm:'neptunium',p:93,ne:144,c:8,r:10},{n:94,s:'Pu',nm:'plutonium',p:94,ne:150,c:9,r:10},{n:95,s:'Am',nm:'americium',p:95,ne:148,c:10,r:10},{n:96,s:'Cm',nm:'curium',p:96,ne:151,c:11,r:10},{n:97,s:'Bk',nm:'berkelium',p:97,ne:150,c:12,r:10},{n:98,s:'Cf',nm:'californium',p:98,ne:153,c:13,r:10},{n:99,s:'Es',nm:'einsteinium',p:99,ne:153,c:14,r:10},{n:100,s:'Fm',nm:'fermium',p:100,ne:157,c:15,r:10},{n:101,s:'Md',nm:'mendelevium',p:101,ne:157,c:16,r:10},{n:102,s:'No',nm:'nobelium',p:102,ne:157,c:17,r:10},{n:103,s:'Lr',nm:'lawrencium',p:103,ne:159,c:18,r:10},{n:104,s:'Rf',nm:'rutherfordium',p:104,ne:163,c:4,r:7},{n:105,s:'Db',nm:'dubnium',p:105,ne:163,c:5,r:7},{n:106,s:'Sg',nm:'seaborgium',p:106,ne:165,c:6,r:7},{n:107,s:'Bh',nm:'bohrium',p:107,ne:163,c:7,r:7},{n:108,s:'Hs',nm:'hassium',p:108,ne:161,c:8,r:7},{n:109,s:'Mt',nm:'meitnerium',p:109,ne:169,c:9,r:7},{n:110,s:'Ds',nm:'darmstadtium',p:110,ne:171,c:10,r:7},{n:111,s:'Rg',nm:'roentgenium',p:111,ne:171,c:11,r:7},{n:112,s:'Cn',nm:'copernicium',p:112,ne:173,c:12,r:7},{n:113,s:'Nh',nm:'nihonium',p:113,ne:173,c:13,r:7},{n:114,s:'Fl',nm:'flerovium',p:114,ne:175,c:14,r:7},{n:115,s:'Mc',nm:'moscovium',p:115,ne:175,c:15,r:7},{n:116,s:'Lv',nm:'livermorium',p:116,ne:177,c:16,r:7},{n:117,s:'Ts',nm:'tennessine',p:117,ne:177,c:17,r:7},{n:118,s:'Og',nm:'oganesson',p:118,ne:176,c:18,r:7}];
+
+        const tableContainer = document.getElementById('table-container');
+        const modal = document.getElementById('modal');
+        const closeBtn = document.getElementById('close-btn');
+        const modalTitle = document.getElementById('modal-title');
+        const modalSubtitle = document.getElementById('modal-subtitle');
+        const canvasContainer = document.getElementById('canvas-container');
+        const loading = document.getElementById('loading');
+
+        eData.forEach(el => {
+            const card = document.createElement('div');
+            card.className = 'element-card';
+            card.style.gridColumn = el.c;
+            card.style.gridRow = el.r;
+            card.innerHTML = `<div class="el-num">${el.n}</div><div class="el-sym">${el.s}</div><div class="el-name">${el.nm}</div>`;
+            card.onclick = () => open3DViewer(el);
+            tableContainer.appendChild(card);
+        });
+
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+        let scene, camera, renderer, animationId, controls, clock;
+        let atomGroup = null; 
+        let particles = [];
+        let minDist = 10, maxDist = 50;
+
+        // Custom Rotation State
+        let isDragging = false;
+        let previousPointer = { x: 0, y: 0 };
+
+        function init3D() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(50, canvasContainer.clientWidth / canvasContainer.clientHeight, 0.1, 1000);
+            clock = new THREE.Clock();
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(canvasContainer.clientWidth, canvasContainer.clientHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            canvasContainer.appendChild(renderer.domElement);
+
+            // Keep OrbitControls for ZOOM only, disable its rotation
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.enablePan = false;
+            controls.enableRotate = false; // We handle rotation manually now
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+            const pointLight = new THREE.PointLight(0xffffff, 1);
+            pointLight.position.set(20, 20, 20);
+            scene.add(pointLight);
+
+            window.addEventListener('resize', onWindowResize, false);
+            setupCustomRotation();
+        }
+
+        function setupCustomRotation() {
+            const dom = renderer.domElement;
+
+            // Mouse Events
+            dom.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                previousPointer = { x: e.clientX, y: e.clientY };
+            });
+            dom.addEventListener('mousemove', (e) => {
+                if (isDragging && atomGroup) {
+                    let deltaX = e.clientX - previousPointer.x;
+                    let deltaY = e.clientY - previousPointer.y;
+                    
+                    // Rotate based on fixed screen axes to prevent Gimbal Lock
+                    atomGroup.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), deltaX * 0.005);
+                    atomGroup.rotateOnWorldAxis(new THREE.Vector3(1, 0, 0), deltaY * 0.005);
+                    
+                    previousPointer = { x: e.clientX, y: e.clientY };
+                }
+            });
+            dom.addEventListener('mouseup', () => isDragging = false);
+            dom.addEventListener('mouseleave', () => isDragging = false);
+
+            // Touch Events
+            dom.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 1) { // Only rotate on 1-finger swipe
+                    isDragging = true;
+                    previousPointer = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                } else {
+                    isDragging = false; // Allow pinch-zoom to take over
+                }
+            });
+            dom.addEventListener('touchmove', (e) => {
+                if (isDragging && e.touches.length === 1 && atomGroup) {
+                    let deltaX = e.touches[0].clientX - previousPointer.x;
+                    let deltaY = e.touches[0].clientY - previousPointer.y;
+                    
+                    atomGroup.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), deltaX * 0.008);
+                    atomGroup.rotateOnWorldAxis(new THREE.Vector3(1, 0, 0), deltaY * 0.008);
+                    
+                    previousPointer = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                }
+            });
+            dom.addEventListener('touchend', () => isDragging = false);
+        }
+
+        function buildAtom(el) {
+            cleanupAtom();
+            if (!scene) init3D();
+            
+            atomGroup = new THREE.Group();
+            scene.add(atomGroup);
+            particles = [];
+
+            const pMat = new THREE.MeshPhongMaterial({ color: 0xff3333, shininess: 80 }); 
+            const nMat = new THREE.MeshPhongMaterial({ color: 0xffff33, shininess: 80 }); 
+            const hashedOrbitMat = new THREE.LineDashedMaterial({ color: 0x00bcd4, dashSize: 1, gapSize: 1 });
+            const electronBaseMat = new THREE.MeshPhongMaterial({ color: 0x3333ff, shininess: 100 }); 
+
+            const nucleonGeo = new THREE.SphereGeometry(1, 16, 16);
+            const electronGeo = new THREE.SphereGeometry(0.5, 16, 16);
+
+            const totalNucleons = el.p + el.ne;
+            const clusterRadius = Math.cbrt(totalNucleons) * 0.8;
+
+            let nucleonsToCreate = [];
+            for (let i = 0; i < el.p; i++) nucleonsToCreate.push({ type: 'p' });
+            for (let i = 0; i < el.ne; i++) nucleonsToCreate.push({ type: 'n' });
+
+            shuffle(nucleonsToCreate);
+
+            for (let i = 0; i < totalNucleons; i++) {
+                const nucleonData = nucleonsToCreate[i];
+                const material = (nucleonData.type === 'p') ? pMat : nMat;
+                const mesh = new THREE.Mesh(nucleonGeo, material);
+                
+                const phi = Math.acos(-1 + (2 * i) / totalNucleons);
+                const theta = Math.sqrt(totalNucleons * Math.PI) * phi;
+                
+                const r = clusterRadius * (0.5 + Math.random() * 0.5); 
+                if (totalNucleons === 1) mesh.position.set(0,0,0);
+                else {
+                    mesh.position.set(r * Math.cos(theta) * Math.sin(phi), r * Math.sin(theta) * Math.sin(phi), r * Math.cos(phi));
+                }
+                atomGroup.add(mesh);
+            }
+
+            const maxInShell = [2, 8, 18, 32, 32, 18, 8]; 
+            let electronsPerShell = [];
+            let remainingE = el.p;
+            
+            for (let max of maxInShell) {
+                if (remainingE <= 0) break;
+                let inThisShell = Math.min(remainingE, max);
+                electronsPerShell.push(inThisShell);
+                remainingE -= inThisShell;
+            }
+
+            let currentShellIndex = 0;
+            let eInShellCounter = 0;
+            let maxOrbitRadius = 0;
+
+            for (let i = 0; i < el.p; i++) {
+                if (eInShellCounter >= electronsPerShell[currentShellIndex]) {
+                    currentShellIndex++;
+                    eInShellCounter = 0;
+                }
+
+                let totalInThisShell = electronsPerShell[currentShellIndex];
+                
+                const baseOffset = clusterRadius + 3; 
+                const orbitRadius = baseOffset + ((currentShellIndex + 1) * 4); 
+                maxOrbitRadius = Math.max(maxOrbitRadius, orbitRadius);
+
+                const orbitGeo = new THREE.BufferGeometry();
+                const orbitPoints = [];
+                for(let j=0; j<=128; j++) {
+                    const angle = (j/128) * Math.PI * 2;
+                    orbitPoints.push(new THREE.Vector3(Math.cos(angle)*orbitRadius, Math.sin(angle)*orbitRadius, 0));
+                }
+                orbitGeo.setFromPoints(orbitPoints);
+                const hashedOrbitLine = new THREE.Line(orbitGeo, hashedOrbitMat);
+                hashedOrbitLine.computeLineDistances(); 
+                
+                const angleStep = Math.PI / totalInThisShell;
+                
+                const rotX = Math.PI / 2;
+                const rotY = angleStep * eInShellCounter; 
+                const rotZ = currentShellIndex * (Math.PI / 6); 
+                
+                hashedOrbitLine.rotation.set(rotX, rotY, rotZ);
+                atomGroup.add(hashedOrbitLine);
+
+                const electron = new THREE.Mesh(electronGeo, electronBaseMat);
+                atomGroup.add(electron);
+
+                const trailMat = new THREE.ShaderMaterial({
+                    uniforms: {
+                        color: { value: new THREE.Color(0x3333ff) },
+                        tailLength: { value: 0.1 } 
+                    },
+                    vertexShader: `
+                        varying float vUvX;
+                        void main() {
+                            vUvX = uv.x;
+                            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                        }
+                    `,
+                    fragmentShader: `
+                        uniform vec3 color;
+                        uniform float tailLength;
+                        varying float vUvX;
+                        void main() {
+                            float alpha = smoothstep(1.0 - tailLength, 1.0, vUvX);
+                            gl_FragColor = vec4(color, alpha * 0.8);
+                        }
+                    `,
+                    transparent: true,
+                    side: THREE.DoubleSide,
+                    depthWrite: false 
+                });
+
+                const ribbonGeo = new THREE.PlaneGeometry(0.8, 1, 64, 1); 
+                ribbonGeo.translate(0, 0.5, 0); 
+                const trailMesh = new THREE.Mesh(ribbonGeo, trailMat);
+                atomGroup.add(trailMesh);
+
+                particles.push({
+                    mesh: electron, radius: orbitRadius,
+                    angle: Math.random() * Math.PI * 2,
+                    rotX: rotX, rotY: rotY, rotZ: rotZ,
+                    trail: trailMesh, trailMat: trailMat
+                });
+
+                eInShellCounter++;
+            }
+
+            const fov = THREE.MathUtils.degToRad(camera.fov / 2);
+            minDist = (maxOrbitRadius + 2) / Math.tan(fov);
+            maxDist = minDist * 4; 
+            
+            controls.minDistance = minDist;
+            controls.maxDistance = maxDist;
+            
+            camera.position.set(0, 0, minDist);
+            controls.update();
+
+            clock.start();
+            animate();
+        }
+
+        function animate() {
+            animationId = requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+
+            const currentDist = camera.position.length();
+            let zoomRatio = (currentDist - minDist) / (maxDist - minDist || 1); 
+            zoomRatio = Math.max(0, Math.min(1, zoomRatio)); 
+            const speedMultiplier = 1 + (9 * zoomRatio);
+
+            const orbitAmount = (Math.PI * 2) * speedMultiplier * delta;
+
+            particles.forEach(p => {
+                p.angle += orbitAmount * (15 / p.radius); 
+                
+                const vector = new THREE.Vector3(Math.cos(p.angle) * p.radius, Math.sin(p.angle) * p.radius, 0);
+                const euler = new THREE.Euler(p.rotX, p.rotY, p.rotZ, 'XYZ');
+                vector.applyEuler(euler);
+                p.mesh.position.copy(vector);
+
+                p.trailMat.uniforms.tailLength.value = 0.1 + (0.5 * zoomRatio); 
+                
+                const trailLengthRadians = p.trailMat.uniforms.tailLength.value * Math.PI;
+
+                const points = [];
+                const segments = 64;
+
+                for (let j = 0; j <= segments; j++) {
+                    const tailAngle = p.angle - (j / segments * trailLengthRadians);
+                    
+                    const headPos = new THREE.Vector3(Math.cos(tailAngle) * p.radius, Math.sin(tailAngle) * p.radius, 0.4);
+                    const tailPos = new THREE.Vector3(Math.cos(tailAngle) * p.radius, Math.sin(tailAngle) * p.radius, -0.4);
+                    
+                    headPos.applyEuler(euler);
+                    tailPos.applyEuler(euler);
+                    
+                    points.push(headPos, tailPos);
+                }
+
+                p.trail.geometry.setFromPoints(points);
+            });
+
+            // Gentle auto-rotation (using fixed screen axes to match swipe behavior)
+            if(atomGroup && !isDragging) {
+                atomGroup.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), 0.2 * delta);
+                atomGroup.rotateOnWorldAxis(new THREE.Vector3(1, 0, 0), 0.1 * delta);
+            }
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        function cleanupAtom() {
+            if (animationId) cancelAnimationFrame(animationId);
+            if (atomGroup && scene) {
+                scene.remove(atomGroup);
+                atomGroup.children.forEach(child => {
+                    if (child.geometry) child.geometry.dispose();
+                    if (child.material) child.material.dispose();
+                });
+                atomGroup = null;
+            }
+        }
+
+        function onWindowResize() {
+            if(!camera || !renderer) return;
+            camera.aspect = canvasContainer.clientWidth / canvasContainer.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(canvasContainer.clientWidth, canvasContainer.clientHeight);
+        }
+
+        function open3DViewer(el) {
+            modalTitle.innerText = `${el.s} - ${el.nm}`;
+            modalSubtitle.innerText = `p: ${el.p} | n: ${el.ne} | e: ${el.p}`;
+            modal.style.display = 'flex';
+            loading.style.display = 'block';
+            
+            setTimeout(() => {
+                buildAtom(el);
+                loading.style.display = 'none';
+            }, 50);
+        }
+
+        closeBtn.onclick = () => {
+            modal.style.display = 'none';
+            cleanupAtom();
+        };
+    </script>
+</body>
+</html>
