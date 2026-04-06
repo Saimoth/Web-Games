@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Crane Operator Simulator - Real Physics</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+    
+    <style>
+        html, body {
+            margin: 0; padding: 0;
+            width: 100%; height: 100%;
+            overflow: hidden;
+            position: fixed;
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            touch-action: none;
+        }
+
+        body { display: flex; flex-direction: column; align-items: center; }
+
+        h1 {
+            margin: env(safe-area-inset-top, 10px) 0 5px 0;
+            font-size: 16px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #f39c12;
+        }
+
+        .game-container {
+            flex-grow: 1;
+            display: flex; align-items: center; justify-content: center;
+            width: 100%; max-width: 400px; min-height: 0;
+        }
+
+        canvas {
+            background-color: #87CEEB;
+            border: 4px solid #34495e;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+            max-width: 95%; max-height: 95%;
+            object-fit: contain;
+        }
+
+        .controls {
+            width: 100%; max-width: 400px;
+            box-sizing: border-box; display: flex;
+            justify-content: space-between; align-items: flex-end;
+            background: #1a252f; border-top: 2px solid #34495e;
+            padding: 10px 15px calc(15px + env(safe-area-inset-bottom)) 15px;
+        }
+
+        .d-pad {
+            display: grid;
+            grid-template-columns: 60px 60px 60px;
+            grid-template-rows: 60px 60px;
+            gap: 5px;
+        }
+
+        .btn {
+            background: #34495e; border: 2px solid #7f8c8d;
+            border-radius: 12px; color: white; font-size: 24px;
+            display: flex; justify-content: center; align-items: center;
+            user-select: none; -webkit-user-select: none;
+        }
+
+        .btn.active { background: #f39c12; border-color: #e67e22; }
+
+        #btnUp { grid-column: 2; grid-row: 1; }
+        #btnLeft { grid-column: 1; grid-row: 2; }
+        #btnDown { grid-column: 2; grid-row: 2; }
+        #btnRight { grid-column: 3; grid-row: 2; }
+
+        .action-pad { display: flex; align-items: flex-end; }
+
+        #btnAction {
+            width: 80px; height: 80px;
+            border-radius: 50%; background: #27ae60; border-color: #2ecc71;
+            font-size: 16px; font-weight: bold; text-align: center; line-height: 1.2;
+            transition: all 0.1s;
+        }
+        
+        #btnAction.closed {
+            background: #c0392b; border-color: #e74c3c;
+        }
+
+        #btnAction:active { transform: scale(0.92); }
+    </style>
+</head>
+<body>
+
+    <h1>Crane Simulator: Physical Claw</h1>
+    
+    <div class="game-container">
+        <canvas id="gameCanvas" width="400" height="600"></canvas>
+    </div>
+    
+    <div class="controls">
+        <div class="d-pad">
+            <div id="btnUp" class="btn">&#9650;</div>
+            <div id="btnLeft" class="btn">&#9664;</div>
+            <div id="btnDown" class="btn">&#9660;</div>
+            <div id="btnRight" class="btn">&#9654;</div>
+        </div>
+        <div class="action-pad">
+            <div id="btnAction" class="btn">OPEN</div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Matter.js Aliases
+        const Engine = Matter.Engine,
+              World = Matter.World,
+              Bodies = Matter.Bodies,
+              Body = Matter.Body,
+              Constraint = Matter.Constraint;
+
+        const engine = Engine.create();
+        
+        // 1. INCREASE GRAVITY for realistic swing and falling
+        engine.world.gravity.y = 1.6; 
+        
+        // Input state
+        const keys = { ArrowLeft: false, ArrowRight: false, ArrowUp: false, ArrowDown: false };
+        let isClawOpen = true;
+
+        // Visual constants
+        const groundY = 540;
+        const containerW = 46;
+        const containerH = 26;
+        const colors = ['#e74c3c', '#2980b9', '#27ae60', '#f1c40f', '#8e44ad', '#e67e22'];
+
+        let containers = [];
+        let score = 0;
+        let highestStack = 0;
+        
+        // Environment bounds
+        const dockLeft = Bodies.rectangle(75, groundY + 50, 150, 100, { isStatic: true, friction: 0.8 });
+        const dockRight = Bodies.rectangle(325, groundY + 50, 150, 100, { isStatic: true, friction: 0.8 });
+        const wallLeft = Bodies.rectangle(-25, 300, 50, 600, { isStatic: true });
+        const wallRight = Bodies.rectangle(425, 300, 50, 600, { isStatic: true });
+        World.add(engine.world, [dockLeft, dockRight, wallLeft, wallRight]);
+
+        // --- THE WIDER PHYSICAL CLAW ---
+        let trolleyX = 300;
+        let ropeLength = 80;
+
+        const clawGroup = Body.nextGroup(true); // Ensures claw parts don't collide with EACH OTHER
+
+        // The heavy base block of the claw - Widened from 40 to 76
+        const clawBase = Bodies.rectangle(300, 45 + ropeLength, 76, 12, { 
+            collisionFilter: { group: clawGroup },
+            density: 0.05, frictionAir: 0.02
+        });
+
+        // The gripping arms (thick heavy pads for maximum friction)
+        // Moved outwards to x: 267 and x: 333 to leave a gap perfectly suited for the 46px box
+        const armLeft = Bodies.rectangle(267, 65 + ropeLength, 12, 50, { 
+            collisionFilter: { group: clawGroup },
+            density: 0.05, friction: 1.0, restitution: 0 // High friction to grip boxes!
+        });
+        
+        const armRight = Bodies.rectangle(333, 65 + ropeLength, 12, 50, { 
+            collisionFilter: { group: clawGroup },
+            density: 0.05, friction: 1.0, restitution: 0 
+        });
+
+        // Hinges attaching arms to the base
+        const hingeLeft = Constraint.create({
+            bodyA: clawBase, pointA: { x: -33, y: 0 },
+            bodyB: armLeft, pointB: { x: 0, y: -20 },
+            stiffness: 1, length: 0
+        });
+        const hingeRight = Constraint.create({
+            bodyA: clawBase, pointA: { x: 33, y: 0 },
+            bodyB: armRight, pointB: { x: 0, y: -20 },
+            stiffness: 1, length: 0
+        });
+
+        // The Actuator (A spring connecting the two arms that pushes them open or pulls them closed)
+        const clawActuator = Constraint.create({
+            bodyA: armLeft, pointA: { x: 0, y: 5 },
+            bodyB: armRight, pointB: { x: 0, y: 5 },
+            stiffness: 0.1, // Springy enough to squeeze without breaking physics
+            length: 85 // New wider open width
+        });
+
+        // Dual winch ropes to prevent the claw from spinning uncontrollably
+        const ropeL = Constraint.create({
+            pointA: { x: trolleyX - 25, y: 45 },
+            bodyB: clawBase, pointB: { x: -25, y: -6 },
+            stiffness: 1, length: ropeLength
+        });
+        const ropeR = Constraint.create({
+            pointA: { x: trolleyX + 25, y: 45 },
+            bodyB: clawBase, pointB: { x: 25, y: -6 },
+            stiffness: 1, length: ropeLength
+        });
+
+        World.add(engine.world, [clawBase, armLeft, armRight, hingeLeft, hingeRight, clawActuator, ropeL, ropeR]);
+
+        // Truck
+        let truck = {
+            x: 460, y: 525, w: 110, h: 20,
+            body: Bodies.rectangle(460, 525, 110, 20, { isStatic: true, friction: 0.8 }),
+            state: 'entering', spawnTimer: 0, currentBox: null
+        };
+        World.add(engine.world, truck.body);
+
+        // --- CONTROLS ---
+        function toggleClaw() {
+            isClawOpen = !isClawOpen;
+            const btn = document.getElementById('btnAction');
+            if (isClawOpen) {
+                btn.innerText = "OPEN";
+                btn.classList.remove('closed');
+            } else {
+                btn.innerText = "CLOSE";
+                btn.classList.add('closed');
+            }
+        }
+
+        function bindTouch(elementId, keyName) {
+            const el = document.getElementById(elementId);
+            el.addEventListener('touchstart', (e) => {
+                e.preventDefault(); 
+                if (keyName === 'Action') toggleClaw();
+                else { keys[keyName] = true; el.classList.add('active'); }
+            }, {passive: false});
+            
+            el.addEventListener('touchend', (e) => {
+                e.preventDefault(); 
+                if (keyName !== 'Action') { keys[keyName] = false; el.classList.remove('active'); }
+            }, {passive: false});
+        }
+
+        bindTouch('btnUp', 'ArrowUp'); bindTouch('btnDown', 'ArrowDown');
+        bindTouch('btnLeft', 'ArrowLeft'); bindTouch('btnRight', 'ArrowRight');
+        bindTouch('btnAction', 'Action');
+
+        window.addEventListener('keydown', (e) => {
+            if(keys.hasOwnProperty(e.code)) keys[e.code] = true;
+            if(e.code === 'Space') toggleClaw();
+        });
+        window.addEventListener('keyup', (e) => {
+            if(keys.hasOwnProperty(e.code)) keys[e.code] = false;
+        });
+
+        // --- LOGIC ---
+        function update() {
+            // Move Trolley
+            if (keys.ArrowLeft) trolleyX -= 3.5;
+            if (keys.ArrowRight) trolleyX += 3.5;
+            trolleyX = Math.max(30, Math.min(canvas.width - 30, trolleyX));
+
+            // Winch Rope
+            if (keys.ArrowUp) ropeLength -= 4;
+            if (keys.ArrowDown) ropeLength += 4;
+            ropeLength = Math.max(30, Math.min(440, ropeLength));
+
+            // Update dual ropes
+            ropeL.pointA = { x: trolleyX - 25, y: 45 };
+            ropeL.length = ropeLength;
+            ropeR.pointA = { x: trolleyX + 25, y: 45 };
+            ropeR.length = ropeLength;
+
+            // Actuate the physical claw constraint
+            // 85 opens wide, 45 pinches in tightly on the 46px box
+            let targetActuatorLength = isClawOpen ? 85 : 45; 
+            clawActuator.length += (targetActuatorLength - clawActuator.length) * 0.15; // Smooth mechanical closing
+
+            // Manage Truck
+            if (truck.state === 'entering') {
+                truck.x -= 2;
+                if (truck.x <= 320) {
+                    truck.x = 320;
+                    truck.state = 'waiting';
+                    let cColor = colors[Math.floor(Math.random() * colors.length)];
+                    truck.currentBox = Bodies.rectangle(truck.x, truck.y - 25, containerW, containerH, { 
+                        friction: 0.8, restitution: 0.1, density: 0.005 // Box is much lighter than the claw arms
+                    });
+                    truck.currentBox.color = cColor;
+                    containers.push(truck.currentBox);
+                    World.add(engine.world, truck.currentBox);
+                }
+            } else if (truck.state === 'waiting') {
+                if (truck.currentBox.position.y < truck.y - 45 || truck.currentBox.position.x < truck.x - 60) {
+                    truck.state = 'leaving';
+                    truck.currentBox = null;
+                }
+            } else if (truck.state === 'leaving') {
+                truck.x += 2.5;
+                if (truck.x > 500) {
+                    truck.spawnTimer++;
+                    if (truck.spawnTimer > 40) {
+                        truck.state = 'entering';
+                        truck.spawnTimer = 0;
+                    }
+                }
+            }
+            Body.setPosition(truck.body, { x: truck.x, y: truck.y });
+
+            // Physics Step
+            Engine.update(engine, 1000 / 60);
+
+            // Score Logic
+            let safeBoxes = 0;
+            for (let i = containers.length - 1; i >= 0; i--) {
+                let box = containers[i];
+                if (box.position.y > 650) {
+                    World.remove(engine.world, box);
+                    containers.splice(i, 1);
+                } else if (box.position.x < 150 && Math.abs(box.velocity.y) < 0.1) {
+                    safeBoxes++;
+                }
+            }
+            score = safeBoxes;
+            if (score > highestStack) highestStack = score;
+        }
+
+        // Helper function to draw a Matter.js body perfectly based on its physical vertices
+        function drawBody(body, fillStyle) {
+            ctx.fillStyle = fillStyle;
+            ctx.beginPath();
+            body.vertices.forEach((v, index) => {
+                if (index === 0) ctx.moveTo(v.x, v.y);
+                else ctx.lineTo(v.x, v.y);
+            });
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#2c3e50';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Water & Docks
+            ctx.fillStyle = '#2980b9';
+            ctx.fillRect(0, groundY, canvas.width, canvas.height - groundY);
+            ctx.fillStyle = '#7f8c8d';
+            ctx.fillRect(0, groundY, 150, canvas.height - groundY);
+            for(let i=0; i<150; i+=25) { ctx.fillStyle = '#f1c40f'; ctx.fillRect(i, groundY, 12, 8); }
+            ctx.fillStyle = '#95a5a6';
+            ctx.fillRect(250, groundY, 150, canvas.height - groundY);
+
+            // Truck
+            ctx.save();
+            ctx.translate(truck.body.position.x, truck.body.position.y);
+            ctx.fillStyle = '#34495e';
+            ctx.fillRect(-truck.w/2, -truck.h/2, truck.w, truck.h);
+            ctx.fillStyle = '#111';
+            ctx.beginPath(); ctx.arc(-35, 10, 8, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(35, 10, 8, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#f1c40f';
+            ctx.fillRect(25, -25, 25, 15);
+            ctx.restore();
+
+            // Crane Support Structure
+            ctx.fillStyle = '#f39c12'; ctx.fillRect(5, 30, 390, 15);
+            ctx.fillStyle = '#e67e22'; ctx.fillRect(5, 45, 15, groundY - 45); ctx.fillRect(380, 45, 15, groundY - 45);
+
+            // Trolley
+            ctx.fillStyle = '#2c3e50'; ctx.fillRect(trolleyX - 35, 20, 70, 25);
+
+            // Dual Ropes
+            ctx.beginPath();
+            ctx.moveTo(ropeL.pointA.x, ropeL.pointA.y); ctx.lineTo(clawBase.position.x - 25, clawBase.position.y - 6);
+            ctx.moveTo(ropeR.pointA.x, ropeR.pointA.y); ctx.lineTo(clawBase.position.x + 25, clawBase.position.y - 6);
+            ctx.strokeStyle = '#bdc3c7'; ctx.lineWidth = 2; ctx.stroke();
+
+            // Containers
+            containers.forEach(box => {
+                drawBody(box, box.color || '#e74c3c');
+                // Inner detail line
+                ctx.save();
+                ctx.translate(box.position.x, box.position.y); ctx.rotate(box.angle);
+                ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+                ctx.strokeRect(-containerW/2 + 3, -containerH/2 + 3, containerW - 6, containerH - 6);
+                ctx.restore();
+            });
+
+            // Draw the Physical Claw parts
+            drawBody(clawBase, '#f39c12'); // Main housing
+            drawBody(armLeft, '#d35400');  // Left gripper
+            drawBody(armRight, '#d35400'); // Right gripper
+
+            // Draw hinges and actuator hydraulics
+            ctx.fillStyle = '#ecf0f1';
+            ctx.beginPath(); ctx.arc(armLeft.position.x, armLeft.position.y, 4, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(armRight.position.x, armRight.position.y, 4, 0, Math.PI*2); ctx.fill();
+            
+            ctx.beginPath();
+            ctx.moveTo(armLeft.position.x, armLeft.position.y);
+            ctx.lineTo(armRight.position.x, armRight.position.y);
+            ctx.strokeStyle = '#7f8c8d'; ctx.lineWidth = 4; ctx.stroke();
+
+            // HUD
+            ctx.fillStyle = '#2c3e50'; ctx.font = 'bold 20px sans-serif';
+            ctx.fillText(`Stacked: ${score}`, 25, 80);
+            ctx.fillStyle = '#8e44ad'; ctx.font = 'bold 14px sans-serif';
+            ctx.fillText(`Record: ${highestStack}`, 25, 100);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.4)'; ctx.font = 'bold 20px sans-serif';
+            ctx.fillText('DROP ZONE', 15, groundY + 40);
+        }
+
+        // Loop
+        function loop() {
+            update(); draw(); requestAnimationFrame(loop);
+        }
+        loop();
+    </script>
+</body>
+</html>
