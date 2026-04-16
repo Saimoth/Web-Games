@@ -186,6 +186,10 @@
 
         let currentElement = null;
         let shuffleInterval;
+        
+        // Array to keep track of the last 5 elements shown
+        let recentElements = [];
+        const MAX_HISTORY = 5;
 
         // Get HTML elements
         const display = document.getElementById('element-display');
@@ -203,7 +207,7 @@
             display.classList.add('shaking');
 
             let shuffleCount = 0;
-            const maxShuffles = 15; // How many times it flashes different symbols before stopping
+            const maxShuffles = 15;
 
             // Rapidly change the symbol to create a "spinning wheel" effect
             shuffleInterval = setInterval(() => {
@@ -215,15 +219,26 @@
                 if (shuffleCount >= maxShuffles) {
                     stopShuffle();
                 }
-            }, 80); // Changes every 80 milliseconds
+            }, 80); 
         }
 
         function stopShuffle() {
             clearInterval(shuffleInterval);
             
-            // Pick the final random element
-            currentElement = elementsData[Math.floor(Math.random() * elementsData.length)];
+            // Create a list of elements that are NOT in the recent memory array
+            const availableElements = elementsData.filter(el => !recentElements.includes(el.symbol));
+            
+            // Pick the final random element from the filtered list
+            currentElement = availableElements[Math.floor(Math.random() * availableElements.length)];
             display.innerText = currentElement.symbol;
+
+            // Add the chosen element to the memory array
+            recentElements.push(currentElement.symbol);
+
+            // If memory gets larger than 5, remove the oldest one
+            if (recentElements.length > MAX_HISTORY) {
+                recentElements.shift();
+            }
             
             // Re-enable buttons and stop the shaking animation
             display.classList.remove('shaking');
