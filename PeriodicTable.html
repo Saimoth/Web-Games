@@ -88,7 +88,7 @@
         #ans-btn:disabled { background-color: #a0a0a0; cursor: not-allowed; box-shadow: none; transform: none; }
 
         #answer-section {
-            min-height: 100px;
+            min-height: 80px;
             margin-top: 30px;
             background-color: #F8F9FA;
             border-radius: 15px;
@@ -134,132 +134,54 @@
         <div id="answer-section">
             <p id="el-name" class="element-name"></p>
             <p class="element-details">🧬 Protons: <span id="el-protons"></span></p>
-            <br>
-            <p class="element-details">🔗 Free Bonds: <span id="el-bonds"></span></p>
         </div>
     </div>
 
     <script>
-        // The complete periodic table (118 elements)
+        // Curated list of common, naturally occurring, and useful elements
         const elementsData = [
-            { symbol: 'H', name: 'Hydrogen', protons: 1, bonds: '1' },
-            { symbol: 'He', name: 'Helium', protons: 2, bonds: '0' },
-            { symbol: 'Li', name: 'Lithium', protons: 3, bonds: '1' },
-            { symbol: 'Be', name: 'Beryllium', protons: 4, bonds: '2' },
-            { symbol: 'B', name: 'Boron', protons: 5, bonds: '3' },
-            { symbol: 'C', name: 'Carbon', protons: 6, bonds: '4' },
-            { symbol: 'N', name: 'Nitrogen', protons: 7, bonds: '3' },
-            { symbol: 'O', name: 'Oxygen', protons: 8, bonds: '2' },
-            { symbol: 'F', name: 'Fluorine', protons: 9, bonds: '1' },
-            { symbol: 'Ne', name: 'Neon', protons: 10, bonds: '0' },
-            { symbol: 'Na', name: 'Sodium', protons: 11, bonds: '1' },
-            { symbol: 'Mg', name: 'Magnesium', protons: 12, bonds: '2' },
-            { symbol: 'Al', name: 'Aluminum', protons: 13, bonds: '3' },
-            { symbol: 'Si', name: 'Silicon', protons: 14, bonds: '4' },
-            { symbol: 'P', name: 'Phosphorus', protons: 15, bonds: '3 or 5' },
-            { symbol: 'S', name: 'Sulfur', protons: 16, bonds: '2, 4, or 6' },
-            { symbol: 'Cl', name: 'Chlorine', protons: 17, bonds: '1' },
-            { symbol: 'Ar', name: 'Argon', protons: 18, bonds: '0' },
-            { symbol: 'K', name: 'Potassium', protons: 19, bonds: '1' },
-            { symbol: 'Ca', name: 'Calcium', protons: 20, bonds: '2' },
-            { symbol: 'Sc', name: 'Scandium', protons: 21, bonds: '3' },
-            { symbol: 'Ti', name: 'Titanium', protons: 22, bonds: '4' },
-            { symbol: 'V', name: 'Vanadium', protons: 23, bonds: '5 or 4' },
-            { symbol: 'Cr', name: 'Chromium', protons: 24, bonds: '3 or 6' },
-            { symbol: 'Mn', name: 'Manganese', protons: 25, bonds: '2, 4, or 7' },
-            { symbol: 'Fe', name: 'Iron', protons: 26, bonds: '2 or 3' },
-            { symbol: 'Co', name: 'Cobalt', protons: 27, bonds: '2 or 3' },
-            { symbol: 'Ni', name: 'Nickel', protons: 28, bonds: '2' },
-            { symbol: 'Cu', name: 'Copper', protons: 29, bonds: '1 or 2' },
-            { symbol: 'Zn', name: 'Zinc', protons: 30, bonds: '2' },
-            { symbol: 'Ga', name: 'Gallium', protons: 31, bonds: '3' },
-            { symbol: 'Ge', name: 'Germanium', protons: 32, bonds: '4' },
-            { symbol: 'As', name: 'Arsenic', protons: 33, bonds: '3 or 5' },
-            { symbol: 'Se', name: 'Selenium', protons: 34, bonds: '2, 4, or 6' },
-            { symbol: 'Br', name: 'Bromine', protons: 35, bonds: '1' },
-            { symbol: 'Kr', name: 'Krypton', protons: 36, bonds: '0' },
-            { symbol: 'Rb', name: 'Rubidium', protons: 37, bonds: '1' },
-            { symbol: 'Sr', name: 'Strontium', protons: 38, bonds: '2' },
-            { symbol: 'Y', name: 'Yttrium', protons: 39, bonds: '3' },
-            { symbol: 'Zr', name: 'Zirconium', protons: 40, bonds: '4' },
-            { symbol: 'Nb', name: 'Niobium', protons: 41, bonds: '5' },
-            { symbol: 'Mo', name: 'Molybdenum', protons: 42, bonds: '6' },
-            { symbol: 'Tc', name: 'Technetium', protons: 43, bonds: '7' },
-            { symbol: 'Ru', name: 'Ruthenium', protons: 44, bonds: '3 or 4' },
-            { symbol: 'Rh', name: 'Rhodium', protons: 45, bonds: '3' },
-            { symbol: 'Pd', name: 'Palladium', protons: 46, bonds: '2 or 4' },
-            { symbol: 'Ag', name: 'Silver', protons: 47, bonds: '1' },
-            { symbol: 'Cd', name: 'Cadmium', protons: 48, bonds: '2' },
-            { symbol: 'In', name: 'Indium', protons: 49, bonds: '3' },
-            { symbol: 'Sn', name: 'Tin', protons: 50, bonds: '2 or 4' },
-            { symbol: 'Sb', name: 'Antimony', protons: 51, bonds: '3 or 5' },
-            { symbol: 'Te', name: 'Tellurium', protons: 52, bonds: '2 or 4' },
-            { symbol: 'I', name: 'Iodine', protons: 53, bonds: '1' },
-            { symbol: 'Xe', name: 'Xenon', protons: 54, bonds: '0' },
-            { symbol: 'Cs', name: 'Cesium', protons: 55, bonds: '1' },
-            { symbol: 'Ba', name: 'Barium', protons: 56, bonds: '2' },
-            { symbol: 'La', name: 'Lanthanum', protons: 57, bonds: '3' },
-            { symbol: 'Ce', name: 'Cerium', protons: 58, bonds: '3 or 4' },
-            { symbol: 'Pr', name: 'Praseodymium', protons: 59, bonds: '3' },
-            { symbol: 'Nd', name: 'Neodymium', protons: 60, bonds: '3' },
-            { symbol: 'Pm', name: 'Promethium', protons: 61, bonds: '3' },
-            { symbol: 'Sm', name: 'Samarium', protons: 62, bonds: '3' },
-            { symbol: 'Eu', name: 'Europium', protons: 63, bonds: '2 or 3' },
-            { symbol: 'Gd', name: 'Gadolinium', protons: 64, bonds: '3' },
-            { symbol: 'Tb', name: 'Terbium', protons: 65, bonds: '3' },
-            { symbol: 'Dy', name: 'Dysprosium', protons: 66, bonds: '3' },
-            { symbol: 'Ho', name: 'Holmium', protons: 67, bonds: '3' },
-            { symbol: 'Er', name: 'Erbium', protons: 68, bonds: '3' },
-            { symbol: 'Tm', name: 'Thulium', protons: 69, bonds: '3' },
-            { symbol: 'Yb', name: 'Ytterbium', protons: 70, bonds: '2 or 3' },
-            { symbol: 'Lu', name: 'Lutetium', protons: 71, bonds: '3' },
-            { symbol: 'Hf', name: 'Hafnium', protons: 72, bonds: '4' },
-            { symbol: 'Ta', name: 'Tantalum', protons: 73, bonds: '5' },
-            { symbol: 'W', name: 'Tungsten', protons: 74, bonds: '6' },
-            { symbol: 'Re', name: 'Rhenium', protons: 75, bonds: '4 or 7' },
-            { symbol: 'Os', name: 'Osmium', protons: 76, bonds: '4 or 8' },
-            { symbol: 'Ir', name: 'Iridium', protons: 77, bonds: '3 or 4' },
-            { symbol: 'Pt', name: 'Platinum', protons: 78, bonds: '2 or 4' },
-            { symbol: 'Au', name: 'Gold', protons: 79, bonds: '1 or 3' },
-            { symbol: 'Hg', name: 'Mercury', protons: 80, bonds: '2' },
-            { symbol: 'Tl', name: 'Thallium', protons: 81, bonds: '1 or 3' },
-            { symbol: 'Pb', name: 'Lead', protons: 82, bonds: '2 or 4' },
-            { symbol: 'Bi', name: 'Bismuth', protons: 83, bonds: '3' },
-            { symbol: 'Po', name: 'Polonium', protons: 84, bonds: '2 or 4' },
-            { symbol: 'At', name: 'Astatine', protons: 85, bonds: '1' },
-            { symbol: 'Rn', name: 'Radon', protons: 86, bonds: '0' },
-            { symbol: 'Fr', name: 'Francium', protons: 87, bonds: '1' },
-            { symbol: 'Ra', name: 'Radium', protons: 88, bonds: '2' },
-            { symbol: 'Ac', name: 'Actinium', protons: 89, bonds: '3' },
-            { symbol: 'Th', name: 'Thorium', protons: 90, bonds: '4' },
-            { symbol: 'Pa', name: 'Protactinium', protons: 91, bonds: '5' },
-            { symbol: 'U', name: 'Uranium', protons: 92, bonds: '4 or 6' },
-            { symbol: 'Np', name: 'Neptunium', protons: 93, bonds: '5' },
-            { symbol: 'Pu', name: 'Plutonium', protons: 94, bonds: '4' },
-            { symbol: 'Am', name: 'Americium', protons: 95, bonds: '3' },
-            { symbol: 'Cm', name: 'Curium', protons: 96, bonds: '3' },
-            { symbol: 'Bk', name: 'Berkelium', protons: 97, bonds: '3' },
-            { symbol: 'Cf', name: 'Californium', protons: 98, bonds: '3' },
-            { symbol: 'Es', name: 'Einsteinium', protons: 99, bonds: '3' },
-            { symbol: 'Fm', name: 'Fermium', protons: 100, bonds: '3' },
-            { symbol: 'Md', name: 'Mendelevium', protons: 101, bonds: '3' },
-            { symbol: 'No', name: 'Nobelium', protons: 102, bonds: '2' },
-            { symbol: 'Lr', name: 'Lawrencium', protons: 103, bonds: '3' },
-            { symbol: 'Rf', name: 'Rutherfordium', protons: 104, bonds: '4' },
-            { symbol: 'Db', name: 'Dubnium', protons: 105, bonds: '5' },
-            { symbol: 'Sg', name: 'Seaborgium', protons: 106, bonds: '6' },
-            { symbol: 'Bh', name: 'Bohrium', protons: 107, bonds: '7' },
-            { symbol: 'Hs', name: 'Hassium', protons: 108, bonds: '8' },
-            { symbol: 'Mt', name: 'Meitnerium', protons: 109, bonds: 'Unknown' },
-            { symbol: 'Ds', name: 'Darmstadtium', protons: 110, bonds: 'Unknown' },
-            { symbol: 'Rg', name: 'Roentgenium', protons: 111, bonds: 'Unknown' },
-            { symbol: 'Cn', name: 'Copernicium', protons: 112, bonds: '2 (predicted)' },
-            { symbol: 'Nh', name: 'Nihonium', protons: 113, bonds: 'Unknown' },
-            { symbol: 'Fl', name: 'Flerovium', protons: 114, bonds: 'Unknown' },
-            { symbol: 'Mc', name: 'Moscovium', protons: 115, bonds: 'Unknown' },
-            { symbol: 'Lv', name: 'Livermorium', protons: 116, bonds: 'Unknown' },
-            { symbol: 'Ts', name: 'Tennessine', protons: 117, bonds: 'Unknown' },
-            { symbol: 'Og', name: 'Oganesson', protons: 118, bonds: 'Unknown' }
+            { symbol: 'H', name: 'Hydrogen', protons: 1 },
+            { symbol: 'He', name: 'Helium', protons: 2 },
+            { symbol: 'Li', name: 'Lithium', protons: 3 },
+            { symbol: 'Be', name: 'Beryllium', protons: 4 },
+            { symbol: 'B', name: 'Boron', protons: 5 },
+            { symbol: 'C', name: 'Carbon', protons: 6 },
+            { symbol: 'N', name: 'Nitrogen', protons: 7 },
+            { symbol: 'O', name: 'Oxygen', protons: 8 },
+            { symbol: 'F', name: 'Fluorine', protons: 9 },
+            { symbol: 'Ne', name: 'Neon', protons: 10 },
+            { symbol: 'Na', name: 'Sodium', protons: 11 },
+            { symbol: 'Mg', name: 'Magnesium', protons: 12 },
+            { symbol: 'Al', name: 'Aluminum', protons: 13 },
+            { symbol: 'Si', name: 'Silicon', protons: 14 },
+            { symbol: 'P', name: 'Phosphorus', protons: 15 },
+            { symbol: 'S', name: 'Sulfur', protons: 16 },
+            { symbol: 'Cl', name: 'Chlorine', protons: 17 },
+            { symbol: 'Ar', name: 'Argon', protons: 18 },
+            { symbol: 'K', name: 'Potassium', protons: 19 },
+            { symbol: 'Ca', name: 'Calcium', protons: 20 },
+            { symbol: 'Ti', name: 'Titanium', protons: 22 },
+            { symbol: 'Cr', name: 'Chromium', protons: 24 },
+            { symbol: 'Mn', name: 'Manganese', protons: 25 },
+            { symbol: 'Fe', name: 'Iron', protons: 26 },
+            { symbol: 'Co', name: 'Cobalt', protons: 27 },
+            { symbol: 'Ni', name: 'Nickel', protons: 28 },
+            { symbol: 'Cu', name: 'Copper', protons: 29 },
+            { symbol: 'Zn', name: 'Zinc', protons: 30 },
+            { symbol: 'As', name: 'Arsenic', protons: 33 },
+            { symbol: 'Br', name: 'Bromine', protons: 35 },
+            { symbol: 'Kr', name: 'Krypton', protons: 36 },
+            { symbol: 'Ag', name: 'Silver', protons: 47 },
+            { symbol: 'Sn', name: 'Tin', protons: 50 },
+            { symbol: 'I', name: 'Iodine', protons: 53 },
+            { symbol: 'Xe', name: 'Xenon', protons: 54 },
+            { symbol: 'Ba', name: 'Barium', protons: 56 },
+            { symbol: 'W', name: 'Tungsten', protons: 74 },
+            { symbol: 'Pt', name: 'Platinum', protons: 78 },
+            { symbol: 'Au', name: 'Gold', protons: 79 },
+            { symbol: 'Hg', name: 'Mercury', protons: 80 },
+            { symbol: 'Pb', name: 'Lead', protons: 82 },
+            { symbol: 'U', name: 'Uranium', protons: 92 }
         ];
 
         let currentElement = null;
@@ -270,7 +192,6 @@
         const answerSection = document.getElementById('answer-section');
         const nameDisplay = document.getElementById('el-name');
         const protonsDisplay = document.getElementById('el-protons');
-        const bondsDisplay = document.getElementById('el-bonds');
         const goBtn = document.getElementById('go-btn');
         const ansBtn = document.getElementById('ans-btn');
 
@@ -288,13 +209,6 @@
             shuffleInterval = setInterval(() => {
                 const randomEl = elementsData[Math.floor(Math.random() * elementsData.length)];
                 
-                // Ensure 3-letter temporary symbols fit in the box nicely
-                if(randomEl.symbol.length > 2) {
-                    display.style.fontSize = '48px';
-                } else {
-                    display.style.fontSize = '64px';
-                }
-                
                 display.innerText = randomEl.symbol;
                 shuffleCount++;
 
@@ -309,13 +223,6 @@
             
             // Pick the final random element
             currentElement = elementsData[Math.floor(Math.random() * elementsData.length)];
-            
-            if(currentElement.symbol.length > 2) {
-                display.style.fontSize = '48px';
-            } else {
-                display.style.fontSize = '64px';
-            }
-            
             display.innerText = currentElement.symbol;
             
             // Re-enable buttons and stop the shaking animation
@@ -329,7 +236,6 @@
                 // Fill in the data
                 nameDisplay.innerText = currentElement.name;
                 protonsDisplay.innerText = currentElement.protons;
-                bondsDisplay.innerText = currentElement.bonds;
                 
                 // Show the answer box
                 answerSection.classList.add('visible');
