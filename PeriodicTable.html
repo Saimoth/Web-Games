@@ -1,264 +1,1123 @@
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Element Explorer!</title>
-    <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #87CEEB; /* Sky blue background */
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            color: #333;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Element Explorer — Periodic Table Game</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f0e17;
+    --card: #1a1830;
+    --accent1: #ff6b6b;
+    --accent2: #ffd93d;
+    --accent3: #6bcb77;
+    --accent4: #4d96ff;
+    --accent5: #c77dff;
+    --text: #fffffe;
+    --subtext: #a7a9be;
+    --alkali: #ff6b6b;
+    --alkaline: #ff9f43;
+    --transition: #4d96ff;
+    --post-transition: #6bcb77;
+    --metalloid: #ffd93d;
+    --nonmetal: #c77dff;
+    --halogen: #ff6eb4;
+    --noble: #00d2ff;
+    --lanthanide: #ff9f43;
+    --actinide: #ff6b6b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Nunito', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
 
-        .game-board {
-            background: white;
-            padding: 40px;
-            border-radius: 25px;
-            box-shadow: 0 15px 30px rgba(0,0,0,0.2);
-            text-align: center;
-            width: 90%;
-            max-width: 450px;
-        }
+/* Stars background */
+body::before {
+content: ‘’;
+position: fixed;
+inset: 0;
+background-image:
+radial-gradient(1px 1px at 10% 15%, rgba(255,255,255,0.4) 0%, transparent 100%),
+radial-gradient(1px 1px at 25% 40%, rgba(255,255,255,0.3) 0%, transparent 100%),
+radial-gradient(1.5px 1.5px at 50% 10%, rgba(255,255,255,0.5) 0%, transparent 100%),
+radial-gradient(1px 1px at 70% 60%, rgba(255,255,255,0.3) 0%, transparent 100%),
+radial-gradient(1px 1px at 85% 25%, rgba(255,255,255,0.4) 0%, transparent 100%),
+radial-gradient(1px 1px at 40% 80%, rgba(255,255,255,0.3) 0%, transparent 100%),
+radial-gradient(1.5px 1.5px at 90% 70%, rgba(255,255,255,0.4) 0%, transparent 100%),
+radial-gradient(1px 1px at 15% 90%, rgba(255,255,255,0.3) 0%, transparent 100%);
+pointer-events: none;
+z-index: 0;
+}
 
-        h1 {
-            margin-top: 0;
-            color: #FF6B6B;
-            font-size: 32px;
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
-        }
+#app { position: relative; z-index: 1; }
 
-        .element-square {
-            width: 160px;
-            height: 160px;
-            background-color: #FFE66D; /* Fun yellow */
-            border: 6px solid #FFD166;
-            border-radius: 20px;
-            margin: 0 auto 30px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 64px;
-            font-weight: bold;
-            color: #2B2D42;
-            box-shadow: inset 0 -5px 0 rgba(0,0,0,0.05);
-            transition: transform 0.1s ease-in-out;
-        }
+header {
+text-align: center;
+padding: 2rem 1rem 1rem;
+}
+header h1 {
+font-family: ‘Fredoka One’, cursive;
+font-size: clamp(2.2rem, 6vw, 4rem);
+background: linear-gradient(135deg, var(–accent2), var(–accent1), var(–accent5));
+-webkit-background-clip: text;
+-webkit-text-fill-color: transparent;
+background-clip: text;
+letter-spacing: 1px;
+}
+header p {
+color: var(–subtext);
+font-size: 1.05rem;
+margin-top: 0.4rem;
+font-weight: 600;
+}
 
-        /* Fun animation class for shuffling */
-        .shaking {
-            transform: scale(1.05) rotate(3deg);
-        }
+/* Mode selector */
+#mode-select {
+display: flex;
+justify-content: center;
+gap: 0.7rem;
+flex-wrap: wrap;
+padding: 1.2rem 1rem 0.5rem;
+}
+.mode-btn {
+font-family: ‘Fredoka One’, cursive;
+font-size: 1rem;
+padding: 0.55rem 1.3rem;
+border-radius: 50px;
+border: 2px solid transparent;
+cursor: pointer;
+transition: all 0.2s;
+background: var(–card);
+color: var(–subtext);
+}
+.mode-btn.active, .mode-btn:hover {
+color: var(–bg);
+transform: scale(1.05);
+}
+.mode-btn[data-mode=“quiz”] { border-color: var(–accent2); }
+.mode-btn[data-mode=“quiz”].active, .mode-btn[data-mode=“quiz”]:hover { background: var(–accent2); color: #0f0e17; }
+.mode-btn[data-mode=“flash”] { border-color: var(–accent4); }
+.mode-btn[data-mode=“flash”].active, .mode-btn[data-mode=“flash”]:hover { background: var(–accent4); }
+.mode-btn[data-mode=“match”] { border-color: var(–accent3); }
+.mode-btn[data-mode=“match”].active, .mode-btn[data-mode=“match”]:hover { background: var(–accent3); color: #0f0e17; }
+.mode-btn[data-mode=“browse”] { border-color: var(–accent5); }
+.mode-btn[data-mode=“browse”].active, .mode-btn[data-mode=“browse”]:hover { background: var(–accent5); }
 
-        .controls button {
-            font-size: 20px;
-            padding: 12px 25px;
-            margin: 0 10px;
-            border: none;
-            border-radius: 12px;
-            cursor: pointer;
-            color: white;
-            font-weight: bold;
-            box-shadow: 0 5px 0 rgba(0,0,0,0.2);
-            transition: all 0.1s;
-        }
+/* Score bar */
+#scorebar {
+display: flex;
+justify-content: center;
+gap: 1.5rem;
+padding: 0.8rem 1rem;
+font-weight: 700;
+font-size: 1.05rem;
+}
+.score-item span:first-child { color: var(–subtext); font-size: 0.8rem; display: block; text-align: center; }
+.score-val { font-family: ‘Fredoka One’, cursive; font-size: 1.4rem; }
+.score-val.green { color: var(–accent3); }
+.score-val.red { color: var(–accent1); }
+.score-val.yellow { color: var(–accent2); }
 
-        .controls button:active {
-            transform: translateY(5px);
-            box-shadow: 0 0 0 rgba(0,0,0,0.2);
-        }
+/* –– QUIZ MODE –– */
+#quiz-section {
+max-width: 600px;
+margin: 0 auto;
+padding: 1rem 1.5rem 2rem;
+}
+.question-card {
+background: var(–card);
+border-radius: 20px;
+padding: 2rem 1.5rem;
+text-align: center;
+margin-bottom: 1.5rem;
+border: 2px solid rgba(255,255,255,0.06);
+animation: fadeUp 0.3s ease;
+}
+@keyframes fadeUp {
+from { opacity:0; transform:translateY(16px); }
+to   { opacity:1; transform:translateY(0); }
+}
+.question-label {
+font-size: 0.85rem;
+color: var(–subtext);
+font-weight: 700;
+text-transform: uppercase;
+letter-spacing: 1.5px;
+margin-bottom: 0.5rem;
+}
+.element-big {
+font-family: ‘Fredoka One’, cursive;
+font-size: clamp(4rem, 15vw, 7rem);
+line-height: 1;
+}
+.element-num-big {
+font-size: 0.9rem;
+color: var(–subtext);
+font-weight: 700;
+margin-top: 0.3rem;
+}
+.question-text {
+font-size: 1.4rem;
+font-weight: 800;
+margin-top: 0.5rem;
+}
+.answer-grid {
+display: grid;
+grid-template-columns: 1fr 1fr;
+gap: 0.8rem;
+}
+.ans-btn {
+font-family: ‘Nunito’, sans-serif;
+font-size: 1rem;
+font-weight: 700;
+padding: 0.9rem 1rem;
+border-radius: 14px;
+border: 2px solid rgba(255,255,255,0.1);
+background: rgba(255,255,255,0.05);
+color: var(–text);
+cursor: pointer;
+transition: all 0.15s;
+position: relative;
+overflow: hidden;
+}
+.ans-btn:hover:not(:disabled) {
+border-color: var(–accent4);
+background: rgba(77,150,255,0.12);
+transform: scale(1.02);
+}
+.ans-btn.correct { background: rgba(107,203,119,0.2); border-color: var(–accent3); color: var(–accent3); }
+.ans-btn.wrong   { background: rgba(255,107,107,0.2); border-color: var(–accent1); color: var(–accent1); }
+.ans-btn:disabled { cursor: default; }
+.feedback-msg {
+text-align: center;
+font-family: ‘Fredoka One’, cursive;
+font-size: 1.6rem;
+margin: 0.8rem 0;
+min-height: 2rem;
+animation: pop 0.3s ease;
+}
+@keyframes pop { from{transform:scale(0.7)} to{transform:scale(1)} }
+.feedback-msg.correct { color: var(–accent3); }
+.feedback-msg.wrong { color: var(–accent1); }
+.next-btn {
+display: block;
+margin: 0.5rem auto 0;
+font-family: ‘Fredoka One’, cursive;
+font-size: 1.2rem;
+padding: 0.7rem 2.5rem;
+border-radius: 50px;
+border: none;
+background: linear-gradient(135deg, var(–accent2), var(–accent1));
+color: #0f0e17;
+cursor: pointer;
+transition: transform 0.15s;
+}
+.next-btn:hover { transform: scale(1.05); }
 
-        #go-btn {
-            background-color: #4ECDC4; /* Mint green */
-        }
+/* category filter */
+#cat-filter {
+display: flex;
+flex-wrap: wrap;
+justify-content: center;
+gap: 0.4rem;
+padding: 0 1rem 0.8rem;
+max-width: 700px;
+margin: 0 auto;
+}
+.cat-btn {
+font-size: 0.75rem;
+font-weight: 700;
+padding: 0.3rem 0.8rem;
+border-radius: 50px;
+border: 1.5px solid;
+cursor: pointer;
+transition: all 0.15s;
+background: transparent;
+opacity: 0.5;
+}
+.cat-btn.active { opacity: 1; color: #0f0e17; }
 
-        #go-btn:hover { background-color: #45b7af; }
-        #go-btn:disabled { background-color: #a0a0a0; cursor: not-allowed; box-shadow: none; transform: none; }
+/* –– FLASHCARD MODE –– */
+#flash-section {
+max-width: 500px;
+margin: 0 auto;
+padding: 1rem 1.5rem 2rem;
+text-align: center;
+}
+.flashcard {
+perspective: 1000px;
+height: 280px;
+cursor: pointer;
+margin-bottom: 1.2rem;
+}
+.flashcard-inner {
+position: relative;
+width: 100%;
+height: 100%;
+transform-style: preserve-3d;
+transition: transform 0.5s cubic-bezier(0.4,0,0.2,1);
+}
+.flashcard.flipped .flashcard-inner { transform: rotateY(180deg); }
+.fc-front, .fc-back {
+position: absolute;
+inset: 0;
+border-radius: 22px;
+backface-visibility: hidden;
+display: flex;
+flex-direction: column;
+align-items: center;
+justify-content: center;
+padding: 1.5rem;
+}
+.fc-front {
+background: linear-gradient(135deg, #1e1b3a, #2a2050);
+border: 2px solid rgba(255,255,255,0.1);
+}
+.fc-back {
+background: linear-gradient(135deg, #1a2e20, #122b22);
+border: 2px solid rgba(107,203,119,0.3);
+transform: rotateY(180deg);
+}
+.fc-symbol {
+font-family: ‘Fredoka One’, cursive;
+font-size: 5rem;
+line-height: 1;
+}
+.fc-num { font-size: 0.9rem; color: var(–subtext); font-weight: 700; }
+.fc-hint { font-size: 0.85rem; color: var(–subtext); margin-top: 1rem; }
+.fc-name {
+font-family: ‘Fredoka One’, cursive;
+font-size: 2.5rem;
+color: var(–accent3);
+}
+.fc-category {
+font-size: 0.8rem;
+font-weight: 700;
+margin-top: 0.5rem;
+padding: 0.2rem 0.8rem;
+border-radius: 50px;
+color: #0f0e17;
+}
+.fc-fact {
+font-size: 0.85rem;
+color: var(–subtext);
+margin-top: 0.8rem;
+max-width: 260px;
+line-height: 1.5;
+}
+.fc-nav {
+display: flex;
+justify-content: center;
+gap: 1rem;
+margin-top: 0.5rem;
+}
+.fc-nav button {
+font-family: ‘Fredoka One’, cursive;
+font-size: 1rem;
+padding: 0.5rem 1.5rem;
+border-radius: 50px;
+border: 2px solid rgba(255,255,255,0.15);
+background: transparent;
+color: var(–text);
+cursor: pointer;
+transition: all 0.15s;
+}
+.fc-nav button:hover { background: rgba(255,255,255,0.08); transform: scale(1.05); }
+.fc-progress { color: var(–subtext); font-weight: 700; font-size: 0.9rem; margin-bottom: 0.5rem; }
 
-        #ans-btn {
-            background-color: #FF6B6B; /* Coral red */
-        }
+/* –– MATCH MODE –– */
+#match-section {
+max-width: 700px;
+margin: 0 auto;
+padding: 1rem 1.5rem 2rem;
+}
+.match-grid {
+display: grid;
+grid-template-columns: repeat(4, 1fr);
+gap: 0.6rem;
+}
+@media(max-width:520px) { .match-grid { grid-template-columns: repeat(3, 1fr); } }
+.match-card {
+aspect-ratio: 1;
+border-radius: 12px;
+display: flex;
+align-items: center;
+justify-content: center;
+font-weight: 700;
+cursor: pointer;
+border: 2px solid rgba(255,255,255,0.1);
+background: var(–card);
+transition: all 0.15s;
+font-size: clamp(0.75rem, 2.5vw, 1rem);
+text-align: center;
+padding: 0.3rem;
+user-select: none;
+}
+.match-card.symbol-card {
+font-family: ‘Fredoka One’, cursive;
+font-size: clamp(1.1rem, 3.5vw, 1.5rem);
+}
+.match-card:hover:not(.matched):not(:disabled) {
+border-color: var(–accent4);
+transform: scale(1.04);
+background: rgba(77,150,255,0.1);
+}
+.match-card.selected { border-color: var(–accent2); background: rgba(255,217,61,0.12); }
+.match-card.matched { background: rgba(107,203,119,0.15); border-color: var(–accent3); color: var(–accent3); opacity: 0.6; cursor: default; }
+.match-card.wrong-flash { animation: wrongFlash 0.4s ease; }
+@keyframes wrongFlash {
+0%,100% { background: var(–card); }
+50% { background: rgba(255,107,107,0.25); border-color: var(–accent1); }
+}
+.match-header {
+display: flex;
+justify-content: space-between;
+align-items: center;
+margin-bottom: 1rem;
+}
+.match-info { font-weight: 700; color: var(–subtext); }
+.new-game-btn {
+font-family: ‘Fredoka One’, cursive;
+font-size: 0.95rem;
+padding: 0.4rem 1.2rem;
+border-radius: 50px;
+border: 2px solid var(–accent3);
+background: transparent;
+color: var(–accent3);
+cursor: pointer;
+transition: all 0.15s;
+}
+.new-game-btn:hover { background: var(–accent3); color: #0f0e17; }
 
-        #ans-btn:hover { background-color: #e55f5f; }
-        #ans-btn:disabled { background-color: #a0a0a0; cursor: not-allowed; box-shadow: none; transform: none; }
+/* –– BROWSE MODE –– */
+#browse-section {
+max-width: 900px;
+margin: 0 auto;
+padding: 1rem 1rem 3rem;
+}
+.browse-search {
+display: flex;
+justify-content: center;
+margin-bottom: 1.2rem;
+}
+.browse-search input {
+font-family: ‘Nunito’, sans-serif;
+font-size: 1rem;
+font-weight: 700;
+padding: 0.65rem 1.2rem;
+border-radius: 50px;
+border: 2px solid rgba(255,255,255,0.12);
+background: var(–card);
+color: var(–text);
+width: 100%;
+max-width: 380px;
+outline: none;
+transition: border-color 0.2s;
+}
+.browse-search input:focus { border-color: var(–accent5); }
+.elements-grid {
+display: grid;
+grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+gap: 0.6rem;
+}
+.elem-card {
+background: var(–card);
+border-radius: 12px;
+padding: 0.6rem 0.4rem;
+text-align: center;
+border: 2px solid rgba(255,255,255,0.06);
+cursor: pointer;
+transition: all 0.15s;
+position: relative;
+overflow: hidden;
+}
+.elem-card::before {
+content: ‘’;
+position: absolute;
+top: 0; left: 0; right: 0;
+height: 3px;
+}
+.elem-card:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,0.4); }
+.elem-num { font-size: 0.65rem; font-weight: 700; color: var(–subtext); }
+.elem-sym { font-family: ‘Fredoka One’, cursive; font-size: 1.5rem; }
+.elem-name { font-size: 0.65rem; font-weight: 700; margin-top: 0.15rem; color: var(–subtext); }
 
-        #answer-section {
-            min-height: 80px;
-            margin-top: 30px;
-            background-color: #F8F9FA;
-            border-radius: 15px;
-            padding: 15px;
-            opacity: 0; /* Hidden by default */
-            transition: opacity 0.3s ease-in-out;
-        }
+/* Modal */
+.modal-overlay {
+position: fixed;
+inset: 0;
+background: rgba(0,0,0,0.7);
+display: flex;
+align-items: center;
+justify-content: center;
+z-index: 100;
+padding: 1rem;
+animation: fadeIn 0.2s ease;
+}
+@keyframes fadeIn { from{opacity:0} to{opacity:1} }
+.modal {
+background: var(–card);
+border-radius: 22px;
+padding: 2rem;
+max-width: 380px;
+width: 100%;
+border: 2px solid rgba(255,255,255,0.08);
+text-align: center;
+animation: slideUp 0.3s ease;
+}
+@keyframes slideUp { from{transform:translateY(30px);opacity:0} to{transform:translateY(0);opacity:1} }
+.modal-sym {
+font-family: ‘Fredoka One’, cursive;
+font-size: 4.5rem;
+line-height: 1;
+}
+.modal-num { font-size: 0.9rem; color: var(–subtext); font-weight: 700; }
+.modal-name { font-family: ‘Fredoka One’, cursive; font-size: 2rem; margin: 0.4rem 0 0.2rem; }
+.modal-cat {
+font-size: 0.8rem;
+font-weight: 700;
+padding: 0.2rem 0.8rem;
+border-radius: 50px;
+color: #0f0e17;
+display: inline-block;
+margin-bottom: 0.8rem;
+}
+.modal-fact {
+font-size: 0.9rem;
+color: var(–subtext);
+line-height: 1.6;
+margin-bottom: 1.2rem;
+}
+.modal-close {
+font-family: ‘Fredoka One’, cursive;
+font-size: 1rem;
+padding: 0.5rem 1.8rem;
+border-radius: 50px;
+border: none;
+background: rgba(255,255,255,0.1);
+color: var(–text);
+cursor: pointer;
+transition: background 0.15s;
+}
+.modal-close:hover { background: rgba(255,255,255,0.18); }
 
-        #answer-section.visible {
-            opacity: 1; /* Shows when answer button is clicked */
-        }
+/* Win celebration */
+.celebration {
+text-align: center;
+padding: 2rem;
+animation: fadeUp 0.4s ease;
+}
+.celebration h2 {
+font-family: ‘Fredoka One’, cursive;
+font-size: 2.5rem;
+background: linear-gradient(135deg, var(–accent2), var(–accent3));
+-webkit-background-clip: text;
+-webkit-text-fill-color: transparent;
+background-clip: text;
+}
+.confetti-emoji { font-size: 2rem; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 
-        .element-name {
-            font-size: 30px;
-            color: #2B2D42;
-            margin: 0 0 10px 0;
-            font-weight: bold;
-        }
+.hidden { display: none !important; }
 
-        .element-details {
-            font-size: 20px;
-            color: #6c757d;
-            margin: 5px 0;
-            background: #E9ECEF;
-            display: inline-block;
-            padding: 5px 15px;
-            border-radius: 10px;
-        }
-    </style>
+/* Difficulty */
+#difficulty-row {
+display: flex;
+justify-content: center;
+gap: 0.5rem;
+margin-bottom: 0.5rem;
+}
+.diff-btn {
+font-size: 0.8rem;
+font-weight: 700;
+padding: 0.3rem 0.9rem;
+border-radius: 50px;
+border: 1.5px solid rgba(255,255,255,0.15);
+background: transparent;
+color: var(–subtext);
+cursor: pointer;
+transition: all 0.15s;
+}
+.diff-btn.active, .diff-btn:hover {
+border-color: var(–accent2);
+color: var(–accent2);
+}
+</style>
+
 </head>
 <body>
+<div id="app">
+  <header>
+    <h1>⚗️ Element Explorer</h1>
+    <p>Learn the Periodic Table — the fun way!</p>
+  </header>
 
-    <div class="game-board">
-        <h1>Element Explorer!</h1>
-        
-        <div id="element-display" class="element-square">?</div>
-        
-        <div class="controls">
-            <button id="go-btn" onclick="startShuffle()">Go!</button>
-            <button id="ans-btn" onclick="showAnswer()" disabled>Answer!</button>
-        </div>
+  <div id="mode-select">
+    <button class="mode-btn active" data-mode="quiz">🧠 Quiz</button>
+    <button class="mode-btn" data-mode="flash">🃏 Flashcards</button>
+    <button class="mode-btn" data-mode="match">🔗 Match</button>
+    <button class="mode-btn" data-mode="browse">🔍 Browse</button>
+  </div>
 
-        <div id="answer-section">
-            <p id="el-name" class="element-name"></p>
-            <p class="element-details">🧬 Protons: <span id="el-protons"></span></p>
-        </div>
+  <!-- CATEGORY FILTER -->
+
+  <div id="cat-filter"></div>
+
+  <!-- SCOREBAR -->
+
+  <div id="scorebar">
+    <div class="score-item">
+      <span>Correct</span>
+      <div class="score-val green" id="score-correct">0</div>
     </div>
+    <div class="score-item">
+      <span>Wrong</span>
+      <div class="score-val red" id="score-wrong">0</div>
+    </div>
+    <div class="score-item">
+      <span>Streak 🔥</span>
+      <div class="score-val yellow" id="score-streak">0</div>
+    </div>
+  </div>
 
-    <script>
-        // Curated list of common, naturally occurring, and useful elements
-        const elementsData = [
-            { symbol: 'H', name: 'Hydrogen', protons: 1 },
-            { symbol: 'He', name: 'Helium', protons: 2 },
-            { symbol: 'Li', name: 'Lithium', protons: 3 },
-            { symbol: 'Be', name: 'Beryllium', protons: 4 },
-            { symbol: 'B', name: 'Boron', protons: 5 },
-            { symbol: 'C', name: 'Carbon', protons: 6 },
-            { symbol: 'N', name: 'Nitrogen', protons: 7 },
-            { symbol: 'O', name: 'Oxygen', protons: 8 },
-            { symbol: 'F', name: 'Fluorine', protons: 9 },
-            { symbol: 'Ne', name: 'Neon', protons: 10 },
-            { symbol: 'Na', name: 'Sodium', protons: 11 },
-            { symbol: 'Mg', name: 'Magnesium', protons: 12 },
-            { symbol: 'Al', name: 'Aluminum', protons: 13 },
-            { symbol: 'Si', name: 'Silicon', protons: 14 },
-            { symbol: 'P', name: 'Phosphorus', protons: 15 },
-            { symbol: 'S', name: 'Sulfur', protons: 16 },
-            { symbol: 'Cl', name: 'Chlorine', protons: 17 },
-            { symbol: 'Ar', name: 'Argon', protons: 18 },
-            { symbol: 'K', name: 'Potassium', protons: 19 },
-            { symbol: 'Ca', name: 'Calcium', protons: 20 },
-            { symbol: 'Ti', name: 'Titanium', protons: 22 },
-            { symbol: 'Cr', name: 'Chromium', protons: 24 },
-            { symbol: 'Mn', name: 'Manganese', protons: 25 },
-            { symbol: 'Fe', name: 'Iron', protons: 26 },
-            { symbol: 'Co', name: 'Cobalt', protons: 27 },
-            { symbol: 'Ni', name: 'Nickel', protons: 28 },
-            { symbol: 'Cu', name: 'Copper', protons: 29 },
-            { symbol: 'Zn', name: 'Zinc', protons: 30 },
-            { symbol: 'As', name: 'Arsenic', protons: 33 },
-            { symbol: 'Br', name: 'Bromine', protons: 35 },
-            { symbol: 'Kr', name: 'Krypton', protons: 36 },
-            { symbol: 'Ag', name: 'Silver', protons: 47 },
-            { symbol: 'Sn', name: 'Tin', protons: 50 },
-            { symbol: 'I', name: 'Iodine', protons: 53 },
-            { symbol: 'Xe', name: 'Xenon', protons: 54 },
-            { symbol: 'Ba', name: 'Barium', protons: 56 },
-            { symbol: 'W', name: 'Tungsten', protons: 74 },
-            { symbol: 'Pt', name: 'Platinum', protons: 78 },
-            { symbol: 'Au', name: 'Gold', protons: 79 },
-            { symbol: 'Hg', name: 'Mercury', protons: 80 },
-            { symbol: 'Pb', name: 'Lead', protons: 82 },
-            { symbol: 'U', name: 'Uranium', protons: 92 }
-        ];
+  <!-- QUIZ -->
 
-        let currentElement = null;
-        let shuffleInterval;
-        
-        // Array to keep track of the last 5 elements shown
-        let recentElements = [];
-        const MAX_HISTORY = 5;
+  <div id="quiz-section">
+    <div id="difficulty-row">
+      <button class="diff-btn active" data-diff="symbol">Symbol → Name</button>
+      <button class="diff-btn" data-diff="name">Name → Symbol</button>
+      <button class="diff-btn" data-diff="number">Number → Name</button>
+    </div>
+    <div class="question-card" id="question-card"></div>
+    <div class="feedback-msg" id="feedback-msg"></div>
+    <div class="answer-grid" id="answer-grid"></div>
+    <button class="next-btn hidden" id="next-btn" onclick="nextQuestion()">Next →</button>
+  </div>
 
-        // Get HTML elements
-        const display = document.getElementById('element-display');
-        const answerSection = document.getElementById('answer-section');
-        const nameDisplay = document.getElementById('el-name');
-        const protonsDisplay = document.getElementById('el-protons');
-        const goBtn = document.getElementById('go-btn');
-        const ansBtn = document.getElementById('ans-btn');
+  <!-- FLASHCARDS -->
 
-        function startShuffle() {
-            // Hide the answer and disable the answer button while shuffling
-            answerSection.classList.remove('visible');
-            ansBtn.disabled = true;
-            goBtn.disabled = true;
-            display.classList.add('shaking');
+  <div id="flash-section" class="hidden">
+    <div class="fc-progress" id="fc-progress"></div>
+    <div class="flashcard" id="flashcard" onclick="flipCard()">
+      <div class="flashcard-inner" id="flashcard-inner">
+        <div class="fc-front" id="fc-front"></div>
+        <div class="fc-back" id="fc-back"></div>
+      </div>
+    </div>
+    <p style="color:var(--subtext);font-size:0.8rem;margin-bottom:0.8rem;">Click card to reveal!</p>
+    <div class="fc-nav">
+      <button onclick="fcNav(-1)">← Prev</button>
+      <button onclick="fcNav(1)">Next →</button>
+    </div>
+  </div>
 
-            let shuffleCount = 0;
-            const maxShuffles = 15;
+  <!-- MATCH -->
 
-            // Rapidly change the symbol to create a "spinning wheel" effect
-            shuffleInterval = setInterval(() => {
-                const randomEl = elementsData[Math.floor(Math.random() * elementsData.length)];
-                
-                display.innerText = randomEl.symbol;
-                shuffleCount++;
+  <div id="match-section" class="hidden">
+    <div class="match-header">
+      <div class="match-info" id="match-info">Match symbols to names!</div>
+      <button class="new-game-btn" onclick="startMatch()">New Game</button>
+    </div>
+    <div class="match-grid" id="match-grid"></div>
+  </div>
 
-                if (shuffleCount >= maxShuffles) {
-                    stopShuffle();
-                }
-            }, 80); 
-        }
+  <!-- BROWSE -->
 
-        function stopShuffle() {
-            clearInterval(shuffleInterval);
-            
-            // Create a list of elements that are NOT in the recent memory array
-            const availableElements = elementsData.filter(el => !recentElements.includes(el.symbol));
-            
-            // Pick the final random element from the filtered list
-            currentElement = availableElements[Math.floor(Math.random() * availableElements.length)];
-            display.innerText = currentElement.symbol;
+  <div id="browse-section" class="hidden">
+    <div class="browse-search">
+      <input type="text" id="browse-input" placeholder="Search elements..." oninput="renderBrowse()">
+    </div>
+    <div class="elements-grid" id="elements-grid"></div>
+  </div>
 
-            // Add the chosen element to the memory array
-            recentElements.push(currentElement.symbol);
+  <!-- Modal -->
 
-            // If memory gets larger than 5, remove the oldest one
-            if (recentElements.length > MAX_HISTORY) {
-                recentElements.shift();
-            }
-            
-            // Re-enable buttons and stop the shaking animation
-            display.classList.remove('shaking');
-            goBtn.disabled = false;
-            ansBtn.disabled = false;
-        }
+  <div class="modal-overlay hidden" id="modal-overlay" onclick="closeModal(event)">
+    <div class="modal" id="modal-content"></div>
+  </div>
+</div>
 
-        function showAnswer() {
-            if (currentElement) {
-                // Fill in the data
-                nameDisplay.innerText = currentElement.name;
-                protonsDisplay.innerText = currentElement.protons;
-                
-                // Show the answer box
-                answerSection.classList.add('visible');
-                
-                // Disable answer button until "Go" is pressed again
-                ansBtn.disabled = true;
-            }
-        }
-    </script>
+<script>
+const CATEGORIES = {
+  'alkali':         { label: 'Alkali Metal',       color: '#ff6b6b' },
+  'alkaline':       { label: 'Alkaline Earth',      color: '#ff9f43' },
+  'transition':     { label: 'Transition Metal',    color: '#4d96ff' },
+  'post-transition':{ label: 'Post-transition',     color: '#6bcb77' },
+  'metalloid':      { label: 'Metalloid',           color: '#ffd93d' },
+  'nonmetal':       { label: 'Nonmetal',            color: '#c77dff' },
+  'halogen':        { label: 'Halogen',             color: '#ff6eb4' },
+  'noble':          { label: 'Noble Gas',           color: '#00d2ff' },
+  'lanthanide':     { label: 'Lanthanide',          color: '#ff9f43' },
+  'actinide':       { label: 'Actinide',            color: '#ff7c5c' },
+};
+
+const ELEMENTS = [
+  {n:1,  sym:'H',  name:'Hydrogen',     cat:'nonmetal',      fact:'The lightest and most abundant element in the universe — stars are mostly hydrogen!'},
+  {n:2,  sym:'He', name:'Helium',       cat:'noble',         fact:'So light it floats! Used in balloons and makes your voice squeaky.'},
+  {n:3,  sym:'Li', name:'Lithium',      cat:'alkali',        fact:'Used in rechargeable batteries in phones and laptops.'},
+  {n:4,  sym:'Be', name:'Beryllium',    cat:'alkaline',      fact:'Extremely light and stiff metal used in spacecraft parts.'},
+  {n:5,  sym:'B',  name:'Boron',        cat:'metalloid',     fact:'Found in borax — used in cleaning products and glass-making.'},
+  {n:6,  sym:'C',  name:'Carbon',       cat:'nonmetal',      fact:'The building block of all life! Forms diamonds, graphite, and coal.'},
+  {n:7,  sym:'N',  name:'Nitrogen',     cat:'nonmetal',      fact:'Makes up 78% of the air we breathe! Also used in fertilizers.'},
+  {n:8,  sym:'O',  name:'Oxygen',       cat:'nonmetal',      fact:'Essential for breathing and burning. Makes up 21% of our air.'},
+  {n:9,  sym:'F',  name:'Fluorine',     cat:'halogen',       fact:'The most reactive element! Added to toothpaste to protect teeth.'},
+  {n:10, sym:'Ne', name:'Neon',         cat:'noble',         fact:'Makes those glowing colorful signs you see in shop windows!'},
+  {n:11, sym:'Na', name:'Sodium',       cat:'alkali',        fact:'Combined with chlorine it makes table salt — Na + Cl = NaCl!'},
+  {n:12, sym:'Mg', name:'Magnesium',    cat:'alkaline',      fact:'Burns with a brilliant white flame. Found in your bones!'},
+  {n:13, sym:'Al', name:'Aluminium',    cat:'post-transition',fact:'Super lightweight metal used in foil, cans, and aeroplanes.'},
+  {n:14, sym:'Si', name:'Silicon',      cat:'metalloid',     fact:'Used to make computer chips. "Silicon Valley" is named after it!'},
+  {n:15, sym:'P',  name:'Phosphorus',   cat:'nonmetal',      fact:'Vital for DNA and bones. White phosphorus glows in the dark!'},
+  {n:16, sym:'S',  name:'Sulfur',       cat:'nonmetal',      fact:'A yellow solid with a rotten-egg smell. Found near volcanoes!'},
+  {n:17, sym:'Cl', name:'Chlorine',     cat:'halogen',       fact:'Used to clean drinking water and swimming pools.'},
+  {n:18, sym:'Ar', name:'Argon',        cat:'noble',         fact:'Fills light bulbs to stop the filament burning out too fast.'},
+  {n:19, sym:'K',  name:'Potassium',    cat:'alkali',        fact:'Bananas are famous for potassium! Vital for healthy nerves and muscles.'},
+  {n:20, sym:'Ca', name:'Calcium',      cat:'alkaline',      fact:'Makes your bones and teeth strong. Found in milk and cheese!'},
+  {n:21, sym:'Sc', name:'Scandium',     cat:'transition',    fact:'Used in aircraft frames and sports equipment for its lightness.'},
+  {n:22, sym:'Ti', name:'Titanium',     cat:'transition',    fact:'Super strong yet lightweight — used in jet engines and body implants.'},
+  {n:23, sym:'V',  name:'Vanadium',     cat:'transition',    fact:'Makes steel much stronger — used in tools and springs.'},
+  {n:24, sym:'Cr', name:'Chromium',     cat:'transition',    fact:'Gives stainless steel its shine and resistance to rust.'},
+  {n:25, sym:'Mn', name:'Manganese',    cat:'transition',    fact:'Essential for making strong steel. Also important for plant growth.'},
+  {n:26, sym:'Fe', name:'Iron',         cat:'transition',    fact:'One of the most important metals — used to make steel and found in blood!'},
+  {n:27, sym:'Co', name:'Cobalt',       cat:'transition',    fact:'Gives glass and ceramics their beautiful blue color.'},
+  {n:28, sym:'Ni', name:'Nickel',       cat:'transition',    fact:'Used in coins and stainless steel. Some people are allergic to it!'},
+  {n:29, sym:'Cu', name:'Copper',       cat:'transition',    fact:'Great conductor of electricity — used in all electrical wiring.'},
+  {n:30, sym:'Zn', name:'Zinc',         cat:'transition',    fact:'Coats iron to prevent rust (galvanizing). Important for immune health!'},
+  {n:31, sym:'Ga', name:'Gallium',      cat:'post-transition',fact:'Melts in your hand! Used in LEDs and solar panels.'},
+  {n:32, sym:'Ge', name:'Germanium',    cat:'metalloid',     fact:'Was predicted by Mendeleev before it was discovered!'},
+  {n:33, sym:'As', name:'Arsenic',      cat:'metalloid',     fact:'Famous as a poison in stories, but also used in semiconductors.'},
+  {n:34, sym:'Se', name:'Selenium',     cat:'nonmetal',      fact:'Used in solar cells and glass manufacturing. Trace amounts needed by humans.'},
+  {n:35, sym:'Br', name:'Bromine',      cat:'halogen',       fact:'One of only two elements that are liquid at room temperature!'},
+  {n:36, sym:'Kr', name:'Krypton',      cat:'noble',         fact:'Used in certain photography flashes and some lasers.'},
+  {n:37, sym:'Rb', name:'Rubidium',     cat:'alkali',        fact:'Used in atomic clocks — the most accurate clocks in the world!'},
+  {n:38, sym:'Sr', name:'Strontium',    cat:'alkaline',      fact:'Creates brilliant red colors in fireworks!'},
+  {n:39, sym:'Y',  name:'Yttrium',      cat:'transition',    fact:'Used in TV screens and LED lighting for bright colors.'},
+  {n:40, sym:'Zr', name:'Zirconium',    cat:'transition',    fact:'Used in nuclear reactors and fake diamond jewelry (cubic zirconia).'},
+  {n:41, sym:'Nb', name:'Niobium',      cat:'transition',    fact:'Used in superconducting magnets in MRI scanners.'},
+  {n:42, sym:'Mo', name:'Molybdenum',   cat:'transition',    fact:'Has one of the highest melting points of all elements.'},
+  {n:43, sym:'Tc', name:'Technetium',   cat:'transition',    fact:'The first artificially created element! Used in medical imaging.'},
+  {n:44, sym:'Ru', name:'Ruthenium',    cat:'transition',    fact:'Used in hard disk drives to increase storage capacity.'},
+  {n:45, sym:'Rh', name:'Rhodium',      cat:'transition',    fact:'One of the rarest metals — used in catalytic converters in cars.'},
+  {n:46, sym:'Pd', name:'Palladium',    cat:'transition',    fact:'Used in catalytic converters to reduce car exhaust pollution.'},
+  {n:47, sym:'Ag', name:'Silver',       cat:'transition',    fact:'The best conductor of electricity! Used in jewelry and coins.'},
+  {n:48, sym:'Cd', name:'Cadmium',      cat:'transition',    fact:'Used in rechargeable batteries and produces yellow/orange colors in glass.'},
+  {n:49, sym:'In', name:'Indium',       cat:'post-transition',fact:'Used in touchscreens! The coating on your phone screen may contain it.'},
+  {n:50, sym:'Sn', name:'Tin',          cat:'post-transition',fact:'Keeps food fresh in tin cans. Combined with copper it makes bronze!'},
+  {n:51, sym:'Sb', name:'Antimony',     cat:'metalloid',     fact:'Used in flame retardants and ancient Egyptian eye makeup (kohl).'},
+  {n:52, sym:'Te', name:'Tellurium',    cat:'metalloid',     fact:'Used in solar panels and blu-ray discs.'},
+  {n:53, sym:'I',  name:'Iodine',       cat:'halogen',       fact:'Used as an antiseptic and added to table salt to prevent thyroid disease.'},
+  {n:54, sym:'Xe', name:'Xenon',        cat:'noble',         fact:'Used in powerful flashlights, car headlights, and space ion engines!'},
+  {n:55, sym:'Cs', name:'Caesium',      cat:'alkali',        fact:'Used in the most accurate atomic clocks — defines the second!'},
+  {n:56, sym:'Ba', name:'Barium',       cat:'alkaline',      fact:'Creates green colors in fireworks. Used in X-ray imaging of the gut.'},
+  {n:57, sym:'La', name:'Lanthanum',    cat:'lanthanide',    fact:'Used in camera and telescope lenses to reduce light distortion.'},
+  {n:58, sym:'Ce', name:'Cerium',       cat:'lanthanide',    fact:'The most abundant rare-earth element. Used in lighter flints!'},
+  {n:59, sym:'Pr', name:'Praseodymium', cat:'lanthanide',    fact:'Used in aircraft engines and strong magnets.'},
+  {n:60, sym:'Nd', name:'Neodymium',    cat:'lanthanide',    fact:'Makes the most powerful permanent magnets in the world!'},
+  {n:61, sym:'Pm', name:'Promethium',   cat:'lanthanide',    fact:'Radioactive and rare — used in some specialty batteries.'},
+  {n:62, sym:'Sm', name:'Samarium',     cat:'lanthanide',    fact:'Used in strong magnets that can work at very high temperatures.'},
+  {n:63, sym:'Eu', name:'Europium',     cat:'lanthanide',    fact:'Creates red and blue phosphors in TV and phone screens.'},
+  {n:64, sym:'Gd', name:'Gadolinium',   cat:'lanthanide',    fact:'Used as a contrast agent to improve MRI scan images.'},
+  {n:65, sym:'Tb', name:'Terbium',      cat:'lanthanide',    fact:'Used in solid-state drives and fuel cells.'},
+  {n:66, sym:'Dy', name:'Dysprosium',   cat:'lanthanide',    fact:'Used in the magnets of electric vehicles and wind turbines.'},
+  {n:67, sym:'Ho', name:'Holmium',      cat:'lanthanide',    fact:'Has the highest magnetic strength of any element!'},
+  {n:68, sym:'Er', name:'Erbium',       cat:'lanthanide',    fact:'Dopes optical fibers to boost internet signal across long distances.'},
+  {n:69, sym:'Tm', name:'Thulium',      cat:'lanthanide',    fact:'Used in portable X-ray machines.'},
+  {n:70, sym:'Yb', name:'Ytterbium',    cat:'lanthanide',    fact:'Used in the most accurate atomic clocks yet made.'},
+  {n:71, sym:'Lu', name:'Lutetium',     cat:'lanthanide',    fact:'Used in cancer treatments and PET scan detectors.'},
+  {n:72, sym:'Hf', name:'Hafnium',      cat:'transition',    fact:'Used in nuclear reactor control rods and computer chips.'},
+  {n:73, sym:'Ta', name:'Tantalum',     cat:'transition',    fact:'Used in your phone capacitors and medical implants.'},
+  {n:74, sym:'W',  name:'Tungsten',     cat:'transition',    fact:'Has the highest melting point of all metals — used in light bulb filaments!'},
+  {n:75, sym:'Re', name:'Rhenium',      cat:'transition',    fact:'One of the rarest elements. Used in jet engine components.'},
+  {n:76, sym:'Os', name:'Osmium',       cat:'transition',    fact:'The densest naturally occurring element — a small piece is very heavy!'},
+  {n:77, sym:'Ir', name:'Iridium',      cat:'transition',    fact:'Extremely corrosion-resistant. The Kilogram standard was once made of it.'},
+  {n:78, sym:'Pt', name:'Platinum',     cat:'transition',    fact:'Rarer than gold! Used in jewelry, catalytic converters, and cancer drugs.'},
+  {n:79, sym:'Au', name:'Gold',         cat:'transition',    fact:'Has been treasured for thousands of years. Excellent electrical conductor!'},
+  {n:80, sym:'Hg', name:'Mercury',      cat:'transition',    fact:'The only metal liquid at room temperature! Used in old thermometers.'},
+  {n:81, sym:'Tl', name:'Thallium',     cat:'post-transition',fact:'Used in heart imaging and research into superconductors.'},
+  {n:82, sym:'Pb', name:'Lead',         cat:'post-transition',fact:'Very dense and heavy. Used in radiation shielding and old water pipes.'},
+  {n:83, sym:'Bi', name:'Bismuth',      cat:'post-transition',fact:'Forms beautiful rainbow-colored crystals! Used in stomach medicine.'},
+  {n:84, sym:'Po', name:'Polonium',     cat:'post-transition',fact:'Discovered by Marie Curie and named after her homeland Poland.'},
+  {n:85, sym:'At', name:'Astatine',     cat:'halogen',       fact:'The rarest naturally occurring element on Earth!'},
+  {n:86, sym:'Rn', name:'Radon',        cat:'noble',         fact:'A radioactive gas that can seep up from the ground into buildings.'},
+  {n:87, sym:'Fr', name:'Francium',     cat:'alkali',        fact:'Extremely rare and radioactive. Almost none exists at any moment!'},
+  {n:88, sym:'Ra', name:'Radium',       cat:'alkaline',      fact:'Discovered by Marie Curie. Once used in glow-in-the-dark paint!'},
+  {n:89, sym:'Ac', name:'Actinium',     cat:'actinide',      fact:'Glows blue in the dark due to its radioactivity.'},
+  {n:90, sym:'Th', name:'Thorium',      cat:'actinide',      fact:'A radioactive metal being explored as future nuclear fuel.'},
+  {n:91, sym:'Pa', name:'Protactinium', cat:'actinide',      fact:'Rare, radioactive, and was only isolated in large amounts in 1961.'},
+  {n:92, sym:'U',  name:'Uranium',      cat:'actinide',      fact:'Used as fuel in nuclear power plants to generate electricity.'},
+  {n:93, sym:'Np', name:'Neptunium',    cat:'actinide',      fact:'Named after Neptune — the planet beyond Uranus (Uranium)!'},
+  {n:94, sym:'Pu', name:'Plutonium',    cat:'actinide',      fact:'Named after Pluto. Used as nuclear fuel and in certain batteries.'},
+];
+
+// State
+let currentMode = 'quiz';
+let selectedCats = new Set(Object.keys(CATEGORIES));
+let quizDiff = 'symbol';
+let correctCount = 0, wrongCount = 0, streak = 0;
+let currentQuestion = null;
+let answered = false;
+
+// Filtered elements
+function filteredElements() {
+  return ELEMENTS.filter(e => selectedCats.has(e.cat));
+}
+
+// --- CATEGORY FILTER ---
+function buildCatFilter() {
+  const div = document.getElementById('cat-filter');
+  div.innerHTML = '';
+  Object.entries(CATEGORIES).forEach(([key, {label, color}]) => {
+    const btn = document.createElement('button');
+    btn.className = 'cat-btn active';
+    btn.textContent = label;
+    btn.style.borderColor = color;
+    btn.style.color = color;
+    btn.dataset.cat = key;
+    btn.onclick = () => toggleCat(key, btn, color);
+    div.appendChild(btn);
+  });
+}
+
+function toggleCat(key, btn, color) {
+  if (selectedCats.has(key)) {
+    if (selectedCats.size <= 1) return;
+    selectedCats.delete(key);
+    btn.classList.remove('active');
+    btn.style.background = '';
+    btn.style.color = color;
+  } else {
+    selectedCats.add(key);
+    btn.classList.add('active');
+    btn.style.background = color;
+    btn.style.color = '#0f0e17';
+  }
+  if (currentMode === 'quiz') newQuestion();
+  if (currentMode === 'flash') { fcIndex = 0; renderFlashcard(); }
+  if (currentMode === 'browse') renderBrowse();
+  if (currentMode === 'match') startMatch();
+}
+
+// Update cat button visuals
+function updateCatBtns() {
+  document.querySelectorAll('.cat-btn').forEach(btn => {
+    const key = btn.dataset.cat;
+    const color = CATEGORIES[key].color;
+    if (selectedCats.has(key)) {
+      btn.classList.add('active');
+      btn.style.background = color;
+      btn.style.color = '#0f0e17';
+    } else {
+      btn.classList.remove('active');
+      btn.style.background = '';
+      btn.style.color = color;
+    }
+  });
+}
+
+// --- MODE SWITCHING ---
+document.querySelectorAll('.mode-btn').forEach(btn => {
+  btn.onclick = () => {
+    currentMode = btn.dataset.mode;
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    ['quiz-section','flash-section','match-section','browse-section'].forEach(id => {
+      document.getElementById(id).classList.add('hidden');
+    });
+    document.getElementById('scorebar').classList.toggle('hidden', currentMode !== 'quiz');
+    document.getElementById('cat-filter').classList.toggle('hidden', false);
+    if (currentMode === 'quiz') {
+      document.getElementById('quiz-section').classList.remove('hidden');
+      newQuestion();
+    } else if (currentMode === 'flash') {
+      document.getElementById('flash-section').classList.remove('hidden');
+      fcIndex = 0;
+      renderFlashcard();
+    } else if (currentMode === 'match') {
+      document.getElementById('match-section').classList.remove('hidden');
+      startMatch();
+    } else if (currentMode === 'browse') {
+      document.getElementById('browse-section').classList.remove('hidden');
+      renderBrowse();
+    }
+  };
+});
+
+// --- DIFFICULTY ---
+document.querySelectorAll('.diff-btn').forEach(btn => {
+  btn.onclick = () => {
+    quizDiff = btn.dataset.diff;
+    document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    newQuestion();
+  };
+});
+
+// --- QUIZ ---
+function shuffle(arr) { return [...arr].sort(() => Math.random() - 0.5); }
+
+function newQuestion() {
+  const pool = filteredElements();
+  if (pool.length < 4) return;
+  answered = false;
+  document.getElementById('feedback-msg').textContent = '';
+  document.getElementById('feedback-msg').className = 'feedback-msg';
+  document.getElementById('next-btn').classList.add('hidden');
+
+  const correct = pool[Math.floor(Math.random() * pool.length)];
+  currentQuestion = correct;
+  const color = CATEGORIES[correct.cat].color;
+
+  // Build question card
+  const qcard = document.getElementById('question-card');
+  if (quizDiff === 'symbol') {
+    qcard.innerHTML = `
+      <div class="question-label">What element is this?</div>
+      <div class="element-big" style="color:${color}">${correct.sym}</div>
+      <div class="element-num-big">Atomic Number: ${correct.n}</div>
+    `;
+  } else if (quizDiff === 'name') {
+    qcard.innerHTML = `
+      <div class="question-label">What is the symbol for...</div>
+      <div class="question-text">${correct.name}</div>
+      <div class="element-num-big">Atomic Number: ${correct.n}</div>
+    `;
+  } else {
+    qcard.innerHTML = `
+      <div class="question-label">Which element has atomic number...</div>
+      <div class="element-big" style="color:${color}">${correct.n}</div>
+    `;
+  }
+
+  // Build options
+  const wrongs = shuffle(pool.filter(e => e.n !== correct.n)).slice(0, 3);
+  const options = shuffle([correct, ...wrongs]);
+  const grid = document.getElementById('answer-grid');
+  grid.innerHTML = '';
+  options.forEach(opt => {
+    const btn = document.createElement('button');
+    btn.className = 'ans-btn';
+    btn.textContent = quizDiff === 'name' ? opt.sym : opt.name;
+    btn.onclick = () => checkAnswer(opt, btn);
+    grid.appendChild(btn);
+  });
+}
+
+function checkAnswer(chosen, btn) {
+  if (answered) return;
+  answered = true;
+  const correct = currentQuestion;
+  const allBtns = document.querySelectorAll('.ans-btn');
+  allBtns.forEach(b => {
+    b.disabled = true;
+    const label = quizDiff === 'name' ? b.textContent : b.textContent;
+    const isCorrectBtn = quizDiff === 'name'
+      ? b.textContent === correct.sym
+      : b.textContent === correct.name;
+    if (isCorrectBtn) b.classList.add('correct');
+  });
+  const fb = document.getElementById('feedback-msg');
+  if (chosen.n === correct.n) {
+    correctCount++; streak++;
+    fb.textContent = ['🎉 Correct!','⭐ Brilliant!','🚀 Amazing!','✨ Nailed it!'][Math.floor(Math.random()*4)];
+    fb.classList.add('correct');
+  } else {
+    wrongCount++; streak = 0;
+    btn.classList.add('wrong');
+    fb.textContent = `❌ It was ${correct.name}!`;
+    fb.classList.add('wrong');
+  }
+  updateScore();
+  document.getElementById('next-btn').classList.remove('hidden');
+}
+
+function nextQuestion() { newQuestion(); }
+
+function updateScore() {
+  document.getElementById('score-correct').textContent = correctCount;
+  document.getElementById('score-wrong').textContent = wrongCount;
+  document.getElementById('score-streak').textContent = streak;
+}
+
+// --- FLASHCARDS ---
+let fcIndex = 0;
+let fcFlipped = false;
+
+function renderFlashcard() {
+  const pool = filteredElements();
+  if (!pool.length) return;
+  const el = pool[fcIndex % pool.length];
+  const color = CATEGORIES[el.cat].color;
+  const card = document.getElementById('flashcard');
+  card.classList.remove('flipped');
+  fcFlipped = false;
+
+  document.getElementById('fc-progress').textContent =
+    `Card ${(fcIndex % pool.length) + 1} of ${pool.length}`;
+
+  document.getElementById('fc-front').innerHTML = `
+    <div class="fc-num">Atomic Number ${el.n}</div>
+    <div class="fc-symbol" style="color:${color}">${el.sym}</div>
+    <div class="fc-hint">Tap to reveal the name!</div>
+  `;
+  document.getElementById('fc-back').innerHTML = `
+    <div class="fc-symbol" style="color:${color};font-size:2.5rem">${el.sym}</div>
+    <div class="fc-name" style="color:${color}">${el.name}</div>
+    <span class="fc-category" style="background:${color}">${CATEGORIES[el.cat].label}</span>
+    <div class="fc-fact">${el.fact}</div>
+  `;
+}
+
+function flipCard() {
+  const card = document.getElementById('flashcard');
+  fcFlipped = !fcFlipped;
+  card.classList.toggle('flipped', fcFlipped);
+}
+
+function fcNav(dir) {
+  const pool = filteredElements();
+  fcIndex = ((fcIndex + dir) % pool.length + pool.length) % pool.length;
+  renderFlashcard();
+}
+
+// --- MATCH GAME ---
+let matchSelected = null;
+let matchPairs = [];
+let matchAttempts = 0;
+let matchMatched = 0;
+
+function startMatch() {
+  matchSelected = null;
+  matchAttempts = 0;
+  matchMatched = 0;
+  const pool = shuffle(filteredElements()).slice(0, 8);
+  matchPairs = pool;
+  const grid = document.getElementById('match-grid');
+  grid.innerHTML = '';
+  document.getElementById('match-info').textContent = 'Match symbols to their names!';
+
+  const cards = [];
+  pool.forEach(el => {
+    cards.push({ type: 'symbol', el, id: el.n + '-sym' });
+    cards.push({ type: 'name',   el, id: el.n + '-name' });
+  });
+  shuffle(cards).forEach(card => {
+    const div = document.createElement('div');
+    div.className = 'match-card' + (card.type === 'symbol' ? ' symbol-card' : '');
+    div.textContent = card.type === 'symbol' ? card.el.sym : card.el.name;
+    div.dataset.elementN = card.el.n;
+    div.dataset.cardId = card.id;
+    div.onclick = () => matchClick(div, card);
+    grid.appendChild(div);
+  });
+}
+
+function matchClick(div, card) {
+  if (div.classList.contains('matched') || div.classList.contains('selected')) return;
+  const color = CATEGORIES[card.el.cat].color;
+  if (!matchSelected) {
+    matchSelected = { div, card };
+    div.classList.add('selected');
+    div.style.borderColor = color;
+    return;
+  }
+  // Check match
+  if (matchSelected.card.el.n === card.el.n && matchSelected.card.type !== card.type) {
+    // Match!
+    matchAttempts++;
+    matchMatched++;
+    [matchSelected.div, div].forEach(d => {
+      d.classList.remove('selected');
+      d.classList.add('matched');
+      d.style.borderColor = '';
+    });
+    matchSelected = null;
+    const remaining = matchPairs.length - matchMatched;
+    if (remaining === 0) {
+      document.getElementById('match-info').innerHTML =
+        `🏆 Done in ${matchAttempts} attempts!`;
+    } else {
+      document.getElementById('match-info').textContent =
+        `${matchMatched} matched! ${remaining} to go...`;
+    }
+  } else {
+    // Wrong
+    matchAttempts++;
+    matchSelected.div.classList.add('wrong-flash');
+    div.classList.add('wrong-flash');
+    matchSelected.div.classList.remove('selected');
+    matchSelected.div.style.borderColor = '';
+    setTimeout(() => {
+      matchSelected && matchSelected.div.classList.remove('wrong-flash');
+      div.classList.remove('wrong-flash');
+    }, 400);
+    matchSelected = null;
+  }
+}
+
+// --- BROWSE ---
+function renderBrowse() {
+  const q = document.getElementById('browse-input').value.toLowerCase();
+  const pool = filteredElements().filter(el =>
+    !q || el.name.toLowerCase().includes(q) || el.sym.toLowerCase().includes(q) || String(el.n).includes(q)
+  );
+  const grid = document.getElementById('elements-grid');
+  grid.innerHTML = '';
+  pool.forEach(el => {
+    const color = CATEGORIES[el.cat].color;
+    const div = document.createElement('div');
+    div.className = 'elem-card';
+    div.style.setProperty('--cat-color', color);
+    div.innerHTML = `
+      <div class="elem-num">${el.n}</div>
+      <div class="elem-sym" style="color:${color}">${el.sym}</div>
+      <div class="elem-name">${el.name}</div>
+    `;
+    div.style.cssText += `--tw:${color}`;
+    div.querySelector('.elem-card::before') // via pseudo element style
+    div.style.cssText = `background: var(--card); border-radius:12px; padding:.6rem .4rem; text-align:center; border:2px solid rgba(255,255,255,0.06); cursor:pointer; transition:all .15s; position:relative; overflow:hidden;`;
+    // re-apply since we reset
+    const inner = `<div style="font-size:.65rem;font-weight:700;color:var(--subtext)">${el.n}</div>
+      <div style="font-family:'Fredoka One',cursive;font-size:1.5rem;color:${color}">${el.sym}</div>
+      <div style="font-size:.65rem;font-weight:700;margin-top:.15rem;color:var(--subtext)">${el.name}</div>
+      <div style="position:absolute;top:0;left:0;right:0;height:3px;background:${color};border-radius:12px 12px 0 0"></div>`;
+    div.innerHTML = inner;
+    div.className = 'elem-card';
+    div.onclick = () => showModal(el);
+    grid.appendChild(div);
+  });
+}
+
+// --- MODAL ---
+function showModal(el) {
+  const color = CATEGORIES[el.cat].color;
+  document.getElementById('modal-content').innerHTML = `
+    <div style="height:4px;background:${color};border-radius:4px;margin-bottom:1.2rem"></div>
+    <div class="modal-sym" style="color:${color}">${el.sym}</div>
+    <div class="modal-num">Atomic Number ${el.n}</div>
+    <div class="modal-name">${el.name}</div>
+    <span class="modal-cat" style="background:${color}">${CATEGORIES[el.cat].label}</span>
+    <p class="modal-fact">${el.fact}</p>
+    <button class="modal-close" onclick="closeModal()">Close</button>
+  `;
+  document.getElementById('modal-overlay').classList.remove('hidden');
+}
+
+function closeModal(e) {
+  if (!e || e.target === document.getElementById('modal-overlay')) {
+    document.getElementById('modal-overlay').classList.add('hidden');
+  }
+}
+
+// --- INIT ---
+buildCatFilter();
+updateCatBtns();
+newQuestion();
+</script>
+
 </body>
 </html>
