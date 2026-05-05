@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Periodic Table Puzzle</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -33,7 +33,14 @@ flex-shrink:0; height:44px;
 display:flex; align-items:center; justify-content:space-between;
 padding:0 12px; background:var(--surface); border-bottom:1px solid var(--border);
 }
+#hdr-left { display: flex; align-items: center; gap: 10px; }
 #hdr-title { font-size:12px; font-weight:700; color:var(--accent); letter-spacing:3px; text-transform:uppercase; }
+#fs-btn { 
+  background: transparent; border: 1px solid var(--border); color: var(--text);
+  padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 10px; font-weight: bold;
+}
+#fs-btn:hover { border-color: var(--accent); color: var(--accent); }
+
 #hdr-stats { display:flex; gap:12px; align-items:center; }
 .stat { font-size:11px; color:var(--muted); letter-spacing:1px; }
 .stat b { color:var(--text); font-size:14px; }
@@ -121,7 +128,7 @@ display:flex; flex-direction:column; align-items:center; justify-content:center;
 }
 #overlay.off { display:none; }
 .ov-content { display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 500px; gap: 20px;}
-.ov-title { font-size:24px; font-weight:700; color:var(--accent); letter-spacing:5px; text-transform:uppercase; }
+.ov-title { font-size:24px; font-weight:700; color:var(--accent); letter-spacing:5px; text-transform:uppercase; text-align:center; }
 .ov-score { font-size:48px; font-weight:700; color: var(--text); }
 .ov-sub { font-size:14px; color:var(--muted); text-align:center; line-height: 1.5; }
 #diff-picker { display:flex; flex-direction: column; gap:10px; width: 240px; }
@@ -145,6 +152,25 @@ transition: all 0.2s;
 .review-tile .rt-s { font-size: 16px; font-weight: 900; }
 .review-tile .rt-nm { font-size: 6px; white-space: nowrap; overflow: hidden; max-width: 90%; }
 
+/* Mobile Portrait Warning */
+#portrait-warning {
+    display: none;
+    position: fixed; inset: 0; z-index: 10000;
+    background: var(--bg); color: var(--text);
+    flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 30px;
+}
+#portrait-warning svg { width: 80px; fill: var(--accent); margin-bottom: 20px; animation: tilt 2s infinite ease-in-out;}
+#portrait-warning h2 { font-size: 22px; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 2px;}
+#portrait-warning p { font-size: 14px; color: var(--muted); }
+
+@keyframes tilt { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(-90deg); } }
+
+/* Show on mobile portrait mode */
+@media screen and (max-width: 899px) and (orientation: portrait) {
+    #portrait-warning { display: flex; }
+}
+
 /* Category Colors */
 .c-alkali { background:#7c2d12; } .c-alkaline { background:#713f12; }
 .c-transition { background:#1e3a5f; } .c-posttrans { background:#1a3a2e; }
@@ -163,9 +189,18 @@ transition: all 0.2s;
 </head>
 <body>
 
+<div id="portrait-warning">
+    <svg viewBox="0 0 24 24"><path d="M16 1H8C6.34 1 5 2.34 5 4v16c0 1.66 1.34 3 3 3h8c1.66 0 3-1.34 3-3V4c0-1.66-1.34-3-3-3zm1 18H7V5h10v14z"/></svg>
+    <h2>Rotate Device</h2>
+    <p>Please rotate your phone sideways to play the Periodic Table Puzzle.</p>
+</div>
+
 <div id="app">
   <div id="hdr">
-    <div id="hdr-title">⚛ Periodic Puzzle</div>
+    <div id="hdr-left">
+      <div id="hdr-title">⚛ Periodic Puzzle</div>
+      <button id="fs-btn">⛶ Fullscreen</button>
+    </div>
     <div id="hdr-stats">
       <div class="stat">SCORE <b id="sv">0</b>/<b id="total">0</b></div>
       <div id="lives"></div>
@@ -217,7 +252,7 @@ const DIFFICULTIES = {
 
 let EL = {}, score=0, wrongs=0, active=false, difficulty='easy', maxWrongs=10;
 let remainingPool = [], trayElements = [], dragNum = null;
-let mistakes = new Set(); // Track unique elements gotten wrong
+let mistakes = new Set(); 
 
 EDATA.forEach(d => { EL[d[0]] = {n:d[0], s:d[1], nm:d[2], r:d[3], c:d[4], cat:d[5]}; });
 
@@ -328,10 +363,14 @@ function drop(cx, cy) {
     document.getElementById('sv').textContent = score;
     doFlash('ok');
     updateTray();
-    if (score === totalToPlace) endGame(true);
+    
+    // Slight delay to allow animation to finish before bringing up win screen
+    if (score === totalToPlace) {
+        setTimeout(() => endGame(true), 300);
+    }
   } else {
     wrongs++;
-    mistakes.add(n); // Add the atomic number of the element you dragged incorrectly
+    mistakes.add(n); 
     doFlash('bad');
     updateLives();
     if (slot) {
@@ -342,7 +381,9 @@ function drop(cx, cy) {
     remainingPool.push(n); 
     updateTray(); 
     
-    if (wrongs >= maxWrongs) endGame(false);
+    if (wrongs >= maxWrongs) {
+        setTimeout(() => endGame(false), 300);
+    }
   }
 }
 
@@ -388,13 +429,20 @@ function endGame(won) {
   active = false;
   const ov = document.getElementById('overlay');
   ov.classList.remove('off');
-  document.getElementById('ov-title').textContent = won ? "Victory!" : "Game Over";
+  
+  const title = document.getElementById('ov-title');
+  title.textContent = won ? "Perfect Game!" : "Game Over";
+  title.style.color = won ? "var(--success)" : "var(--accent)";
+  
   document.getElementById('ov-score').style.display = 'block';
   document.getElementById('ov-score').innerHTML = `<span>${score}</span> / ${totalToPlace}`;
   
-  // Review Mistakes
+  const sub = document.getElementById('ov-sub');
+  sub.textContent = won && mistakes.size === 0 ? "Flawless! You placed all elements perfectly." : "Click a mode to play again.";
+  
   const reviewArea = document.getElementById('review-area');
   const reviewGrid = document.getElementById('review-grid');
+  
   if (mistakes.size > 0) {
       reviewArea.style.display = 'block';
       reviewGrid.innerHTML = '';
@@ -409,8 +457,21 @@ function endGame(won) {
           `;
           reviewGrid.appendChild(tile);
       });
+  } else {
+      reviewArea.style.display = 'none';
   }
 }
+
+// Fullscreen Logic
+document.getElementById('fs-btn').addEventListener('click', () => {
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => {
+            console.log("Error attempting to enable fullscreen:", err.message);
+        });
+    } else {
+        document.exitFullscreen();
+    }
+});
 
 document.querySelectorAll('.diff-btn').forEach(b => {
   b.onclick = () => startGame(b.dataset.diff);
