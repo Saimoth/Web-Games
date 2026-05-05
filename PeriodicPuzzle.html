@@ -19,11 +19,11 @@
 
 html, body {
 width:100%; 
-height:100dvh; /* Uses dynamic viewport height to respect mobile browser UI */
+height:100dvh; 
 background:var(--bg); color:var(--text);
 font-family: Arial, Helvetica, sans-serif;
 overflow:hidden;
-overscroll-behavior: none; /* Stops pull-to-refresh elastic bouncing */
+overscroll-behavior: none; 
 user-select:none; -webkit-user-select:none;
 }
 
@@ -51,13 +51,13 @@ padding:0 12px; background:var(--surface); border-bottom:1px solid var(--border)
 #table-wrap {
 flex:1; overflow-y:auto; overflow-x:hidden;
 display:flex; align-items:flex-start; justify-content:center;
-padding:20px 50px; /* 50px padding on either side */
+padding:20px 50px; 
 min-height:0;
 }
 
 #ptable {
 display:grid; gap:2px;
-width: 100%; /* Fills parent wrapper, respecting its 50px padding */
+width: 100%; 
 max-width: 1200px;
 grid-template-columns: repeat(18, 1fr);
 }
@@ -346,14 +346,24 @@ function checkHover(x, y) {
 }
 
 function drop(cx, cy) {
+  const n = dragNum;
+  // Critical fix: Prevents the double-fire event bug from pushing a null tile to the deck
+  if (n === null) return; 
+  dragNum = null;
+
   const ghost = document.getElementById('ghost');
   ghost.style.display = 'none';
+  
   const target = document.elementFromPoint(cx, cy);
   const slot = target?.closest('.slot');
-  const n = dragNum;
-  dragNum = null;
   
-  if (slot && slot.dataset.expects == n) {
+  // Critical fix: If dropped outside an empty valid grid slot, cancel drag safely
+  if (!slot || slot.classList.contains('filled')) {
+      document.querySelectorAll('.card').forEach(c => c.classList.remove('dragging'));
+      return;
+  }
+  
+  if (slot.dataset.expects == n) {
     slot.classList.add('filled');
     slot.innerHTML = `<div class="placed p-${EL[n].cat}"><div class="pn">${n}</div><div class="ps">${EL[n].s}</div></div>`;
     trayElements = trayElements.filter(id => id !== n);
@@ -370,10 +380,10 @@ function drop(cx, cy) {
     mistakes.add(n); 
     doFlash('bad');
     updateLives();
-    if (slot) {
-      slot.classList.add('shake');
-      setTimeout(() => slot.classList.remove('shake'), 300);
-    }
+    
+    slot.classList.add('shake');
+    setTimeout(() => slot.classList.remove('shake'), 300);
+    
     trayElements = trayElements.filter(id => id !== n);
     remainingPool.push(n); 
     updateTray(); 
