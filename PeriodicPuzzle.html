@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Periodic Table Puzzle</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+:root {
+–bg:#0a0c10; –surface:#12151c; –border:#1e2535;
+–accent:#00d4ff; –success:#00ff88; –danger:#ff3366; –warn:#ff6b35;
+–text:#e8eaf0; –muted:#4a5068;
+}
+
+html, body {
+width:100%; height:100%;
+background:var(–bg); color:var(–text);
+font-family: Arial, Helvetica, sans-serif;
+overflow:hidden;
+user-select:none; -webkit-user-select:none;
+}
+
+/* scanlines */
+body::after {
+content:’’; position:fixed; inset:0; pointer-events:none; z-index:9000;
+background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,212,255,0.01) 2px,rgba(0,212,255,0.01) 4px);
+}
+
+/* ── LAYOUT ── */
+#app {
+position:fixed; inset:0;
+display:flex; flex-direction:column;
+}
+
+/* ── HEADER ── */
+#hdr {
+flex-shrink:0;
+height:36px;
+display:flex; align-items:center; justify-content:space-between;
+padding:0 12px;
+background:var(–surface);
+border-bottom:1px solid var(–border);
+}
+#hdr-title { font-size:11px; font-weight:700; color:var(–accent); letter-spacing:3px; text-transform:uppercase; }
+#hdr-stats { display:flex; gap:12px; align-items:center; }
+.stat { font-size:10px; color:var(–muted); letter-spacing:1px; }
+.stat b { color:var(–text); font-size:13px; }
+#lives { display:flex; gap:3px; align-items:center; }
+.life { width:8px; height:8px; border-radius:50%; background:var(–warn); box-shadow:0 0 4px var(–warn); transition:all .3s; }
+.life.dead { background:var(–muted); box-shadow:none; }
+
+/* ── TABLE AREA ── */
+#table-wrap {
+flex:1;
+overflow:auto;
+-webkit-overflow-scrolling:touch;
+display:flex;
+align-items:center;
+justify-content:center;
+padding:8px;
+/* critical: prevent flex child from collapsing */
+min-height:0;
+}
+
+/* THE GRID */
+#ptable {
+/* width/height set by JS based on difficulty */
+display:grid;
+gap:2px;
+flex-shrink:0;
+/* grid-template-columns/rows set by JS */
+}
+
+/* Gap cells — invisible, just hold grid spacing */
+.gcell {
+background:transparent;
+border:none;
+pointer-events:none;
+}
+
+/* Element slots */
+.slot {
+border:1px solid #2a3a52;
+border-radius:3px;
+background:#131926;
+display:flex; align-items:center; justify-content:center;
+transition:border-color .12s, box-shadow .12s, background .12s;
+position:relative;
+cursor:default;
+}
+.slot.hover {
+border-color:var(–accent);
+box-shadow:0 0 8px var(–accent), inset 0 0 6px rgba(0,212,255,.1);
+background:rgba(0,212,255,.06);
+}
+.slot.filled { border-color:transparent; }
+
+.placed {
+width:100%; height:100%; border-radius:3px;
+display:flex; flex-direction:column; align-items:center; justify-content:center;
+animation:pop .3s cubic-bezier(.34,1.56,.64,1);
+}
+.placed .pn { font-size:5px; color:rgba(255,255,255,.5); line-height:1; font-weight:bold; }
+.placed .ps { font-size:7px; font-weight:700; color:#fff; line-height:1.2; }
+
+@keyframes pop { from{transform:scale(.3);opacity:0} to{transform:scale(1);opacity:1} }
+@keyframes shake {
+0%,100%{transform:translateX(0)}
+25%{transform:translateX(-5px)} 75%{transform:translateX(5px)}
+}
+.shake { animation:shake .3s ease; }
+
+/* ── TRAY ── */
+#tray-wrap {
+flex-shrink:0;
+height:84px;
+background:var(–surface);
+border-top:1px solid var(–border);
+display:flex; flex-direction:column;
+padding:5px 8px 6px; gap:3px;
+}
+#tray-lbl { font-size:8px; color:var(–muted); letter-spacing:2px; text-align:center; text-transform:uppercase; }
+#tray-scroll { overflow-x:auto; overflow-y:hidden; -webkit-overflow-scrolling:touch; flex:1; }
+#tray { display:flex; gap:5px; align-items:center; height:100%; width:max-content; padding:1px 4px; }
+
+.card {
+width:52px; height:58px; border-radius:4px; flex-shrink:0;
+display:flex; flex-direction:column; align-items:center; justify-content:center;
+border:1px solid rgba(255,255,255,.12);
+cursor:grab; touch-action:none; transition:opacity .15s;
+}
+.card.dragging { opacity:.2; }
+.card .cs { font-size:18px; font-weight:700; color:#fff; line-height:1; }
+.card .cn { font-size:8px; color:rgba(255,255,255,.75); margin-top:2px; text-align:center; max-width:50px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+/* ── GHOST ── */
+#ghost {
+position:fixed; pointer-events:none; z-index:8000;
+width:52px; height:58px; border-radius:4px;
+display:none; flex-direction:column; align-items:center; justify-content:center;
+border:1px solid rgba(255,255,255,.4);
+box-shadow:0 8px 28px rgba(0,0,0,.7), 0 0 18px rgba(0,212,255,.4);
+transform:scale(1.1);
+}
+#ghost .cs { font-size:18px; font-weight:700; color:#fff; line-height:1; }
+#ghost .cn { font-size:8px; color:rgba(255,255,255,.75); margin-top:2px; }
+
+/* ── FEEDBACK ── */
+#flash { position:fixed; inset:0; pointer-events:none; z-index:7000; opacity:0; transition:opacity .1s; }
+#flash.ok  { background:rgba(0,255,136,.08); }
+#flash.bad { background:rgba(255,51,102,.15); }
+#wtxt {
+position:fixed; top:45%; left:50%; transform:translate(-50%,-50%);
+font-size:20px; font-weight:700; color:var(–danger);
+letter-spacing:4px; pointer-events:none; z-index:7500; opacity:0;
+text-shadow:0 0 18px var(–danger); transition:opacity .15s;
+text-transform:uppercase;
+}
+
+/* ── OVERLAY ── */
+#overlay {
+position:fixed; inset:0; z-index:6000;
+background:rgba(10,12,16,.97);
+display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px;
+}
+#overlay.off { display:none; }
+
+.ov-title { font-size:18px; font-weight:700; letter-spacing:4px; color:var(–accent); text-align:center; text-transform:uppercase; }
+.ov-score { font-size:38px; font-weight:700; color:var(–text); }
+.ov-score span { color:var(–accent); }
+.ov-sub { font-size:13px; color:var(–muted); text-align:center; max-width:300px; line-height:1.6; }
+
+/* Difficulty picker */
+#diff-picker { display:flex; gap:10px; }
+.diff-btn {
+padding:10px 18px; border-radius:4px; border:2px solid var(–border);
+background:var(–surface); color:var(–text);
+font-size:13px; font-weight:700; letter-spacing:2px; cursor:pointer;
+text-transform:uppercase; transition:all .15s;
+display:flex; flex-direction:column; align-items:center; gap:3px;
+}
+.diff-btn:hover, .diff-btn.sel { border-color:var(–accent); color:var(–accent); background:rgba(0,212,255,.08); }
+.diff-btn.sel { box-shadow:0 0 12px rgba(0,212,255,.3); }
+.diff-btn span { font-size:9px; color:var(–muted); letter-spacing:1px; font-weight:400; }
+.diff-btn.sel span { color:var(–accent); opacity:.7; }
+
+.btn {
+padding:11px 28px; border-radius:3px; border:none;
+background:var(–accent); color:var(–bg);
+font-size:11px; font-weight:700; letter-spacing:3px; cursor:pointer; text-transform:uppercase;
+}
+.btn:active { opacity:.85; transform:scale(.97); }
+
+/* ── ELEMENT COLOURS ── */
+/* cards */
+.c-alkali     { background:#7c2d12; }
+.c-alkaline   { background:#713f12; }
+.c-transition { background:#1e3a5f; }
+.c-posttrans  { background:#1a3a2e; }
+.c-metalloid  { background:#2d2a5c; }
+.c-nonmetal   { background:#1a3d1a; }
+.c-halogen    { background:#2d1b4e; }
+.c-noble      { background:#2d1a1a; }
+.c-lanthanide { background:#1a2d3d; }
+.c-actinide   { background:#2d1a2d; }
+.c-unknown    { background:#252525; }
+/* placed (brighter) */
+.p-alkali     { background:#9a3515; }
+.p-alkaline   { background:#8f5016; }
+.p-transition { background:#234876; }
+.p-posttrans  { background:#1f4a38; }
+.p-metalloid  { background:#363372; }
+.p-nonmetal   { background:#1f4d1f; }
+.p-halogen    { background:#3a2264; }
+.p-noble      { background:#3a2222; }
+.p-lanthanide { background:#1f384d; }
+.p-actinide   { background:#3a2238; }
+.p-unknown    { background:#333;    }
+</style>
+
+</head>
+<body>
+<div id="app">
+  <div id="hdr">
+    <div id="hdr-title">⚛ Periodic Puzzle</div>
+    <div id="hdr-stats">
+      <div class="stat">SCORE <b id="sv">0</b>/<b id="total">0</b></div>
+      <div class="stat">WRONG</div>
+      <div id="lives"></div>
+    </div>
+  </div>
+
+  <div id="table-wrap">
+    <div id="ptable"></div>
+  </div>
+
+  <div id="tray-wrap">
+    <div id="tray-lbl">Drag the element to its correct position</div>
+    <div id="tray-scroll"><div id="tray"></div></div>
+  </div>
+</div>
+
+<div id="ghost"><div class="cs"></div><div class="cn"></div></div>
+<div id="flash"></div>
+<div id="wtxt">✕ Wrong!</div>
+
+<div id="overlay">
+  <div class="ov-title" id="ov-title">Periodic Puzzle</div>
+  <div class="ov-score" id="ov-score" style="display:none"></div>
+  <div class="ov-sub" id="ov-sub">Choose your difficulty, then place each element in its correct position. 10 wrong placements = game over.</div>
+  <div id="diff-picker">
+    <button class="diff-btn sel" data-diff="easy">Easy<span>Rows 1–3 · 18 el.</span></button>
+    <button class="diff-btn"     data-diff="medium">Medium<span>Rows 1–5 · 54 el.</span></button>
+    <button class="diff-btn"     data-diff="hard">Hard<span>All rows · 118 el.</span></button>
+  </div>
+  <button class="btn" id="ov-btn">Start Game</button>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────
+// ALL 118 ELEMENTS  [atomicNum, symbol, name, gridRow, gridCol, category]
+// Grid is 18 cols × 10 rows (1-indexed).
+// Row 8 = blank spacer between main table and lanthanide/actinide rows.
+// Rows 9–10 = lanthanide / actinide series (cols 4–17).
+// ─────────────────────────────────────────────────────────────
+const EDATA = [
+  // Period 1 (row 1)
+  [1,"H","Hydrogen",1,1,"nonmetal"],
+  [2,"He","Helium",1,18,"noble"],
+  // Period 2 (row 2)
+  [3,"Li","Lithium",2,1,"alkali"],
+  [4,"Be","Beryllium",2,2,"alkaline"],
+  [5,"B","Boron",2,13,"metalloid"],
+  [6,"C","Carbon",2,14,"nonmetal"],
+  [7,"N","Nitrogen",2,15,"nonmetal"],
+  [8,"O","Oxygen",2,16,"nonmetal"],
+  [9,"F","Fluorine",2,17,"halogen"],
+  [10,"Ne","Neon",2,18,"noble"],
+  // Period 3 (row 3)
+  [11,"Na","Sodium",3,1,"alkali"],
+  [12,"Mg","Magnesium",3,2,"alkaline"],
+  [13,"Al","Aluminum",3,13,"posttrans"],
+  [14,"Si","Silicon",3,14,"metalloid"],
+  [15,"P","Phosphorus",3,15,"nonmetal"],
+  [16,"S","Sulfur",3,16,"nonmetal"],
+  [17,"Cl","Chlorine",3,17,"halogen"],
+  [18,"Ar","Argon",3,18,"noble"],
+  // Period 4 (row 4)
+  [19,"K","Potassium",4,1,"alkali"],
+  [20,"Ca","Calcium",4,2,"alkaline"],
+  [21,"Sc","Scandium",4,3,"transition"],
+  [22,"Ti","Titanium",4,4,"transition"],
+  [23,"V","Vanadium",4,5,"transition"],
+  [24,"Cr","Chromium",4,6,"transition"],
+  [25,"Mn","Manganese",4,7,"transition"],
+  [26,"Fe","Iron",4,8,"transition"],
+  [27,"Co","Cobalt",4,9,"transition"],
+  [28,"Ni","Nickel",4,10,"transition"],
+  [29,"Cu","Copper",4,11,"transition"],
+  [30,"Zn","Zinc",4,12,"transition"],
+  [31,"Ga","Gallium",4,13,"posttrans"],
+  [32,"Ge","Germanium",4,14,"metalloid"],
+  [33,"As","Arsenic",4,15,"metalloid"],
+  [34,"Se","Selenium",4,16,"nonmetal"],
+  [35,"Br","Bromine",4,17,"halogen"],
+  [36,"Kr","Krypton",4,18,"noble"],
+  // Period 5 (row 5)
+  [37,"Rb","Rubidium",5,1,"alkali"],
+  [38,"Sr","Strontium",5,2,"alkaline"],
+  [39,"Y","Yttrium",5,3,"transition"],
+  [40,"Zr","Zirconium",5,4,"transition"],
+  [41,"Nb","Niobium",5,5,"transition"],
+  [42,"Mo","Molybdenum",5,6,"transition"],
+  [43,"Tc","Technetium",5,7,"transition"],
+  [44,"Ru","Ruthenium",5,8,"transition"],
+  [45,"Rh","Rhodium",5,9,"transition"],
+  [46,"Pd","Palladium",5,10,"transition"],
+  [47,"Ag","Silver",5,11,"transition"],
+  [48,"Cd","Cadmium",5,12,"transition"],
+  [49,"In","Indium",5,13,"posttrans"],
+  [50,"Sn","Tin",5,14,"posttrans"],
+  [51,"Sb","Antimony",5,15,"metalloid"],
+  [52,"Te","Tellurium",5,16,"metalloid"],
+  [53,"I","Iodine",5,17,"halogen"],
+  [54,"Xe","Xenon",5,18,"noble"],
+  // Period 6 (row 6)
+  [55,"Cs","Cesium",6,1,"alkali"],
+  [56,"Ba","Barium",6,2,"alkaline"],
+  [57,"La","Lanthanum",6,3,"lanthanide"],
+  [72,"Hf","Hafnium",6,4,"transition"],
+  [73,"Ta","Tantalum",6,5,"transition"],
+  [74,"W","Tungsten",6,6,"transition"],
+  [75,"Re","Rhenium",6,7,"transition"],
+  [76,"Os","Osmium",6,8,"transition"],
+  [77,"Ir","Iridium",6,9,"transition"],
+  [78,"Pt","Platinum",6,10,"transition"],
+  [79,"Au","Gold",6,11,"transition"],
+  [80,"Hg","Mercury",6,12,"transition"],
+  [81,"Tl","Thallium",6,13,"posttrans"],
+  [82,"Pb","Lead",6,14,"posttrans"],
+  [83,"Bi","Bismuth",6,15,"posttrans"],
+  [84,"Po","Polonium",6,16,"metalloid"],
+  [85,"At","Astatine",6,17,"halogen"],
+  [86,"Rn","Radon",6,18,"noble"],
+  // Period 7 (row 7)
+  [87,"Fr","Francium",7,1,"alkali"],
+  [88,"Ra","Radium",7,2,"alkaline"],
+  [89,"Ac","Actinium",7,3,"actinide"],
+  [104,"Rf","Rutherfordium",7,4,"transition"],
+  [105,"Db","Dubnium",7,5,"transition"],
+  [106,"Sg","Seaborgium",7,6,"transition"],
+  [107,"Bh","Bohrium",7,7,"transition"],
+  [108,"Hs","Hassium",7,8,"transition"],
+  [109,"Mt","Meitnerium",7,9,"unknown"],
+  [110,"Ds","Darmstadtium",7,10,"unknown"],
+  [111,"Rg","Roentgenium",7,11,"unknown"],
+  [112,"Cn","Copernicium",7,12,"posttrans"],
+  [113,"Nh","Nihonium",7,13,"posttrans"],
+  [114,"Fl","Flerovium",7,14,"posttrans"],
+  [115,"Mc","Moscovium",7,15,"posttrans"],
+  [116,"Lv","Livermorium",7,16,"posttrans"],
+  [117,"Ts","Tennessine",7,17,"halogen"],
+  [118,"Og","Oganesson",7,18,"noble"],
+  // Row 8 = blank spacer (no elements)
+  // Lanthanides: row 9, cols 4-17
+  [58,"Ce","Cerium",9,4,"lanthanide"],
+  [59,"Pr","Praseodymium",9,5,"lanthanide"],
+  [60,"Nd","Neodymium",9,6,"lanthanide"],
+  [61,"Pm","Promethium",9,7,"lanthanide"],
+  [62,"Sm","Samarium",9,8,"lanthanide"],
+  [63,"Eu","Europium",9,9,"lanthanide"],
+  [64,"Gd","Gadolinium",9,10,"lanthanide"],
+  [65,"Tb","Terbium",9,11,"lanthanide"],
+  [66,"Dy","Dysprosium",9,12,"lanthanide"],
+  [67,"Ho","Holmium",9,13,"lanthanide"],
+  [68,"Er","Erbium",9,14,"lanthanide"],
+  [69,"Tm","Thulium",9,15,"lanthanide"],
+  [70,"Yb","Ytterbium",9,16,"lanthanide"],
+  [71,"Lu","Lutetium",9,17,"lanthanide"],
+  // Actinides: row 10, cols 4-17
+  [90,"Th","Thorium",10,4,"actinide"],
+  [91,"Pa","Protactinium",10,5,"actinide"],
+  [92,"U","Uranium",10,6,"actinide"],
+  [93,"Np","Neptunium",10,7,"actinide"],
+  [94,"Pu","Plutonium",10,8,"actinide"],
+  [95,"Am","Americium",10,9,"actinide"],
+  [96,"Cm","Curium",10,10,"actinide"],
+  [97,"Bk","Berkelium",10,11,"actinide"],
+  [98,"Cf","Californium",10,12,"actinide"],
+  [99,"Es","Einsteinium",10,13,"actinide"],
+  [100,"Fm","Fermium",10,14,"actinide"],
+  [101,"Md","Mendelevium",10,15,"actinide"],
+  [102,"No","Nobelium",10,16,"actinide"],
+  [103,"Lr","Lawrencium",10,17,"actinide"],
+];
+
+// ─────────────────────────────────────────────────────────────
+// DIFFICULTY CONFIG
+// Each difficulty defines which grid rows to show.
+// Elements whose gridRow is NOT in activeRows are excluded entirely.
+// For hard mode we show rows 1-10 (including lanthanide/actinide rows 9-10
+// and the spacer row 8).
+// ─────────────────────────────────────────────────────────────
+const DIFFICULTIES = {
+  easy:   { rows:[1,2,3],           maxRows:3,  label:"18 elements" },
+  medium: { rows:[1,2,3,4,5],       maxRows:5,  label:"54 elements" },
+  hard:   { rows:[1,2,3,4,5,6,7,8,9,10], maxRows:10, label:"118 elements" },
+};
+
+// Build element lookup
+const EL = {};
+const GRID_ALL = {}; // "r,c" -> atomicNum  (all 118)
+EDATA.forEach(([n,s,nm,r,c,cat]) => {
+  EL[n] = {n,s,nm,r,c,cat};
+  GRID_ALL[`${r},${c}`] = n;
+});
+
+// ─────────────────────────────────────────────────────────────
+// GAME STATE
+// ─────────────────────────────────────────────────────────────
+let score=0, wrongs=0, active=false, difficulty='easy';
+const MAX_WRONGS = 10;
+let remaining = [];
+let dragNum = null;
+let activeGrid = {}; // subset of GRID_ALL for current difficulty
+let gridRows = 0;    // number of rows to render
+
+const ghost   = document.getElementById('ghost');
+const flashEl = document.getElementById('flash');
+const wtxt    = document.getElementById('wtxt');
+
+// ─────────────────────────────────────────────────────────────
+// BUILD TABLE
+// Renders an 18-col × gridRows-row CSS grid.
+// Every cell slot is a div child in source order (left-to-right, top-to-bottom).
+// Element cells → .slot   |   empty/gap cells → .gcell (invisible)
+// ─────────────────────────────────────────────────────────────
+function buildTable() {
+  const pt = document.getElementById('ptable');
+  pt.innerHTML = '';
+
+  const CELL = 28; // px per cell
+  const GAP  = 2;  // px gap
+
+  // Size the grid container explicitly so it never collapses
+  const W = 18 * CELL + 17 * GAP;
+  const H = gridRows * CELL + (gridRows - 1) * GAP;
+  pt.style.gridTemplateColumns = `repeat(18, ${CELL}px)`;
+  pt.style.gridTemplateRows    = `repeat(${gridRows}, ${CELL}px)`;
+  pt.style.width  = W + 'px';
+  pt.style.height = H + 'px';
+
+  for (let r = 1; r <= gridRows; r++) {
+    for (let c = 1; c <= 18; c++) {
+      const key = `${r},${c}`;
+      const div = document.createElement('div');
+      if (activeGrid[key]) {
+        div.className = 'slot';
+        div.dataset.expects = activeGrid[key];
+      } else {
+        div.className = 'gcell';
+      }
+      pt.appendChild(div);
+    }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// BUILD TRAY
+// ─────────────────────────────────────────────────────────────
+function buildTray() {
+  const tray = document.getElementById('tray');
+  tray.innerHTML = '';
+  remaining.forEach(n => createCard(n, tray, true));
+}
+
+function createCard(n, container, append) {
+  const el = EL[n];
+  const card = document.createElement('div');
+  card.className = `card c-${el.cat}`;
+  card.dataset.num = n;
+  card.innerHTML = `<div class="cs">${el.s}</div><div class="cn">${el.nm}</div>`;
+  card.addEventListener('mousedown',  cardMouseDown);
+  card.addEventListener('touchstart', cardTouchStart, {passive:false});
+  card.addEventListener('touchmove',  cardTouchMove,  {passive:false});
+  card.addEventListener('touchend',   cardTouchEnd,   {passive:false});
+  if (append) container.appendChild(card);
+  else container.prepend(card);
+  return card;
+}
+
+// ─────────────────────────────────────────────────────────────
+// DRAG HELPERS
+// ─────────────────────────────────────────────────────────────
+function startDrag(n, x, y) {
+  dragNum = n;
+  const el = EL[n];
+  ghost.querySelector('.cs').textContent = el.s;
+  ghost.querySelector('.cn').textContent = el.nm;
+  ghost.className = `c-${el.cat}`; // background colour class
+  // restore required inline styles (className wipes them if they were inline)
+  ghost.style.cssText = 'position:fixed;pointer-events:none;z-index:8000;width:52px;height:58px;border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.4);box-shadow:0 8px 28px rgba(0,0,0,.7),0 0 18px rgba(0,212,255,.4);transform:scale(1.1);';
+  placeGhost(x, y);
+  const card = document.querySelector(`.card[data-num="${n}"]`);
+  if (card) card.classList.add('dragging');
+}
+
+function placeGhost(x, y) {
+  ghost.style.left = (x - 26) + 'px';
+  ghost.style.top  = (y - 29) + 'px';
+}
+
+function doHover(x, y) {
+  clearHover();
+  ghost.style.visibility = 'hidden';
+  const under = document.elementFromPoint(x, y);
+  ghost.style.visibility = '';
+  const slot = under && under.closest('.slot');
+  if (slot && !slot.classList.contains('filled') && slot.dataset.expects) {
+    slot.classList.add('hover');
+  }
+}
+
+function clearHover() {
+  document.querySelectorAll('.slot.hover').forEach(s => s.classList.remove('hover'));
+}
+
+function dropAt(x, y) {
+  ghost.style.display = 'none';
+  clearHover();
+  const under = document.elementFromPoint(x, y);
+  const slot = under && under.closest('.slot');
+  if (slot && !slot.classList.contains('filled') && slot.dataset.expects) {
+    tryPlace(parseInt(slot.dataset.expects), slot);
+  } else {
+    cancelDrag();
+  }
+}
+
+function cancelDrag() {
+  if (dragNum) {
+    const card = document.querySelector(`.card[data-num="${dragNum}"]`);
+    if (card) card.classList.remove('dragging');
+    dragNum = null;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// MOUSE DRAG
+// ─────────────────────────────────────────────────────────────
+function cardMouseDown(e) {
+  if (!active) return;
+  e.preventDefault();
+  startDrag(parseInt(e.currentTarget.dataset.num), e.clientX, e.clientY);
+  document.addEventListener('mousemove', onMouseMove);
+  document.addEventListener('mouseup',   onMouseUp);
+}
+function onMouseMove(e) {
+  placeGhost(e.clientX, e.clientY);
+  doHover(e.clientX, e.clientY);
+}
+function onMouseUp(e) {
+  document.removeEventListener('mousemove', onMouseMove);
+  document.removeEventListener('mouseup',   onMouseUp);
+  if (!dragNum) return;
+  dropAt(e.clientX, e.clientY);
+}
+
+// ─────────────────────────────────────────────────────────────
+// TOUCH DRAG
+// ─────────────────────────────────────────────────────────────
+function cardTouchStart(e) {
+  if (!active) return;
+  e.preventDefault();
+  const t = e.touches[0];
+  startDrag(parseInt(e.currentTarget.dataset.num), t.clientX, t.clientY);
+}
+function cardTouchMove(e) {
+  if (!dragNum) return;
+  e.preventDefault();
+  const t = e.touches[0];
+  placeGhost(t.clientX, t.clientY);
+  doHover(t.clientX, t.clientY);
+}
+function cardTouchEnd(e) {
+  if (!dragNum) return;
+  e.preventDefault();
+  const t = e.changedTouches[0];
+  dropAt(t.clientX, t.clientY);
+}
+
+// ─────────────────────────────────────────────────────────────
+// PLACEMENT LOGIC
+// ─────────────────────────────────────────────────────────────
+function tryPlace(expects, slot) {
+  const n = dragNum;
+  dragNum = null;
+  document.querySelectorAll('.card.dragging').forEach(c => c.classList.remove('dragging'));
+
+  if (expects === n) {
+    // ✓ Correct
+    const el = EL[n];
+    slot.innerHTML = '';
+    slot.classList.add('filled');
+    const div = document.createElement('div');
+    div.className = `placed p-${el.cat}`;
+    div.innerHTML = `<div class="pn">${el.n}</div><div class="ps">${el.s}</div>`;
+    slot.appendChild(div);
+    const card = document.querySelector(`.card[data-num="${n}"]`);
+    if (card) card.remove();
+    remaining = remaining.filter(x => x !== n);
+    score++;
+    document.getElementById('sv').textContent = score;
+    doFlash('ok');
+    if (score === remaining.length + score && remaining.length === 0) {
+      setTimeout(() => endGame(true), 400);
+    }
+  } else {
+    // ✗ Wrong
+    wrongs++;
+    updateLives();
+    doFlash('bad');
+    wtxt.style.opacity = 1;
+    setTimeout(() => wtxt.style.opacity = 0, 700);
+    slot.classList.add('shake');
+    setTimeout(() => slot.classList.remove('shake'), 350);
+    const card = document.querySelector(`.card[data-num="${n}"]`);
+    if (card) { card.classList.remove('dragging'); document.getElementById('tray').appendChild(card); }
+    if (wrongs >= MAX_WRONGS) setTimeout(() => endGame(false), 400);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// FEEDBACK
+// ─────────────────────────────────────────────────────────────
+function doFlash(type) {
+  flashEl.className = type;
+  flashEl.style.opacity = 1;
+  setTimeout(() => flashEl.style.opacity = 0, 250);
+}
+
+function updateLives() {
+  const el = document.getElementById('lives');
+  el.innerHTML = '';
+  for (let i = 0; i < MAX_WRONGS; i++) {
+    const d = document.createElement('div');
+    d.className = 'life' + (i < wrongs ? ' dead' : '');
+    el.appendChild(d);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// GAME FLOW
+// ─────────────────────────────────────────────────────────────
+function startGame() {
+  score = 0; wrongs = 0; dragNum = null; active = false;
+
+  const cfg = DIFFICULTIES[difficulty];
+
+  // Build the active grid for this difficulty
+  activeGrid = {};
+  EDATA.forEach(([n,s,nm,r,c,cat]) => {
+    if (cfg.rows.includes(r)) {
+      activeGrid[`${r},${c}`] = n;
+    }
+  });
+
+  // For hard mode, row 8 is a spacer — no elements, but we still render it
+  gridRows = cfg.maxRows;
+
+  // Elements to place = only those in activeGrid
+  remaining = Object.values(activeGrid).slice();
+  // Shuffle
+  for (let i = remaining.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
+  }
+
+  const totalEl = remaining.length;
+  document.getElementById('sv').textContent = '0';
+  document.getElementById('total').textContent = totalEl;
+  updateLives();
+  buildTable();
+  buildTray();
+  active = true;
+  document.getElementById('overlay').classList.add('off');
+}
+
+function endGame(won) {
+  active = false;
+  const ov    = document.getElementById('overlay');
+  const title = document.getElementById('ov-title');
+  const sc    = document.getElementById('ov-score');
+  const sub   = document.getElementById('ov-sub');
+  const btn   = document.getElementById('ov-btn');
+  const picker = document.getElementById('diff-picker');
+  const total  = DIFFICULTIES[difficulty].rows.reduce((a,r) => {
+    return a + EDATA.filter(e => e[3] === r).length;
+  }, 0);
+
+  sc.style.display = 'block';
+  title.style.color = won ? 'var(--success)' : 'var(--danger)';
+  title.textContent = won ? '🎉 Perfect!' : 'Game Over';
+  sc.innerHTML = `<span>${score}</span> / ${total}`;
+  sub.textContent = won
+    ? `You placed all ${total} elements correctly! Amazing!`
+    : `You placed ${score} element${score!==1?'s':''} correctly before ${MAX_WRONGS} wrong placements.`;
+  picker.style.display = 'flex';
+  btn.textContent = 'Play Again';
+  btn.onclick = startGame;
+  ov.classList.remove('off');
+}
+
+// ─────────────────────────────────────────────────────────────
+// DIFFICULTY SELECTION
+// ─────────────────────────────────────────────────────────────
+document.querySelectorAll('.diff-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('sel'));
+    btn.classList.add('sel');
+    difficulty = btn.dataset.diff;
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────────────────────
+document.getElementById('ov-btn').onclick = startGame;
+updateLives();
+
+// Prevent iOS page scroll while dragging
+document.addEventListener('touchmove', e => { if (dragNum) e.preventDefault(); }, {passive:false});
+</script>
+
+</body>
+</html>
