@@ -37,7 +37,7 @@ padding:0 12px; background:var(--surface); border-bottom:1px solid var(--border)
 #hdr-stats { display:flex; gap:12px; align-items:center; }
 .stat { font-size:11px; color:var(--muted); letter-spacing:1px; }
 .stat b { color:var(--text); font-size:14px; }
-#lives { display:flex; gap:3px; align-items:center; flex-wrap: wrap; max-width: 100px; justify-content: flex-end;}
+#lives { display:flex; gap:3px; align-items:center; flex-wrap: wrap; max-width: 120px; justify-content: flex-end;}
 .life { width:7px; height:7px; border-radius:50%; background:var(--warn); box-shadow:0 0 4px var(--warn); transition:all .3s; }
 .life.dead { background:var(--muted); box-shadow:none; opacity: 0.3; }
 
@@ -61,7 +61,6 @@ aspect-ratio: 1 / 1;
 border:1px solid #2a3a52; border-radius:3px;
 background:#131926; display:flex; align-items:center; justify-content:center;
 transition:all .12s; position:relative; cursor:default;
-/* Bigger, scaling font for the background numbers */
 font-size: clamp(9px, 2vw, 16px);
 color: var(--muted);
 font-weight: bold;
@@ -74,7 +73,6 @@ width:100%; height:100%; border-radius:3px;
 display:flex; flex-direction:column; align-items:center; justify-content:center;
 animation:pop .3s cubic-bezier(.34,1.56,.64,1);
 }
-/* Scaled font for placed elements */
 .placed .pn { font-size: 0.55em; color:rgba(255,255,255,0.6); font-weight:bold; line-height: 1; }
 .placed .ps { font-size: 1.1em; font-weight:700; color:#fff; line-height: 1.1; }
 
@@ -119,20 +117,33 @@ background: var(--surface);
 #overlay {
 position:fixed; inset:0; z-index:9500;
 background:rgba(10,12,16,.98);
-display:flex; flex-direction:column; align-items:center; justify-content:center; gap:25px;
+display:flex; flex-direction:column; align-items:center; justify-content:center; padding: 20px;
 }
 #overlay.off { display:none; }
+.ov-content { display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 500px; gap: 20px;}
 .ov-title { font-size:24px; font-weight:700; color:var(--accent); letter-spacing:5px; text-transform:uppercase; }
 .ov-score { font-size:48px; font-weight:700; color: var(--text); }
-.ov-sub { font-size:14px; color:var(--muted); text-align:center; max-width:80%; line-height: 1.5; }
-#diff-picker { display:flex; flex-direction: column; gap:12px; width: 220px; }
+.ov-sub { font-size:14px; color:var(--muted); text-align:center; line-height: 1.5; }
+#diff-picker { display:flex; flex-direction: column; gap:10px; width: 240px; }
 .diff-btn {
-padding:16px; border:1px solid var(--border); background:var(--surface);
-color:var(--text); cursor:pointer; border-radius:6px; font-size:12px;
+padding:14px; border:1px solid var(--border); background:var(--surface);
+color:var(--text); cursor:pointer; border-radius:6px; font-size:11px;
 font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
 transition: all 0.2s;
 }
 .diff-btn:hover { border-color: var(--accent); background: rgba(0,212,255,0.05); }
+
+/* Review Section */
+#review-area { width: 100%; max-height: 250px; overflow-y: auto; margin-top: 10px; padding: 10px; border-top: 1px solid var(--border);}
+#review-title { font-size: 10px; color: var(--danger); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 15px; text-align: center;}
+#review-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; justify-items: center;}
+.review-tile { 
+    width: 100%; aspect-ratio: 1/1.2; border-radius: 4px; display: flex; flex-direction: column; 
+    align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,0.1);
+}
+.review-tile .rt-n { font-size: 8px; opacity: 0.7; font-weight: bold; }
+.review-tile .rt-s { font-size: 16px; font-weight: 900; }
+.review-tile .rt-nm { font-size: 6px; white-space: nowrap; overflow: hidden; max-width: 90%; }
 
 /* Category Colors */
 .c-alkali { background:#7c2d12; } .c-alkaline { background:#713f12; }
@@ -175,18 +186,25 @@ transition: all 0.2s;
 <div id="flash"></div>
 
 <div id="overlay">
-  <div class="ov-title" id="ov-title">Periodic Puzzle</div>
-  <div class="ov-score" id="ov-score" style="display:none"></div>
-  <div class="ov-sub" id="ov-sub">Click a mode to start immediately.</div>
-  <div id="diff-picker">
-    <button class="diff-btn" data-diff="easy">Easy (Rows 1-3)</button>
-    <button class="diff-btn" data-diff="medium">Medium (Rows 1-5)</button>
-    <button class="diff-btn" data-diff="hard">Hard (Full Table)</button>
+  <div class="ov-content">
+    <div class="ov-title" id="ov-title">Periodic Puzzle</div>
+    <div class="ov-score" id="ov-score" style="display:none"></div>
+    <div class="ov-sub" id="ov-sub">Click a mode to start immediately.</div>
+    
+    <div id="review-area" style="display:none">
+        <div id="review-title">Mistakes Review</div>
+        <div id="review-grid"></div>
+    </div>
+
+    <div id="diff-picker">
+      <button class="diff-btn" data-diff="easy">Easy (Rows 1-3)</button>
+      <button class="diff-btn" data-diff="medium">Medium (Rows 1-5)</button>
+      <button class="diff-btn" data-diff="hard">Hard (Full Table)</button>
+    </div>
   </div>
 </div>
 
 <script>
-// Data omitted for brevity but remains the same as your source
 const EDATA = [
   [1,"H","Hydrogen",1,1,"nonmetal"],[2,"He","Helium",1,18,"noble"],[3,"Li","Lithium",2,1,"alkali"],[4,"Be","Beryllium",2,2,"alkaline"],[5,"B","Boron",2,13,"metalloid"],[6,"C","Carbon",2,14,"nonmetal"],[7,"N","Nitrogen",2,15,"nonmetal"],[8,"O","Oxygen",2,16,"nonmetal"],[9,"F","Fluorine",2,17,"halogen"],[10,"Ne","Neon",2,18,"noble"],[11,"Na","Sodium",3,1,"alkali"],[12,"Mg","Magnesium",3,2,"alkaline"],[13,"Al","Aluminum",3,13,"posttrans"],[14,"Si","Silicon",3,14,"metalloid"],[15,"P","Phosphorus",3,15,"nonmetal"],[16,"S","Sulfur",3,16,"nonmetal"],[17,"Cl","Chlorine",3,17,"halogen"],[18,"Ar","Argon",3,18,"noble"],[19,"K","Potassium",4,1,"alkali"],[20,"Ca","Calcium",4,2,"alkaline"],[21,"Sc","Scandium",4,3,"transition"],[22,"Ti","Titanium",4,4,"transition"],[23,"V","Vanadium",4,5,"transition"],[24,"Cr","Chromium",4,6,"transition"],[25,"Mn","Manganese",4,7,"transition"],[26,"Fe","Iron",4,8,"transition"],[27,"Co","Cobalt",4,9,"transition"],[28,"Ni","Nickel",4,10,"transition"],[29,"Cu","Copper",4,11,"transition"],[30,"Zn","Zinc",4,12,"transition"],[31,"Ga","Gallium",4,13,"posttrans"],[32,"Ge","Germanium",4,14,"metalloid"],[33,"As","Arsenic",4,15,"metalloid"],[34,"Se","Selenium",4,16,"nonmetal"],[35,"Br","Bromine",4,17,"halogen"],[36,"Kr","Krypton",4,18,"noble"],[37,"Rb","Rubidium",5,1,"alkali"],[38,"Sr","Strontium",5,2,"alkaline"],[39,"Y","Yttrium",5,3,"transition"],[40,"Zr","Zirconium",5,4,"transition"],[41,"Nb","Niobium",5,5,"transition"],[42,"Mo","Molybdenum",5,6,"transition"],[43,"Tc","Technetium",5,7,"transition"],[44,"Ru","Ruthenium",5,8,"transition"],[45,"Rh","Rhodium",5,9,"transition"],[46,"Pd","Palladium",5,10,"transition"],[47,"Ag","Silver",5,11,"transition"],[48,"Cd","Cadmium",5,12,"transition"],[49,"In","Indium",5,13,"posttrans"],[50,"Sn","Tin",5,14,"posttrans"],[51,"Sb","Antimony",5,15,"metalloid"],[52,"Te","Tellurium",5,16,"metalloid"],[53,"I","Iodine",5,17,"halogen"],[54,"Xe","Xenon",5,18,"noble"],[55,"Cs","Cesium",6,1,"alkali"],[56,"Ba","Barium",6,2,"alkaline"],[57,"La","Lanthanum",6,3,"lanthanide"],[72,"Hf","Hafnium",6,4,"transition"],[73,"Ta","Tantalum",6,5,"transition"],[74,"W","Tungsten",6,6,"transition"],[75,"Re","Rhenium",6,7,"transition"],[76,"Os","Osmium",6,8,"transition"],[77,"Ir","Iridium",6,9,"transition"],[78,"Pt","Platinum",6,10,"transition"],[79,"Au","Gold",6,11,"transition"],[80,"Hg","Mercury",6,12,"transition"],[81,"Tl","Thallium",6,13,"posttrans"],[82,"Pb","Lead",6,14,"posttrans"],[83,"Bi","Bismuth",6,15,"posttrans"],[84,"Po","Polonium",6,16,"metalloid"],[85,"At","Astatine",6,17,"halogen"],[86,"Rn","Radon",6,18,"noble"],[87,"Fr","Francium",7,1,"alkali"],[88,"Ra","Radium",7,2,"alkaline"],[89,"Ac","Actinium",7,3,"actinide"],[104,"Rf","Rutherfordium",7,4,"transition"],[105,"Db","Dubnium",7,5,"transition"],[106,"Sg","Seaborgium",7,6,"transition"],[107,"Bh","Bohrium",7,7,"transition"],[108,"Hs","Hassium",7,8,"transition"],[109,"Mt","Meitnerium",7,9,"unknown"],[110,"Ds","Darmstadtium",7,10,"unknown"],[111,"Rg","Roentgenium",7,11,"unknown"],[112,"Cn","Copernicium",7,12,"posttrans"],[113,"Nh","Nihonium",7,13,"posttrans"],[114,"Fl","Flerovium",7,14,"posttrans"],[115,"Mc","Moscovium",7,15,"posttrans"],[116,"Lv","Livermorium",7,16,"posttrans"],[117,"Ts","Tennessine",7,17,"halogen"],[118,"Og","Oganesson",7,18,"noble"],[58,"Ce","Cerium",9,4,"lanthanide"],[59,"Pr","Praseodymium",9,5,"lanthanide"],[60,"Nd","Neodymium",9,6,"lanthanide"],[61,"Pm","Promethium",9,7,"lanthanide"],[62,"Sm","Samarium",9,8,"lanthanide"],[63,"Eu","Europium",9,9,"lanthanide"],[64,"Gd","Gadolinium",9,10,"lanthanide"],[65,"Tb","Terbium",9,11,"lanthanide"],[66,"Dy","Dysprosium",9,12,"lanthanide"],[67,"Ho","Holmium",9,13,"lanthanide"],[68,"Er","Erbium",9,14,"lanthanide"],[69,"Tm","Thulium",9,15,"lanthanide"],[70,"Yb","Ytterbium",9,16,"lanthanide"],[71,"Lu","Lutetium",9,17,"lanthanide"],[90,"Th","Thorium",10,4,"actinide"],[91,"Pa","Protactinium",10,5,"actinide"],[92,"U","Uranium",10,6,"actinide"],[93,"Np","Neptunium",10,7,"actinide"],[94,"Pu","Plutonium",10,8,"actinide"],[95,"Am","Americium",10,9,"actinide"],[96,"Cm","Curium",10,10,"actinide"],[97,"Bk","Berkelium",10,11,"actinide"],[98,"Cf","Californium",10,12,"actinide"],[99,"Es","Einsteinium",10,13,"actinide"],[100,"Fm","Fermium",10,14,"actinide"],[101,"Md","Mendelevium",10,15,"actinide"],[102,"No","Nobelium",10,16,"actinide"],[103,"Lr","Lawrencium",10,17,"actinide"]
 ];
@@ -199,6 +217,7 @@ const DIFFICULTIES = {
 
 let EL = {}, score=0, wrongs=0, active=false, difficulty='easy', maxWrongs=10;
 let remainingPool = [], trayElements = [], dragNum = null;
+let mistakes = new Set(); // Track unique elements gotten wrong
 
 EDATA.forEach(d => { EL[d[0]] = {n:d[0], s:d[1], nm:d[2], r:d[3], c:d[4], cat:d[5]}; });
 
@@ -293,10 +312,10 @@ function checkHover(x, y) {
   if (slot && !slot.classList.contains('filled')) slot.classList.add('hover');
 }
 
-function drop(x, y) {
+function drop(cx, cy) {
   const ghost = document.getElementById('ghost');
   ghost.style.display = 'none';
-  const target = document.elementFromPoint(x, y);
+  const target = document.elementFromPoint(cx, cy);
   const slot = target?.closest('.slot');
   const n = dragNum;
   dragNum = null;
@@ -311,15 +330,14 @@ function drop(x, y) {
     updateTray();
     if (score === totalToPlace) endGame(true);
   } else {
-    // WRONG GUESS Logic: Move to back of deck
     wrongs++;
+    mistakes.add(n); // Add the atomic number of the element you dragged incorrectly
     doFlash('bad');
     updateLives();
     if (slot) {
       slot.classList.add('shake');
       setTimeout(() => slot.classList.remove('shake'), 300);
     }
-    // Remove from tray and move to end of pool
     trayElements = trayElements.filter(id => id !== n);
     remainingPool.push(n); 
     updateTray(); 
@@ -350,6 +368,7 @@ function startGame(diffKey) {
   const cfg = DIFFICULTIES[difficulty];
   maxWrongs = cfg.lives;
   score = 0; wrongs = 0; active = true;
+  mistakes.clear();
   
   remainingPool = EDATA.filter(e => cfg.rows.includes(e[3])).map(e => e[0]);
   totalToPlace = remainingPool.length;
@@ -359,6 +378,7 @@ function startGame(diffKey) {
   document.getElementById('total').textContent = totalToPlace;
   document.getElementById('sv').textContent = '0';
   document.getElementById('overlay').classList.add('off');
+  document.getElementById('review-area').style.display = 'none';
   buildTable();
   updateTray();
   updateLives();
@@ -371,6 +391,25 @@ function endGame(won) {
   document.getElementById('ov-title').textContent = won ? "Victory!" : "Game Over";
   document.getElementById('ov-score').style.display = 'block';
   document.getElementById('ov-score').innerHTML = `<span>${score}</span> / ${totalToPlace}`;
+  
+  // Review Mistakes
+  const reviewArea = document.getElementById('review-area');
+  const reviewGrid = document.getElementById('review-grid');
+  if (mistakes.size > 0) {
+      reviewArea.style.display = 'block';
+      reviewGrid.innerHTML = '';
+      mistakes.forEach(num => {
+          const el = EL[num];
+          const tile = document.createElement('div');
+          tile.className = `review-tile c-${el.cat}`;
+          tile.innerHTML = `
+            <div class="rt-n">${el.n}</div>
+            <div class="rt-s">${el.s}</div>
+            <div class="rt-nm">${el.nm}</div>
+          `;
+          reviewGrid.appendChild(tile);
+      });
+  }
 }
 
 document.querySelectorAll('.diff-btn').forEach(b => {
