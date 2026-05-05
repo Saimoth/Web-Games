@@ -19,11 +19,11 @@
 
 html, body {
 width:100%; 
-height:100dvh; 
+height:100dvh; /* Uses dynamic viewport height to respect mobile browser UI */
 background:var(--bg); color:var(--text);
 font-family: Arial, Helvetica, sans-serif;
 overflow:hidden;
-overscroll-behavior: none; 
+overscroll-behavior: none; /* Stops pull-to-refresh elastic bouncing */
 user-select:none; -webkit-user-select:none;
 }
 
@@ -51,13 +51,13 @@ padding:0 12px; background:var(--surface); border-bottom:1px solid var(--border)
 #table-wrap {
 flex:1; overflow-y:auto; overflow-x:hidden;
 display:flex; align-items:flex-start; justify-content:center;
-padding:20px 50px; 
+padding:20px 50px; /* 50px padding on either side */
 min-height:0;
 }
 
 #ptable {
 display:grid; gap:2px;
-width: 100%; 
+width: 100%; /* Fills parent wrapper, respecting its 50px padding */
 max-width: 1200px;
 grid-template-columns: repeat(18, 1fr);
 }
@@ -125,14 +125,19 @@ background: var(--surface);
 #overlay {
 position:fixed; inset:0; z-index:9500;
 background:rgba(10,12,16,.98);
-display:flex; flex-direction:column; align-items:center; justify-content:center; padding: 20px;
+overflow-y:auto; overflow-x:hidden;
+-webkit-overflow-scrolling: touch;
+display:flex; flex-direction:column; align-items:center; padding: 40px 20px;
 }
 #overlay.off { display:none; }
-.ov-content { display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 500px; gap: 20px;}
+.ov-content { 
+  margin: auto; /* Centers when space is available, allows scrolling when overflowing */
+  display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 500px; gap: 20px; flex-shrink: 0;
+}
 .ov-title { font-size:24px; font-weight:700; color:var(--accent); letter-spacing:5px; text-transform:uppercase; text-align:center; }
 .ov-score { font-size:48px; font-weight:700; color: var(--text); }
 .ov-sub { font-size:14px; color:var(--muted); text-align:center; line-height: 1.5; }
-#diff-picker { display:flex; flex-direction: column; gap:10px; width: 240px; }
+#diff-picker { display:flex; flex-direction: column; gap:10px; width: 240px; margin-bottom: 20px;}
 .diff-btn {
 padding:14px; border:1px solid var(--border); background:var(--surface);
 color:var(--text); cursor:pointer; border-radius:6px; font-size:11px;
@@ -142,7 +147,7 @@ transition: all 0.2s;
 .diff-btn:hover { border-color: var(--accent); background: rgba(0,212,255,0.05); }
 
 /* Review Section */
-#review-area { width: 100%; max-height: 250px; overflow-y: auto; margin-top: 10px; padding: 10px; border-top: 1px solid var(--border);}
+#review-area { width: 100%; padding: 10px; border-top: 1px solid var(--border); margin-top: 10px;}
 #review-title { font-size: 10px; color: var(--danger); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 15px; text-align: center;}
 #review-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; justify-items: center;}
 .review-tile { 
@@ -347,7 +352,6 @@ function checkHover(x, y) {
 
 function drop(cx, cy) {
   const n = dragNum;
-  // Critical fix: Prevents the double-fire event bug from pushing a null tile to the deck
   if (n === null) return; 
   dragNum = null;
 
@@ -357,7 +361,6 @@ function drop(cx, cy) {
   const target = document.elementFromPoint(cx, cy);
   const slot = target?.closest('.slot');
   
-  // Critical fix: If dropped outside an empty valid grid slot, cancel drag safely
   if (!slot || slot.classList.contains('filled')) {
       document.querySelectorAll('.card').forEach(c => c.classList.remove('dragging'));
       return;
@@ -437,6 +440,9 @@ function endGame(won) {
   const ov = document.getElementById('overlay');
   ov.classList.remove('off');
   
+  // Make sure we scroll back to the top of the overlay when it appears
+  ov.scrollTop = 0;
+  
   const title = document.getElementById('ov-title');
   title.textContent = won ? "Perfect Game!" : "Game Over";
   title.style.color = won ? "var(--success)" : "var(--accent)";
@@ -451,7 +457,11 @@ function endGame(won) {
   const reviewGrid = document.getElementById('review-grid');
   
   if (mistakes.size > 0) {
+      // Remove any previously set max-height on the review area so the parent scrolling takes over
       reviewArea.style.display = 'block';
+      reviewArea.style.maxHeight = 'none'; 
+      reviewArea.style.overflowY = 'visible';
+      
       reviewGrid.innerHTML = '';
       mistakes.forEach(num => {
           const el = EL[num];
