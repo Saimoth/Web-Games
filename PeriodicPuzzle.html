@@ -19,11 +19,11 @@
 
 html, body {
 width:100%; 
-height:100dvh; /* Uses dynamic viewport height to respect mobile browser UI */
+height:100dvh; 
 background:var(--bg); color:var(--text);
 font-family: Arial, Helvetica, sans-serif;
 overflow:hidden;
-overscroll-behavior: none; /* Stops pull-to-refresh elastic bouncing */
+overscroll-behavior: none; 
 user-select:none; -webkit-user-select:none;
 }
 
@@ -44,20 +44,22 @@ padding:0 12px; background:var(--surface); border-bottom:1px solid var(--border)
 #hdr-stats { display:flex; gap:12px; align-items:center; }
 .stat { font-size:11px; color:var(--muted); letter-spacing:1px; }
 .stat b { color:var(--text); font-size:14px; }
-#lives { display:flex; gap:3px; align-items:center; flex-wrap: wrap; max-width: 120px; justify-content: flex-end;}
-.life { width:7px; height:7px; border-radius:50%; background:var(--warn); box-shadow:0 0 4px var(--warn); transition:all .3s; }
+
+/* Enforced single row of lives */
+#lives { display:flex; gap:3px; align-items:center; flex-wrap: nowrap; justify-content: flex-end;}
+.life { width:6px; height:6px; border-radius:50%; background:var(--warn); box-shadow:0 0 4px var(--warn); transition:all .3s; }
 .life.dead { background:var(--muted); box-shadow:none; opacity: 0.3; }
 
 #table-wrap {
 flex:1; overflow-y:auto; overflow-x:hidden;
 display:flex; align-items:flex-start; justify-content:center;
-padding:20px 50px; /* 50px padding on either side */
+padding:20px 50px; 
 min-height:0;
 }
 
 #ptable {
 display:grid; gap:2px;
-width: 100%; /* Fills parent wrapper, respecting its 50px padding */
+width: 100%; 
 max-width: 1200px;
 grid-template-columns: repeat(18, 1fr);
 }
@@ -131,19 +133,23 @@ display:flex; flex-direction:column; align-items:center; padding: 40px 20px;
 }
 #overlay.off { display:none; }
 .ov-content { 
-  margin: auto; /* Centers when space is available, allows scrolling when overflowing */
+  margin: auto; 
   display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 500px; gap: 20px; flex-shrink: 0;
 }
 .ov-title { font-size:24px; font-weight:700; color:var(--accent); letter-spacing:5px; text-transform:uppercase; text-align:center; }
 .ov-score { font-size:48px; font-weight:700; color: var(--text); }
 .ov-sub { font-size:14px; color:var(--muted); text-align:center; line-height: 1.5; }
-#diff-picker { display:flex; flex-direction: column; gap:10px; width: 240px; margin-bottom: 20px;}
+
+/* Diff Picker converted to grid to save space */
+#diff-picker { display:grid; grid-template-columns: 1fr 1fr; gap:8px; width: 100%; max-width: 400px; margin-bottom: 20px;}
 .diff-btn {
-padding:14px; border:1px solid var(--border); background:var(--surface);
-color:var(--text); cursor:pointer; border-radius:6px; font-size:11px;
+padding:12px; border:1px solid var(--border); background:var(--surface);
+color:var(--text); cursor:pointer; border-radius:6px; font-size:10px;
 font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
 transition: all 0.2s;
+display: flex; flex-direction: column; align-items: center; gap: 4px;
 }
+.diff-btn span { color: var(--warn); font-size: 8px; font-weight: 400; }
 .diff-btn:hover { border-color: var(--accent); background: rgba(0,212,255,0.05); }
 
 /* Review Section */
@@ -153,10 +159,18 @@ transition: all 0.2s;
 .review-tile { 
     width: 100%; aspect-ratio: 1/1.2; border-radius: 4px; display: flex; flex-direction: column; 
     align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,0.1);
+    padding: 2px;
 }
-.review-tile .rt-n { font-size: 8px; opacity: 0.7; font-weight: bold; }
-.review-tile .rt-s { font-size: 16px; font-weight: 900; }
-.review-tile .rt-nm { font-size: 6px; white-space: nowrap; overflow: hidden; max-width: 90%; }
+.review-tile .rt-n { font-size: clamp(9px, 2.5vw, 12px); opacity: 0.7; font-weight: bold; }
+.review-tile .rt-s { font-size: clamp(18px, 5vw, 24px); font-weight: 900; line-height: 1.2; }
+.review-tile .rt-nm { 
+    font-size: clamp(8px, 2vw, 11px); 
+    white-space: nowrap; 
+    overflow: hidden; 
+    text-overflow: ellipsis; 
+    max-width: 95%; 
+    text-align: center;
+}
 
 /* Mobile Portrait Warning */
 #portrait-warning {
@@ -235,25 +249,39 @@ transition: all 0.2s;
     </div>
 
     <div id="diff-picker">
-      <button class="diff-btn" data-diff="easy">Easy (Rows 1-3)</button>
-      <button class="diff-btn" data-diff="medium">Medium (Rows 1-5)</button>
-      <button class="diff-btn" data-diff="hard">Hard (Full Table)</button>
+      <button class="diff-btn" data-diff="easy">Easy <span>First 2 rows (3 Errors)</span></button>
+      <button class="diff-btn" data-diff="medium">Medium <span>First 3 rows (5 Errors)</span></button>
+      <button class="diff-btn" data-diff="hard">Hard <span>First 4 rows (7 Errors)</span></button>
+      <button class="diff-btn" data-diff="even_harder">Even Harder <span>First 5 rows (9 Errors)</span></button>
+      <button class="diff-btn" data-diff="really_hard">Really Hard <span>First 7 rows (12 Errors)</span></button>
+      <button class="diff-btn" data-diff="insane">Insane <span>Full Table (15 Errors)</span></button>
     </div>
   </div>
 </div>
 
 <script>
 const EDATA = [
-  [1,"H","Hydrogen",1,1,"nonmetal"],[2,"He","Helium",1,18,"noble"],[3,"Li","Lithium",2,1,"alkali"],[4,"Be","Beryllium",2,2,"alkaline"],[5,"B","Boron",2,13,"metalloid"],[6,"C","Carbon",2,14,"nonmetal"],[7,"N","Nitrogen",2,15,"nonmetal"],[8,"O","Oxygen",2,16,"nonmetal"],[9,"F","Fluorine",2,17,"halogen"],[10,"Ne","Neon",2,18,"noble"],[11,"Na","Sodium",3,1,"alkali"],[12,"Mg","Magnesium",3,2,"alkaline"],[13,"Al","Aluminum",3,13,"posttrans"],[14,"Si","Silicon",3,14,"metalloid"],[15,"P","Phosphorus",3,15,"nonmetal"],[16,"S","Sulfur",3,16,"nonmetal"],[17,"Cl","Chlorine",3,17,"halogen"],[18,"Ar","Argon",3,18,"noble"],[19,"K","Potassium",4,1,"alkali"],[20,"Ca","Calcium",4,2,"alkaline"],[21,"Sc","Scandium",4,3,"transition"],[22,"Ti","Titanium",4,4,"transition"],[23,"V","Vanadium",4,5,"transition"],[24,"Cr","Chromium",4,6,"transition"],[25,"Mn","Manganese",4,7,"transition"],[26,"Fe","Iron",4,8,"transition"],[27,"Co","Cobalt",4,9,"transition"],[28,"Ni","Nickel",4,10,"transition"],[29,"Cu","Copper",4,11,"transition"],[30,"Zn","Zinc",4,12,"transition"],[31,"Ga","Gallium",4,13,"posttrans"],[32,"Ge","Germanium",4,14,"metalloid"],[33,"As","Arsenic",4,15,"metalloid"],[34,"Se","Selenium",4,16,"nonmetal"],[35,"Br","Bromine",4,17,"halogen"],[36,"Kr","Krypton",4,18,"noble"],[37,"Rb","Rubidium",5,1,"alkali"],[38,"Sr","Strontium",5,2,"alkaline"],[39,"Y","Yttrium",5,3,"transition"],[40,"Zr","Zirconium",5,4,"transition"],[41,"Nb","Niobium",5,5,"transition"],[42,"Mo","Molybdenum",5,6,"transition"],[43,"Tc","Technetium",5,7,"transition"],[44,"Ru","Ruthenium",5,8,"transition"],[45,"Rh","Rhodium",5,9,"transition"],[46,"Pd","Palladium",5,10,"transition"],[47,"Ag","Silver",5,11,"transition"],[48,"Cd","Cadmium",5,12,"transition"],[49,"In","Indium",5,13,"posttrans"],[50,"Sn","Tin",5,14,"posttrans"],[51,"Sb","Antimony",5,15,"metalloid"],[52,"Te","Tellurium",5,16,"metalloid"],[53,"I","Iodine",5,17,"halogen"],[54,"Xe","Xenon",5,18,"noble"],[55,"Cs","Cesium",6,1,"alkali"],[56,"Ba","Barium",6,2,"alkaline"],[57,"La","Lanthanum",6,3,"lanthanide"],[72,"Hf","Hafnium",6,4,"transition"],[73,"Ta","Tantalum",6,5,"transition"],[74,"W","Tungsten",6,6,"transition"],[75,"Re","Rhenium",6,7,"transition"],[76,"Os","Osmium",6,8,"transition"],[77,"Ir","Iridium",6,9,"transition"],[78,"Pt","Platinum",6,10,"transition"],[79,"Au","Gold",6,11,"transition"],[80,"Hg","Mercury",6,12,"transition"],[81,"Tl","Thallium",6,13,"posttrans"],[82,"Pb","Lead",6,14,"posttrans"],[83,"Bi","Bismuth",6,15,"posttrans"],[84,"Po","Polonium",6,16,"metalloid"],[85,"At","Astatine",6,17,"halogen"],[86,"Rn","Radon",6,18,"noble"],[87,"Fr","Francium",7,1,"alkali"],[88,"Ra","Radium",7,2,"alkaline"],[89,"Ac","Actinium",7,3,"actinide"],[104,"Rf","Rutherfordium",7,4,"transition"],[105,"Db","Dubnium",7,5,"transition"],[106,"Sg","Seaborgium",7,6,"transition"],[107,"Bh","Bohrium",7,7,"transition"],[108,"Hs","Hassium",7,8,"transition"],[109,"Mt","Meitnerium",7,9,"unknown"],[110,"Ds","Darmstadtium",7,10,"unknown"],[111,"Rg","Roentgenium",7,11,"unknown"],[112,"Cn","Copernicium",7,12,"posttrans"],[113,"Nh","Nihonium",7,13,"posttrans"],[114,"Fl","Flerovium",7,14,"posttrans"],[115,"Mc","Moscovium",7,15,"posttrans"],[116,"Lv","Livermorium",7,16,"posttrans"],[117,"Ts","Tennessine",7,17,"halogen"],[118,"Og","Oganesson",7,18,"noble"],[58,"Ce","Cerium",9,4,"lanthanide"],[59,"Pr","Praseodymium",9,5,"lanthanide"],[60,"Nd","Neodymium",9,6,"lanthanide"],[61,"Pm","Promethium",9,7,"lanthanide"],[62,"Sm","Samarium",9,8,"lanthanide"],[63,"Eu","Europium",9,9,"lanthanide"],[64,"Gd","Gadolinium",9,10,"lanthanide"],[65,"Tb","Terbium",9,11,"lanthanide"],[66,"Dy","Dysprosium",9,12,"lanthanide"],[67,"Ho","Holmium",9,13,"lanthanide"],[68,"Er","Erbium",9,14,"lanthanide"],[69,"Tm","Thulium",9,15,"lanthanide"],[70,"Yb","Ytterbium",9,16,"lanthanide"],[71,"Lu","Lutetium",9,17,"lanthanide"],[90,"Th","Thorium",10,4,"actinide"],[91,"Pa","Protactinium",10,5,"actinide"],[92,"U","Uranium",10,6,"actinide"],[93,"Np","Neptunium",10,7,"actinide"],[94,"Pu","Plutonium",10,8,"actinide"],[95,"Am","Americium",10,9,"actinide"],[96,"Cm","Curium",10,10,"actinide"],[97,"Bk","Berkelium",10,11,"actinide"],[98,"Cf","Californium",10,12,"actinide"],[99,"Es","Einsteinium",10,13,"actinide"],[100,"Fm","Fermium",10,14,"actinide"],[101,"Md","Mendelevium",10,15,"actinide"],[102,"No","Nobelium",10,16,"actinide"],[103,"Lr","Lawrencium",10,17,"actinide"]
+  [1,"H","Hydrogen",1,1,"nonmetal"],[2,"He","Helium",1,18,"noble"],[3,"Li","Lithium",2,1,"alkali"],[4,"Be","Beryllium",2,2,"alkaline"],[5,"B","Boron",2,13,"metalloid"],[6,"C","Carbon",2,14,"nonmetal"],[7,"N","Nitrogen",2,15,"nonmetal"],[8,"O","Oxygen",2,16,"nonmetal"],[9,"F","Fluorine",2,17,"halogen"],[10,"Ne","Neon",2,18,"noble"],[11,"Na","Sodium",3,1,"alkali"],[12,"Mg","Magnesium",3,2,"alkaline"],[13,"Al","Aluminum",3,13,"posttrans"],[14,"Si","Silicon",3,14,"metalloid"],[15,"P","Phosphorus",3,15,"nonmetal"],[16,"S","Sulfur",3,16,"nonmetal"],[17,"Cl","Chlorine",3,17,"halogen"],[18,"Ar","Argon",3,18,"noble"],[19,"K","Potassium",4,1,"alkali"],[20,"Ca","Calcium",4,2,"alkaline"],[21,"Sc","Scandium",4,3,"transition"],[22,"Ti","Titanium",4,4,"transition"],[23,"V","Vanadium",4,5,"transition"],[24,"Cr","Chromium",4,6,"transition"],[25,"Mn","Manganese",4,7,"transition"],[26,"Fe","Iron",4,8,"transition"],[27,"Co","Cobalt",4,9,"transition"],[28,"Ni","Nickel",4,10,"transition"],[29,"Cu","Copper",4,11,"transition"],[30,"Zn","Zinc",4,12,"transition"],[31,"Ga","Gallium",4,13,"posttrans"],[32,"Ge","Germanium",4,14,"metalloid"],[33,"As","Arsenic",4,15,"metalloid"],[34,"Se","Selenium",4,16,"nonmetal"],[35,"Br","Bromine",4,17,"halogen"],[36,"Kr","Krypton",4,18,"noble"],[37,"Rb","Rubidium",5,1,"alkali"],[38,"Sr","Strontium",5,2,"alkaline"],[39,"Y","Yttrium",5,3,"transition"],[40,"Zr","Zirconium",5,4,"transition"],[41,"Nb","Niobium",5,5,"transition"],[42,"Mo","Molybdenum",5,6,"transition"],[43,"Tc","Technetium",5,7,"transition"],[44,"Ru","Ruthenium",5,8,"transition"],[45,"Rh","Rhodium",5,9,"transition"],[46,"Pd","Palladium",5,10,"transition"],[47,"Ag","Silver",5,11,"transition"],[48,"Cd","Cadmium",5,12,"transition"],[49,"In","Indium",5,13,"posttrans"],[50,"Sn","Tin",5,14,"posttrans"],[51,"Sb","Antimony",5,15,"metalloid"],[52,"Te","Tellurium",5,16,"metalloid"],[53,"I","Iodine",5,17,"halogen"],[54,"Xe","Xenon",5,18,"noble"],[55,"Cs","Cesium",6,1,"alkali"],[56,"Ba","Barium",6,2,"alkaline"],
+  
+  /* Moved Lanthanum and Actinium to row 9 and 10 */
+  [57,"La","Lanthanum",9,3,"lanthanide"],
+  [89,"Ac","Actinium",10,3,"actinide"],
+
+  [72,"Hf","Hafnium",6,4,"transition"],[73,"Ta","Tantalum",6,5,"transition"],[74,"W","Tungsten",6,6,"transition"],[75,"Re","Rhenium",6,7,"transition"],[76,"Os","Osmium",6,8,"transition"],[77,"Ir","Iridium",6,9,"transition"],[78,"Pt","Platinum",6,10,"transition"],[79,"Au","Gold",6,11,"transition"],[80,"Hg","Mercury",6,12,"transition"],[81,"Tl","Thallium",6,13,"posttrans"],[82,"Pb","Lead",6,14,"posttrans"],[83,"Bi","Bismuth",6,15,"posttrans"],[84,"Po","Polonium",6,16,"metalloid"],[85,"At","Astatine",6,17,"halogen"],[86,"Rn","Radon",6,18,"noble"],[87,"Fr","Francium",7,1,"alkali"],[88,"Ra","Radium",7,2,"alkaline"],
+  
+  [104,"Rf","Rutherfordium",7,4,"transition"],[105,"Db","Dubnium",7,5,"transition"],[106,"Sg","Seaborgium",7,6,"transition"],[107,"Bh","Bohrium",7,7,"transition"],[108,"Hs","Hassium",7,8,"transition"],[109,"Mt","Meitnerium",7,9,"unknown"],[110,"Ds","Darmstadtium",7,10,"unknown"],[111,"Rg","Roentgenium",7,11,"unknown"],[112,"Cn","Copernicium",7,12,"posttrans"],[113,"Nh","Nihonium",7,13,"posttrans"],[114,"Fl","Flerovium",7,14,"posttrans"],[115,"Mc","Moscovium",7,15,"posttrans"],[116,"Lv","Livermorium",7,16,"posttrans"],[117,"Ts","Tennessine",7,17,"halogen"],[118,"Og","Oganesson",7,18,"noble"],[58,"Ce","Cerium",9,4,"lanthanide"],[59,"Pr","Praseodymium",9,5,"lanthanide"],[60,"Nd","Neodymium",9,6,"lanthanide"],[61,"Pm","Promethium",9,7,"lanthanide"],[62,"Sm","Samarium",9,8,"lanthanide"],[63,"Eu","Europium",9,9,"lanthanide"],[64,"Gd","Gadolinium",9,10,"lanthanide"],[65,"Tb","Terbium",9,11,"lanthanide"],[66,"Dy","Dysprosium",9,12,"lanthanide"],[67,"Ho","Holmium",9,13,"lanthanide"],[68,"Er","Erbium",9,14,"lanthanide"],[69,"Tm","Thulium",9,15,"lanthanide"],[70,"Yb","Ytterbium",9,16,"lanthanide"],[71,"Lu","Lutetium",9,17,"lanthanide"],[90,"Th","Thorium",10,4,"actinide"],[91,"Pa","Protactinium",10,5,"actinide"],[92,"U","Uranium",10,6,"actinide"],[93,"Np","Neptunium",10,7,"actinide"],[94,"Pu","Plutonium",10,8,"actinide"],[95,"Am","Americium",10,9,"actinide"],[96,"Cm","Curium",10,10,"actinide"],[97,"Bk","Berkelium",10,11,"actinide"],[98,"Cf","Californium",10,12,"actinide"],[99,"Es","Einsteinium",10,13,"actinide"],[100,"Fm","Fermium",10,14,"actinide"],[101,"Md","Mendelevium",10,15,"actinide"],[102,"No","Nobelium",10,16,"actinide"],[103,"Lr","Lawrencium",10,17,"actinide"]
 ];
 
 const DIFFICULTIES = {
-  easy: { rows:[1,2,3], maxRows:3, lives: 5 },
-  medium: { rows:[1,2,3,4,5], maxRows:5, lives: 10 },
-  hard: { rows:[1,2,3,4,5,6,7,8,9,10], maxRows:10, lives: 15 }
+  easy: { rows:[1,2], maxRows:2, lives: 3 },
+  medium: { rows:[1,2,3], maxRows:3, lives: 5 },
+  hard: { rows:[1,2,3,4], maxRows:4, lives: 7 },
+  even_harder: { rows:[1,2,3,4,5], maxRows:5, lives: 9 },
+  really_hard: { rows:[1,2,3,4,5,6,7], maxRows:7, lives: 12 },
+  insane: { rows:[1,2,3,4,5,6,7,8,9,10], maxRows:10, lives: 15 }
 };
 
-let EL = {}, score=0, wrongs=0, active=false, difficulty='easy', maxWrongs=10;
+let EL = {}, score=0, wrongs=0, active=false, difficulty='easy', maxWrongs=3;
 let remainingPool = [], trayElements = [], dragNum = null;
 let mistakes = new Set(); 
 
@@ -440,7 +468,6 @@ function endGame(won) {
   const ov = document.getElementById('overlay');
   ov.classList.remove('off');
   
-  // Make sure we scroll back to the top of the overlay when it appears
   ov.scrollTop = 0;
   
   const title = document.getElementById('ov-title');
@@ -457,7 +484,6 @@ function endGame(won) {
   const reviewGrid = document.getElementById('review-grid');
   
   if (mistakes.size > 0) {
-      // Remove any previously set max-height on the review area so the parent scrolling takes over
       reviewArea.style.display = 'block';
       reviewArea.style.maxHeight = 'none'; 
       reviewArea.style.overflowY = 'visible';
