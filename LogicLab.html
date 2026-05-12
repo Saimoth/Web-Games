@@ -164,6 +164,10 @@
         .config-row { margin-bottom: 15px; }
         .config-label { display: block; margin-bottom: 5px; font-size: 0.9rem; color: #aaa; }
         input[type="range"] { width: 100%; }
+        input[type="text"] { 
+            width: 90%; padding: 8px; border-radius: 4px; 
+            border: 1px solid #444; background: #1a1a2e; color: white; 
+        }
 
         .radio-group {
             display: grid;
@@ -289,6 +293,10 @@
             </div>
 
             <div class="category-label">Advanced</div>
+            <div class="tool-item" draggable="true" data-type="LABEL">
+                <div class="tool-icon" style="background:#555; color:white; border:1px dashed #aaa;">TXT</div>
+                <span>Text Label</span>
+            </div>
             <div class="tool-item" draggable="true" data-type="SHIFT_REG">
                 <div class="tool-icon" style="background:#8e44ad; color:white">SR8</div>
                 <span>Shift Reg (8)</span>
@@ -335,6 +343,14 @@
         <div id="configPanel">
             <h3 id="configTitle">Settings</h3>
             
+            <!-- Text Labels -->
+            <div id="textControls" style="display:none;">
+                <div class="config-row">
+                    <div class="config-label">Label Text:</div>
+                    <input type="text" id="labelTextInput" placeholder="Enter label text...">
+                </div>
+            </div>
+
             <!-- Timers/Clock -->
             <div id="timerControls">
                 <div class="config-row">
@@ -444,6 +460,7 @@ const COMP_DEFS = {
     TOF: { w: 60, inputs: 1, outputs: 1, color: '#d0021b', label: 'TOF' },
     TRIG_H: { w: 60, inputs: 1, outputs: 1, color: '#f39c12', label: 'R-TRIG' }, 
     TRIG_L: { w: 60, inputs: 1, outputs: 1, color: '#e67e22', label: 'F-TRIG' }, 
+    LABEL: { w: 60, inputs: 0, outputs: 0, color: 'transparent', label: '' } 
 };
 
 class Component {
@@ -465,6 +482,7 @@ class Component {
         this.updateTimerLimit(); this.prevClockState = false;
         this.displayValue = 0;
         this.prevInputState = false; this.activePulse = false;
+        this.text = 'Label'; // Used exclusively for the LABEL component
     }
     resize() {
         const maxPins = Math.max(this.inputStates.length, this.outputStates.length);
@@ -472,12 +490,14 @@ class Component {
         else if (this.type === 'SEVEN_SEG' || this.type === 'DEC_DISPLAY') this.h = 180;
         else if (this.type === 'TRAFFIC_LIGHT') this.h = 80;
         else if (this.type === 'CLOCK' || this.type === 'SWITCH') this.h = 60; 
+        else if (this.type === 'LABEL') this.h = 30; // Fixed height, width determined in draw
         else this.h = Math.max(40, maxPins * 20);
     }
     updateConfig(config) {
         if (config.timeSetting) this.timeSetting = parseFloat(config.timeSetting);
         if (config.timeBase) this.timeBase = parseFloat(config.timeBase);
         if (config.dutyCycle) this.dutyCycle = parseInt(config.dutyCycle);
+        if (config.text !== undefined) this.text = config.text;
         if (config.inputCount && this.def.resizable) {
             const count = parseInt(config.inputCount);
             const newInputs = new Array(count).fill(false);
@@ -521,7 +541,6 @@ class Component {
             const isRisingEdge = this.inputStates[0] && !this.prevInputState;
             const isFallingEdge = !this.inputStates[0] && this.prevInputState;
 
-            // Trigger the pulse if valid edge detected
             if ((this.type === 'TRIG_H' && isRisingEdge) || (this.type === 'TRIG_L' && isFallingEdge)) {
                 this.activePulse = true;
                 this.timerValue = 0;
@@ -568,6 +587,26 @@ class Component {
     getOutputPos(index) { return { x: this.x + this.w, y: this.y + (index * 20) + 10 }; }
     
     draw(ctx) {
+        if (this.type === 'LABEL') {
+            ctx.font = "bold 16px sans-serif";
+            const metrics = ctx.measureText(this.text || 'Label');
+            this.w = Math.max(40, metrics.width + 20); // Dynamically update width for grabbing bounds
+
+            if (this === draggingComponent) {
+                ctx.fillStyle = 'rgba(255,255,255,0.1)';
+                roundRect(ctx, this.x, this.y, this.w, this.h, 4);
+                ctx.fill();
+                ctx.strokeStyle = '#888';
+                ctx.stroke();
+            }
+            
+            ctx.fillStyle = '#fff';
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(this.text || 'Label', this.x + this.w/2, this.y + this.h/2);
+            return; // Skip drawing any standard component bounding boxes or pins
+        }
+
         let bodyColor = this.def.color;
         if (this.type === 'PUSH_BTN' && this.outputStates[0]) bodyColor = '#2ecc71';
         if (this === draggingComponent) { ctx.shadowColor = 'rgba(255,255,255,0.5)'; ctx.shadowBlur = 10; }
@@ -864,7 +903,6 @@ function drawWire(ctx, p1, p2, active) {
     ctx.strokeStyle = active ? WIRE_COLOR_ON : WIRE_COLOR_OFF; 
     ctx.lineWidth = 3; 
     
-    // 10px rigid straight segments as requested
     const stub = 10;
     const s1 = { x: p1.x + stub, y: p1.y };
     const s2 = { x: p2.x - stub, y: p2.y };
@@ -873,9 +911,9 @@ function drawWire(ctx, p1, p2, active) {
     const cp2 = { x: s2.x - 40, y: s2.y };
     
     ctx.moveTo(p1.x, p1.y);
-    ctx.lineTo(s1.x, s1.y); // Straight out
-    ctx.bezierCurveTo(cp1.x, cp1.y, cp2.x, cp2.y, s2.x, s2.y); // Smooth curve
-    ctx.lineTo(p2.x, p2.y); // Straight in
+    ctx.lineTo(s1.x, s1.y); 
+    ctx.bezierCurveTo(cp1.x, cp1.y, cp2.x, cp2.y, s2.x, s2.y); 
+    ctx.lineTo(p2.x, p2.y); 
     
     if (active) { ctx.shadowColor = WIRE_COLOR_ON; ctx.shadowBlur = 10; } 
     else { ctx.shadowBlur = 0; }
@@ -949,7 +987,7 @@ canvas.addEventListener('contextmenu', (e) => {
         }
         lastRightClickId = clickedComp.id;
         lastRightClickTime = now;
-        if (['TON', 'TOF', 'CLOCK', 'TRIG_H', 'TRIG_L'].includes(clickedComp.type) || clickedComp.def.resizable) {
+        if (['TON', 'TOF', 'CLOCK', 'TRIG_H', 'TRIG_L', 'LABEL'].includes(clickedComp.type) || clickedComp.def.resizable) {
             openConfig(clickedComp);
         }
     }
@@ -967,7 +1005,7 @@ function handleInputStart(e) {
                 return;
             }
         }
-        if (c.isLed) continue; 
+        if (c.isLed || c.type === 'LABEL') continue; 
         for(let i=0; i<c.inputStates.length; i++) {
             if (isHoveringPin(c.getInputPos(i))) {
                 wiringStart = { comp: c, pinType: 'input', pinIndex: i };
@@ -1048,15 +1086,22 @@ function handleInputEnd(e) {
     container.style.cursor = "crosshair";
 }
 
-// ... existing configuration/save logic ...
 function openConfig(comp) {
     editingComponent = comp;
     const panel = document.getElementById('configPanel');
     const timerControls = document.getElementById('timerControls');
     const inputCountControls = document.getElementById('inputCountControls');
+    const textControls = document.getElementById('textControls');
+    
     timerControls.style.display = 'none';
     inputCountControls.style.display = 'none';
+    textControls.style.display = 'none';
     
+    if (comp.type === 'LABEL') {
+        textControls.style.display = 'block';
+        document.getElementById('labelTextInput').value = comp.text || 'Label';
+    }
+
     if (['TON', 'TOF', 'CLOCK', 'TRIG_H', 'TRIG_L'].includes(comp.type)) {
         timerControls.style.display = 'block';
         document.getElementById('timerSlider').value = comp.timeSetting;
@@ -1078,9 +1123,11 @@ function openConfig(comp) {
     }
     panel.style.display = 'block';
 }
+
 function updateValDisplay(val) { document.getElementById('valDisplay').textContent = val; }
 function updateDutyDisplay(val) { document.getElementById('dutyDisplay').textContent = val; }
 function updateInputCountDisplay(val) { document.getElementById('inputCountDisplay').textContent = val; }
+
 function saveConfig() {
     if (!editingComponent) return;
     const config = {};
@@ -1090,20 +1137,25 @@ function saveConfig() {
         const radios = document.getElementsByName('timebase');
         for(let r of radios) { if (r.checked) config.timeBase = r.value; }
     }
+    if (editingComponent.type === 'LABEL') {
+        config.text = document.getElementById('labelTextInput').value;
+    }
     if (editingComponent.def.resizable) {
         config.inputCount = document.getElementById('inputCountSlider').value;
     }
     editingComponent.updateConfig(config);
     closeConfig();
 }
+
 function closeConfig() {
     document.getElementById('configPanel').style.display = 'none';
     editingComponent = null;
 }
+
 function saveProject() {
     const data = {
         components: components.map(c => ({
-            type: c.type, x: c.x, y: c.y, id: c.id, inputCount: c.inputStates.length,
+            type: c.type, x: c.x, y: c.y, id: c.id, inputCount: c.inputStates.length, text: c.text,
             timerSettings: { timeSetting: c.timeSetting, timeBase: c.timeBase, dutyCycle: c.dutyCycle }
         })),
         wires: wires.map(w => ({ fromId: w.from.comp.id, fromPin: w.from.pinIdx, toId: w.to.comp.id, toPin: w.to.pinIdx }))
@@ -1114,6 +1166,7 @@ function saveProject() {
     a.href = url; a.download = "logic_lab_circuit.json"; a.click();
     URL.revokeObjectURL(url);
 }
+
 function loadProject(input) {
     const file = input.files[0];
     if (!file) return;
@@ -1125,6 +1178,7 @@ function loadProject(input) {
             data.components.forEach(c => {
                 const comp = new Component(c.type, c.x, c.y, c.inputCount);
                 comp.id = c.id;
+                if (c.text !== undefined) comp.text = c.text;
                 if (c.timerSettings) comp.updateConfig(c.timerSettings);
                 components.push(comp);
             });
@@ -1140,6 +1194,7 @@ function loadProject(input) {
     reader.readAsText(file);
     input.value = '';
 }
+
 function clearBoard() {
     components = []; wires = []; viewX = 0; viewY = 0;
 }
