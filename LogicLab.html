@@ -301,6 +301,14 @@
                 <div class="tool-icon" style="background:#d0021b; color:white">TOF</div>
                 <span>Timer OFF</span>
             </div>
+            <div class="tool-item" draggable="true" data-type="TRIG_H">
+                <div class="tool-icon" style="background:#f39c12; color:white; font-size:10px;">R_TR</div>
+                <span>Trigger High</span>
+            </div>
+            <div class="tool-item" draggable="true" data-type="TRIG_L">
+                <div class="tool-icon" style="background:#e67e22; color:white; font-size:10px;">F_TR</div>
+                <span>Trigger Low</span>
+            </div>
         </div>
 
         <div class="controls">
@@ -371,7 +379,7 @@
             <h2>How to Use Logic Lab</h2>
             <p>1. <strong>Wiring:</strong> Drag from Circle (Out) to Square (In).</p>
             <p>2. <strong>Traffic Light:</strong> 3 Inputs (Red, Amber, Green).</p>
-            <p>3. <strong>Config:</strong> Right-Click a Gate or LED to change count (1-8).</p>
+            <p>3. <strong>Config:</strong> Right-Click a Gate or LED to change count (1-8) or timer settings.</p>
             <p>4. <strong>Controls:</strong>
                 <br>- Double Right-Click Component: Delete
                 <br>- Right-Click Pin: Clear Wires
@@ -433,7 +441,9 @@ const COMP_DEFS = {
     DEC_DISPLAY: { w: 160, inputs: 8, outputs: 0, color: '#000000', label: '' },
     TRAFFIC_LIGHT: { w: 60, inputs: 3, outputs: 0, color: '#111', label: '' },
     TON: { w: 60, inputs: 1, outputs: 1, color: '#417505', label: 'TON' }, 
-    TOF: { w: 60, inputs: 1, outputs: 1, color: '#d0021b', label: 'TOF' }, 
+    TOF: { w: 60, inputs: 1, outputs: 1, color: '#d0021b', label: 'TOF' },
+    TRIG_H: { w: 60, inputs: 1, outputs: 1, color: '#f39c12', label: 'R-TRIG' }, 
+    TRIG_L: { w: 60, inputs: 1, outputs: 1, color: '#e67e22', label: 'F-TRIG' }, 
 };
 
 class Component {
@@ -448,9 +458,13 @@ class Component {
         this.inputStates = new Array(initialInputs).fill(false);
         this.outputStates = new Array(this.def.outputs).fill(false);
         this.resize();
-        this.timerValue = 0; this.timeSetting = 0.5; this.timeBase = 1.0; this.dutyCycle = 50; 
+        this.timerValue = 0; 
+        this.timeSetting = (type === 'TRIG_H' || type === 'TRIG_L') ? 0.05 : 0.5; 
+        this.timeBase = 1.0; 
+        this.dutyCycle = 50; 
         this.updateTimerLimit(); this.prevClockState = false;
         this.displayValue = 0;
+        this.prevInputState = false; this.activePulse = false;
     }
     resize() {
         const maxPins = Math.max(this.inputStates.length, this.outputStates.length);
@@ -503,6 +517,30 @@ class Component {
                 else { this.outputStates[0] = false; }
             }
         } 
+        else if (this.type === 'TRIG_H' || this.type === 'TRIG_L') {
+            const isRisingEdge = this.inputStates[0] && !this.prevInputState;
+            const isFallingEdge = !this.inputStates[0] && this.prevInputState;
+
+            // Trigger the pulse if valid edge detected
+            if ((this.type === 'TRIG_H' && isRisingEdge) || (this.type === 'TRIG_L' && isFallingEdge)) {
+                this.activePulse = true;
+                this.timerValue = 0;
+            }
+
+            if (this.activePulse) {
+                if (this.timerValue < this.timerLimit) {
+                    this.timerValue++;
+                    this.outputStates[0] = true;
+                } else {
+                    this.activePulse = false;
+                    this.outputStates[0] = false;
+                }
+            } else {
+                this.outputStates[0] = false;
+                this.timerValue = 0;
+            }
+            this.prevInputState = this.inputStates[0];
+        }
         else if (this.type === 'CLOCK') {
             this.timerValue++;
             if (this.timerValue >= this.timerLimit) this.timerValue = 0;
@@ -606,7 +644,7 @@ class Component {
 
         if (!this.isLed && !['SWITCH','PUSH_BTN','CLOCK','TRAFFIC_LIGHT'].includes(this.type)) {
             ctx.fillStyle = this.def.textColor || 'white'; ctx.font = "bold 14px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
-            if (this.type === 'TON' || this.type === 'TOF') {
+            if (['TON', 'TOF', 'TRIG_H', 'TRIG_L'].includes(this.type)) {
                 let pct = this.timerValue / this.timerLimit;
                 const barW = this.w - 10;
                 ctx.fillText(this.def.label, this.x + this.w/2, this.y + 5);
@@ -911,7 +949,7 @@ canvas.addEventListener('contextmenu', (e) => {
         }
         lastRightClickId = clickedComp.id;
         lastRightClickTime = now;
-        if (clickedComp.type === 'TON' || clickedComp.type === 'TOF' || clickedComp.type === 'CLOCK' || clickedComp.def.resizable) {
+        if (['TON', 'TOF', 'CLOCK', 'TRIG_H', 'TRIG_L'].includes(clickedComp.type) || clickedComp.def.resizable) {
             openConfig(clickedComp);
         }
     }
@@ -1018,7 +1056,8 @@ function openConfig(comp) {
     const inputCountControls = document.getElementById('inputCountControls');
     timerControls.style.display = 'none';
     inputCountControls.style.display = 'none';
-    if (['TON', 'TOF', 'CLOCK'].includes(comp.type)) {
+    
+    if (['TON', 'TOF', 'CLOCK', 'TRIG_H', 'TRIG_L'].includes(comp.type)) {
         timerControls.style.display = 'block';
         document.getElementById('timerSlider').value = comp.timeSetting;
         updateValDisplay(comp.timeSetting);
@@ -1045,7 +1084,7 @@ function updateInputCountDisplay(val) { document.getElementById('inputCountDispl
 function saveConfig() {
     if (!editingComponent) return;
     const config = {};
-    if (['TON', 'TOF', 'CLOCK'].includes(editingComponent.type)) {
+    if (['TON', 'TOF', 'CLOCK', 'TRIG_H', 'TRIG_L'].includes(editingComponent.type)) {
         config.timeSetting = document.getElementById('timerSlider').value;
         config.dutyCycle = document.getElementById('dutySlider').value;
         const radios = document.getElementsByName('timebase');
