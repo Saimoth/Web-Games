@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Swap Sort Lab</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --accent-color: #3b82f6;
+            --highlight-color: #f43f5e;
+            --computer-color: #a855f7;
+            --text-color: #f8fafc;
+            --success-color: #10b981;
+            --tile-size: 78px;
+            --tile-gap: 12px;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            height: 100vh;
+            overflow: hidden;
+            position: relative;
+        }
+
+        header {
+            text-align: center;
+            padding: 20px 10px 5px 10px;
+            z-index: 5;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin: 0 0 5px 0;
+            font-weight: 800;
+            letter-spacing: -0.025em;
+        }
+
+        #statusMode {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+            background-color: rgba(59, 130, 246, 0.2);
+            color: var(--accent-color);
+            transition: all 0.3s;
+        }
+
+        #statusMode.cpu-mode {
+            background-color: rgba(168, 85, 247, 0.2);
+            color: var(--computer-color);
+        }
+
+        .scoreboard {
+            display: flex;
+            justify-content: center;
+            gap: 25px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #94a3b8;
+        }
+
+        .scoreboard span {
+            font-weight: 800;
+        }
+        #playerScore { color: var(--accent-color); }
+        #cpuScore { color: var(--computer-color); }
+
+        /* The viewport window */
+        .viewport {
+            width: 100%;
+            overflow: hidden;
+            position: relative;
+            height: 150px;
+            display: flex;
+            align-items: center;
+        }
+
+        /* Center guidelines */
+        .viewport::before, .viewport::after {
+            content: '';
+            position: absolute;
+            top: 10px;
+            bottom: 10px;
+            width: 2px;
+            z-index: 3;
+            pointer-events: none;
+            transition: background 0.3s;
+            background: rgba(244, 63, 94, 0.2);
+        }
+        .viewport::before { left: calc(50% - var(--tile-size) - (var(--tile-gap) / 2) - 4px); }
+        .viewport::after { right: calc(50% - var(--tile-size) - (var(--tile-gap) / 2) - 4px); }
+
+        body.cpu-running .viewport::before, 
+        body.cpu-running .viewport::after {
+            background: rgba(168, 85, 247, 0.4);
+        }
+
+        .track {
+            display: flex;
+            gap: var(--tile-gap);
+            padding: 0;
+            margin: 0;
+            list-style: none;
+            position: absolute;
+            left: 0;
+            transform: translateX(0);
+            transition: transform 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+            will-change: transform;
+        }
+
+        .tile {
+            width: var(--tile-size);
+            height: var(--tile-size);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            font-weight: 800;
+            border-radius: 16px;
+            user-select: none;
+            border: 3px solid transparent;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+            flex-shrink: 0;
+        }
+
+        .tile.active {
+            border-color: var(--highlight-color);
+            transform: scale(1.1);
+            box-shadow: 0 0 20px rgba(244, 63, 94, 0.4);
+            z-index: 2;
+        }
+
+        body.cpu-running .tile.active {
+            border-color: var(--computer-color);
+            box-shadow: 0 0 20px rgba(168, 85, 247, 0.4);
+        }
+
+        /* Fixed Bottom Controls: Explicit grid layout mapping */
+        .controls-container {
+            padding: 15px 15px 35px 15px;
+            background: linear-gradient(to top, rgba(15,23,42,1) 85%, rgba(15,23,42,0) 100%);
+            z-index: 5;
+        }
+
+        .main-controls {
+            display: grid;
+            grid-template-columns: 85px 1fr 85px;
+            grid-template-rows: 50px 60px;
+            gap: 12px;
+            max-width: 450px;
+            margin: 0 auto;
+        }
+
+        button {
+            border: none;
+            font-weight: 700;
+            font-size: 1rem;
+            border-radius: 14px;
+            cursor: pointer;
+            transition: background 0.1s, transform 0.1s, opacity 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        button:disabled {
+            opacity: 0.15;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        button:active:not(:disabled) {
+            transform: scale(0.95);
+        }
+
+        /* Strict Grid Assignments */
+        #startBtn {
+            grid-column: 1;
+            grid-row: 1;
+            background-color: #334155;
+            color: #94a3b8;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border: 1px solid #475569;
+        }
+
+        #prevBtn {
+            grid-column: 1;
+            grid-row: 2;
+            background-color: var(--card-bg);
+            color: var(--text-color);
+            font-size: 1.6rem;
+            border: 1px solid #334155;
+        }
+
+        #swapBtn {
+            grid-column: 2;
+            grid-row: 2;
+            background-color: var(--highlight-color);
+            color: white;
+            font-size: 1.3rem;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            box-shadow: 0 4px 15px rgba(244, 63, 94, 0.3);
+            height: 100%;
+        }
+
+        #endBtn {
+            grid-column: 3;
+            grid-row: 1;
+            background-color: #334155;
+            color: #94a3b8;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border: 1px solid #475569;
+        }
+
+        #nextBtn {
+            grid-column: 3;
+            grid-row: 2;
+            background-color: var(--card-bg);
+            color: var(--text-color);
+            font-size: 1.6rem;
+            border: 1px solid #334155;
+        }
+
+        .utility-controls {
+            display: flex;
+            justify-content: center;
+            margin-top: 15px;
+        }
+
+        .reset-btn {
+            background-color: transparent;
+            color: #64748b;
+            font-size: 0.9rem;
+            padding: 6px 14px;
+            border: 1px solid #334155;
+        }
+
+        /* Comparative Score Screen Overlay */
+        .win-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(15, 23, 42, 0.95);
+            z-index: 10;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .win-box {
+            background: var(--card-bg);
+            border: 2px solid var(--accent-color);
+            padding: 30px 20px;
+            border-radius: 24px;
+            max-width: 340px;
+            width: 100%;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+        }
+
+        .win-box h2 {
+            color: var(--success-color);
+            font-size: 1.6rem;
+            margin-top: 0;
+            margin-bottom: 10px;
+        }
+
+        .vs-container {
+            display: flex;
+            justify-content: space-around;
+            margin: 25px 0;
+            background: rgba(15, 23, 42, 0.5);
+            padding: 15px;
+            border-radius: 16px;
+        }
+
+        .vs-column h3 {
+            font-size: 0.9rem;
+            color: #94a3b8;
+            margin: 0 0 5px 0;
+            text-transform: uppercase;
+        }
+
+        .vs-column p {
+            font-size: 1.8rem;
+            font-weight: 800;
+            margin: 0;
+        }
+
+        .analysis-text {
+            font-size: 0.95rem;
+            color: #cbd5e1;
+            line-height: 1.5;
+            margin-bottom: 20px;
+        }
+
+        .win-box button {
+            background-color: var(--accent-color);
+            color: white;
+            width: 100%;
+            height: 50px;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Swap Sort Lab</h1>
+        <div id="statusMode">Player's Turn</div>
+        <div class="scoreboard">
+            <div>Player: <span id="playerScore">0</span></div>
+            <div>Computer: <span id="cpuScore">0</span></div>
+        </div>
+    </header>
+
+    <div class="viewport">
+        <ul class="track" id="track"></ul>
+    </div>
+
+    <!-- Explicit Grid Layout HUD Map -->
+    <div class="controls-container">
+        <div class="main-controls">
+            <button id="startBtn">Start</button>
+            <button id="prevBtn">←</button>
+            
+            <button id="swapBtn">Swap</button>
+            
+            <button id="endBtn">End</button>
+            <button id="nextBtn">→</button>
+        </div>
+        <div class="utility-controls">
+            <button class="reset-btn" id="resetBtn">Shuffle New Deck</button>
+        </div>
+    </div>
+
+    <div class="win-overlay" id="winOverlay">
+        <div class="win-box">
+            <h2>📊 Efficiency Analysis</h2>
+            
+            <div class="vs-container">
+                <div class="vs-column">
+                    <h3>Player</h3>
+                    <p id="finalPlayer" style="color: var(--accent-color);">0</p>
+                </div>
+                <div class="vs-column" style="border-left: 1px solid #334155; padding-left: 20px;">
+                    <h3>Bubble Sort</h3>
+                    <p id="finalCpu" style="color: var(--computer-color);">0</p>
+                </div>
+            </div>
+
+            <div class="analysis-text" id="analysisMessage"></div>
+            
+            <button onclick="initGame()">Try Another Shuffle</button>
+        </div>
+    </div>
+
+    <script>
+        const TOTAL_TILES = 10; 
+        let initialShuffle = []; 
+        let tiles = [];
+        let pointer = 0; 
+        let playerSwaps = 0;
+        let cpuSwaps = 0;
+        let isCpuReplayMode = false;
+        let cpuInterval = null;
+        let cpuDidSwapLastTick = false;
+
+        const trackElement = document.getElementById('track');
+        const playerScoreElement = document.getElementById('playerScore');
+        const cpuScoreElement = document.getElementById('cpuScore');
+        const statusModeElement = document.getElementById('statusMode');
+        const winOverlay = document.getElementById('winOverlay');
+
+        function getTileColor(value) {
+            const minHue = 200; 
+            const maxHue = 290; 
+            const hue = minHue + ((value - 1) / (TOTAL_TILES - 1)) * (maxHue - minHue);
+            return `hsl(${hue}, 75%, 45%)`;
+        }
+
+        function initGame() {
+            if (cpuInterval) clearInterval(cpuInterval);
+            
+            tiles = Array.from({ length: TOTAL_TILES }, (_, i) => i + 1);
+            
+            for (let i = tiles.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [tiles[i], tiles[j]] = [tiles[j], tiles[i]];
+            }
+
+            initialShuffle = [...tiles];
+
+            pointer = 0;
+            playerSwaps = 0;
+            cpuSwaps = 0;
+            isCpuReplayMode = false;
+            cpuDidSwapLastTick = false;
+            
+            document.body.classList.remove('cpu-running');
+            statusModeElement.innerText = "Player's Turn";
+            statusModeElement.classList.remove('cpu-mode');
+            playerScoreElement.innerText = playerSwaps;
+            cpuScoreElement.innerText = cpuSwaps;
+            winOverlay.style.display = 'none';
+            
+            toggleButtons(false);
+            renderTrack();
+            centerActivePair();
+        }
+
+        function renderTrack() {
+            trackElement.innerHTML = '';
+            tiles.forEach((value, index) => {
+                const li = document.createElement('li');
+                li.classList.add('tile');
+                li.innerText = value;
+                li.style.backgroundColor = getTileColor(value);
+
+                if (index === pointer || index === pointer + 1) {
+                    li.classList.add('active');
+                }
+                trackElement.appendChild(li);
+            });
+        }
+
+        function centerActivePair() {
+            const tileElements = trackElement.children;
+            if (tileElements.length === 0) return;
+
+            const activeTile = tileElements[pointer];
+            const tileWidth = activeTile.offsetWidth;
+            const tileOffset = activeTile.offsetLeft;
+            
+            const rootStyles = getComputedStyle(document.documentElement);
+            const gap = parseInt(rootStyles.getPropertyValue('--tile-gap')) || 12;
+
+            const pairWidth = (tileWidth * 2) + gap;
+            const pairCenterPoint = tileOffset + (pairWidth / 2);
+
+            const viewportCenterPoint = window.innerWidth / 2;
+            const transformX = viewportCenterPoint - pairCenterPoint;
+
+            trackElement.style.transform = `translateX(${transformX}px)`;
+        }
+
+        function checkArraySorted() {
+            for (let i = 0; i < tiles.length; i++) {
+                if (tiles[i] !== i + 1) return false;
+            }
+            return true;
+        }
+
+        function toggleButtons(disabled) {
+            document.getElementById('startBtn').disabled = disabled;
+            document.getElementById('prevBtn').disabled = disabled;
+            document.getElementById('swapBtn').disabled = disabled;
+            document.getElementById('endBtn').disabled = disabled;
+            document.getElementById('nextBtn').disabled = disabled;
+            document.getElementById('resetBtn').disabled = disabled;
+        }
+
+        // NAVIGATION CONTROL HANDLERS
+        document.getElementById('startBtn').addEventListener('click', () => {
+            if (!isCpuReplayMode && pointer !== 0) {
+                pointer = 0; renderTrack(); centerActivePair();
+            }
+        });
+
+        document.getElementById('endBtn').addEventListener('click', () => {
+            const maxPointer = TOTAL_TILES - 2;
+            if (!isCpuReplayMode && pointer !== maxPointer) {
+                pointer = maxPointer; renderTrack(); centerActivePair();
+            }
+        });
+
+        document.getElementById('nextBtn').addEventListener('click', () => {
+            if (!isCpuReplayMode && pointer < TOTAL_TILES - 2) {
+                pointer++; renderTrack(); centerActivePair();
+            }
+        });
+
+        document.getElementById('prevBtn').addEventListener('click', () => {
+            if (!isCpuReplayMode && pointer > 0) {
+                pointer--; renderTrack(); centerActivePair();
+            }
+        });
+
+        document.getElementById('swapBtn').addEventListener('click', () => {
+            if (isCpuReplayMode) return;
+
+            [tiles[pointer], tiles[pointer + 1]] = [tiles[pointer + 1], tiles[pointer]];
+            playerSwaps++;
+            playerScoreElement.innerText = playerSwaps;
+            renderTrack();
+            centerActivePair();
+
+            if (checkArraySorted()) {
+                toggleButtons(true);
+                setTimeout(startCpuReplayEngine, 1200); 
+            }
+        });
+
+        document.getElementById('resetBtn').addEventListener('click', initGame);
+
+        // CPU AUTOMATION ENGINE (5 ticks/second)
+        function startCpuReplayEngine() {
+            isCpuReplayMode = true;
+            document.body.classList.add('cpu-running');
+            statusModeElement.innerText = "Computer Replay";
+            statusModeElement.classList.add('cpu-mode');
+            
+            tiles = [...initialShuffle];
+            pointer = 0;
+            cpuSwaps = 0;
+            cpuDidSwapLastTick = false;
+            
+            renderTrack();
+            centerActivePair();
+
+            cpuInterval = setInterval(executeCpuTick, 200);
+        }
+
+        function executeCpuTick() {
+            if (checkArraySorted()) {
+                clearInterval(cpuInterval);
+                setTimeout(showFinalEvaluationOverlay, 800);
+                return;
+            }
+
+            if (cpuDidSwapLastTick) {
+                advanceCpuPointer();
+                cpuDidSwapLastTick = false;
+                renderTrack();
+                centerActivePair();
+                return;
+            }
+
+            if (tiles[pointer] > tiles[pointer + 1]) {
+                [tiles[pointer], tiles[pointer + 1]] = [tiles[pointer + 1], tiles[pointer]];
+                cpuSwaps++;
+                cpuScoreElement.innerText = cpuSwaps;
+                cpuDidSwapLastTick = true;
+            } else {
+                advanceCpuPointer();
+            }
+
+            renderTrack();
+            centerActivePair();
+        }
+
+        function advanceCpuPointer() {
+            if (pointer < TOTAL_TILES - 2) {
+                pointer++;
+            } else {
+                pointer = 0; 
+            }
+        }
+
+        function showFinalEvaluationOverlay() {
+            document.getElementById('finalPlayer').innerText = playerSwaps;
+            document.getElementById('finalCpu').innerText = cpuSwaps;
+            
+            const analysisText = document.getElementById('analysisMessage');
+            if (playerSwaps < cpuSwaps) {
+                analysisText.innerHTML = `🌟 <strong>Incredible!</strong> You actually beat the standard Bubble Sort algorithm by optimizing your jumps! That is phenomenal optimization.`;
+            } else if (playerSwaps === cpuSwaps) {
+                analysisText.innerHTML = `🤝 <strong>Perfect Match!</strong> You sorted the deck with the absolute maximum mathematical efficiency possible for this array. High five!`;
+            } else {
+                analysisText.innerHTML = `📈 <strong>A Great Run!</strong> Bubble Sort found a path with fewer shifts this time. Run another shuffle and see if you can track closer to its code!`;
+            }
+            
+            winOverlay.style.display = 'flex';
+        }
+
+        window.addEventListener('resize', centerActivePair);
+        initGame();
+    </script>
+</body>
+</html>
