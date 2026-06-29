@@ -835,12 +835,21 @@
           <input type="number" id="pensionEmpPct" value="12" step="0.5" min="0" max="100">
         </div>
       </div>
-      <div class="field">
-        <label>
-          Company Match %
-          <span class="info-icon" data-tip="Employer contribution as a % of your salary. Many employers match 5–10%.">i</span>
-        </label>
-        <input type="number" id="pensionMatch" value="8" step="0.5" min="0" max="100">
+      <div class="field-row">
+        <div class="field">
+          <label>
+            Company Match %
+            <span class="info-icon" data-tip="Employer contribution as a % of your salary. Many employers match 5–10%.">i</span>
+          </label>
+          <input type="number" id="pensionMatch" value="8" step="0.5" min="0" max="100">
+        </div>
+        <div class="field">
+          <label>
+            Annual Pay Rise %
+            <span class="info-icon" data-tip="Your salary grows by this % each year, increasing pension contributions in line with your earnings.">i</span>
+          </label>
+          <input type="number" id="payRise" value="2" step="0.5" min="0" max="20">
+        </div>
       </div>
     </div>
 
@@ -1056,12 +1065,15 @@ function solveExtraMonthly(mortgages, targetMonths, overpayIncreasePct) {
 }
 
 // ─────────────────────────────────────────────
-//  PENSION PROJECTION
+//  PENSION PROJECTION (salary grows by payRisePct% each year)
 // ─────────────────────────────────────────────
-function projectPension(startPot, annualContrib, years, growthRate) {
-  let pot = startPot;
+function projectPension(startPot, startSalary, totalContribPct, years, growthRate, payRisePct) {
+  let pot    = startPot;
+  let salary = startSalary;
   for (let y = 0; y < years; y++) {
-    pot = (pot + annualContrib) * (1 + growthRate / 100);
+    const contrib = salary * totalContribPct / 100;
+    pot    = (pot + contrib) * (1 + growthRate / 100);
+    salary = salary * (1 + payRisePct / 100);
   }
   return pot;
 }
@@ -1077,6 +1089,7 @@ function calculate() {
   const pensionPot      = parseFloat(document.getElementById('pensionPot').value)     || 0;
   const pensionEmpPct   = parseFloat(document.getElementById('pensionEmpPct').value)  || 12;
   const pensionMatch    = parseFloat(document.getElementById('pensionMatch').value)    || 8;
+  const payRise         = parseFloat(document.getElementById('payRise').value)        || 2;
 
   const yearsToRetire = retireAge - currentAge;
   if (yearsToRetire <= 0) { alert('Retirement age must be greater than current age.'); return; }
@@ -1084,8 +1097,9 @@ function calculate() {
   const mortgages = getMortgages();
   if (mortgages.length === 0) { alert('Please enter at least one mortgage.'); return; }
 
-  const targetMonths         = yearsToRetire * 12;
-  const annualPensionContrib = salary * (pensionEmpPct + pensionMatch) / 100;
+  const targetMonths         = yearsToRetire * 12 - 1; // pay off by end of second-to-last month so the full final year contributes payments
+  const totalContribPct      = pensionEmpPct + pensionMatch;
+  const annualPensionContrib = salary * totalContribPct / 100; // Year 1 contribution (for display)
   const totalDebt            = mortgages.reduce((s, m) => s + m.balance, 0);
 
   // ── 1. Standard monthly payments per mortgage ──────────────────────────────
@@ -1122,9 +1136,9 @@ function calculate() {
   }
 
   // ── 5. Pension ────────────────────────────────────────────────────────────
-  const pension3      = projectPension(pensionPot, annualPensionContrib, yearsToRetire, 3);
-  const pension5      = projectPension(pensionPot, annualPensionContrib, yearsToRetire, 5);
-  const pension7      = projectPension(pensionPot, annualPensionContrib, yearsToRetire, 7);
+  const pension3      = projectPension(pensionPot, salary, totalContribPct, yearsToRetire, 3, payRise);
+  const pension5      = projectPension(pensionPot, salary, totalContribPct, yearsToRetire, 5, payRise);
+  const pension7      = projectPension(pensionPot, salary, totalContribPct, yearsToRetire, 7, payRise);
   const pension5Annual = pension5 / 20;
 
   // PLSA 2024 benchmarks
@@ -1149,9 +1163,11 @@ function calculate() {
   if (pension5Annual >= comfStd) {
     stdCommentary = `<div class="good-box">✓ On track for a <strong>Comfortable</strong> retirement (${fmt(comfStd)}/yr). At 5% growth, your projected income of ${fmt(pension5Annual)}/yr exceeds this benchmark by ${fmt(pension5Annual - comfStd)}/yr.</div>`;
   } else if (pension5Annual >= modStd) {
-    stdCommentary = `<div class="warning-box">⚠ On track for a <strong>Moderate</strong> retirement (${fmt(modStd)}/yr). To reach Comfortable (${fmt(comfStd)}/yr), consider increasing contributions by ~${Math.ceil((comfStd - pension5Annual) / salary * 100)}% of salary.</div>`;
+    stdCommentary = `<div class="good-box">✓ On track for a <strong>Moderate</strong> retirement (${fmt(modStd)}/yr). To reach Comfortable (${fmt(comfStd)}/yr), consider increasing contributions by ~${Math.ceil((comfStd - pension5Annual) / salary * 100)}% of salary.</div>`;
+  } else if (pension5Annual >= minStd) {
+    stdCommentary = `<div class="warning-box">⚠ Projected income of ${fmt(pension5Annual)}/yr meets the <strong>Minimum</strong> standard (${fmt(minStd)}/yr) but falls short of Moderate (${fmt(modStd)}/yr). Consider increasing contributions by ~${Math.ceil((modStd - pension5Annual) / salary * 100)}% of salary to improve your retirement income.</div>`;
   } else {
-    stdCommentary = `<div class="warning-box">⚠ Projected income of ${fmt(pension5Annual)}/yr falls below the <strong>Minimum</strong> standard (${fmt(minStd)}/yr). Consider increasing contributions — you may need an extra ${fmt(minStd - pension5Annual)}/yr from other sources.</div>`;
+    stdCommentary = `<div class="warning-box">⚠ Projected income of ${fmt(pension5Annual)}/yr falls below the <strong>Minimum</strong> standard (${fmt(minStd)}/yr). Consider increasing contributions significantly — you may need an extra ${fmt(minStd - pension5Annual)}/yr from other sources.</div>`;
   }
 
   // Year 1–5 schedule cards
@@ -1324,7 +1340,7 @@ function calculate() {
     <!-- PENSION PROJECTIONS -->
     <div class="result-block">
       <h3>Pension Pot at Retirement (Age ${retireAge})</h3>
-      <p style="font-size:12px;color:#7a8a99;margin-bottom:14px;">Starting from ${fmt(pensionPot)}, contributing ${fmt(annualPensionContrib)}/yr (you ${pensionEmpPct}% + employer ${pensionMatch}%) over ${yearsToRetire} years.</p>
+      <p style="font-size:12px;color:#7a8a99;margin-bottom:14px;">Starting from ${fmt(pensionPot)}, with Year 1 contributions of ${fmt(annualPensionContrib)}/yr (you ${pensionEmpPct}% + employer ${pensionMatch}%) growing at ${payRise}%/yr alongside your salary. Projected salary at retirement: ${fmt(salary * Math.pow(1 + payRise / 100, yearsToRetire))}.</p>
       <div class="pension-grid">
         <div class="pension-scenario">
           <div class="ps-rate">Conservative · 3%</div>
