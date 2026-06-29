@@ -1,0 +1,1394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Retirement Planner</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #0f1e2e;
+    --navy-mid: #162840;
+    --navy-light: #1e3a55;
+    --slate: #2d4a63;
+    --amber: #e8a020;
+    --amber-light: #f5c050;
+    --amber-dim: #7a5210;
+    --white: #f5f6f7;
+    --offwhite: #edf0f3;
+    --text-dim: #8ba3b8;
+    --text-mid: #c4d2dc;
+    --green: #3ecf8e;
+    --green-dim: #1a5c3e;
+    --red: #e85050;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'Inter', sans-serif;
+    --radius: 8px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--sans);
+    background: var(--navy);
+    color: var(--white);
+    min-height: 100vh;
+  }
+
+  /* ── HEADER ── */
+  header {
+    background: var(--navy-mid);
+    border-bottom: 1px solid var(--navy-light);
+    padding: 20px 40px;
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+  }
+
+  header h1 {
+    font-family: var(--mono);
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--amber);
+    letter-spacing: -0.5px;
+  }
+
+  header span {
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+
+  /* ── LAYOUT ── */
+  .layout {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    min-height: calc(100vh - 65px);
+  }
+
+  /* ── INPUT PANEL ── */
+  .inputs {
+    background: var(--navy-mid);
+    border-right: 1px solid var(--navy-light);
+    padding: 28px 24px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .section-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--amber);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--navy-light);
+  }
+
+  .field {
+    margin-bottom: 14px;
+  }
+
+  .field label {
+    display: block;
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 5px;
+    font-weight: 500;
+  }
+
+  .field input {
+    width: 100%;
+    background: var(--navy-light);
+    border: 1px solid var(--slate);
+    border-radius: var(--radius);
+    padding: 9px 12px;
+    color: var(--white);
+    font-family: var(--mono);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .field input:focus {
+    border-color: var(--amber);
+  }
+
+  .field input::placeholder {
+    color: var(--text-dim);
+    opacity: 0.5;
+  }
+
+  .field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  /* ── MORTGAGE CARDS ── */
+  .mortgage-card {
+    background: var(--navy);
+    border: 1px solid var(--navy-light);
+    border-radius: var(--radius);
+    padding: 14px;
+    margin-bottom: 10px;
+    position: relative;
+  }
+
+  .mortgage-card .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  .mortgage-card .card-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--amber);
+    font-weight: 500;
+  }
+
+  .remove-btn {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: color 0.15s, background 0.15s;
+  }
+
+  .remove-btn:hover {
+    color: var(--red);
+    background: rgba(232,80,80,0.1);
+  }
+
+  .add-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: none;
+    border: 1px dashed var(--slate);
+    border-radius: var(--radius);
+    color: var(--text-mid);
+    font-size: 12px;
+    padding: 9px 14px;
+    cursor: pointer;
+    width: 100%;
+    transition: border-color 0.15s, color 0.15s;
+    font-family: var(--sans);
+  }
+
+  .add-btn:hover {
+    border-color: var(--amber);
+    color: var(--amber);
+  }
+
+  /* ── CALCULATE BUTTON ── */
+  .calc-btn {
+    background: var(--amber);
+    color: var(--navy);
+    border: none;
+    border-radius: var(--radius);
+    padding: 13px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    width: 100%;
+    font-family: var(--sans);
+    letter-spacing: 0.3px;
+    transition: background 0.15s, transform 0.1s;
+    margin-top: 6px;
+  }
+
+  .calc-btn:hover { background: var(--amber-light); }
+  .calc-btn:active { transform: scale(0.99); }
+
+  /* ── RESULTS PANEL ── */
+  .results {
+    background: var(--offwhite);
+    color: var(--navy);
+    overflow-y: auto;
+    padding: 32px 36px;
+  }
+
+  .results-placeholder {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-dim);
+    gap: 12px;
+    text-align: center;
+    padding: 60px;
+  }
+
+  .results-placeholder .icon {
+    font-size: 48px;
+    opacity: 0.3;
+  }
+
+  .results-placeholder p {
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  /* ── TIMELINE BAR ── */
+  .timeline-section {
+    background: var(--navy);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 28px;
+    color: var(--white);
+  }
+
+  .timeline-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--amber);
+    margin-bottom: 20px;
+  }
+
+  .timeline-bar-wrap {
+    position: relative;
+    height: 52px;
+    margin-bottom: 24px;
+  }
+
+  .timeline-track {
+    height: 12px;
+    background: var(--navy-light);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-top: 8px;
+  }
+
+  .timeline-mortgage {
+    height: 100%;
+    background: linear-gradient(90deg, var(--amber), var(--amber-light));
+    border-radius: 6px;
+    animation: growBar 0.9s ease-out;
+  }
+
+  .timeline-pension {
+    height: 8px;
+    background: linear-gradient(90deg, var(--green), #5ee8a8);
+    border-radius: 6px;
+    margin-top: 4px;
+    animation: growBar 0.9s ease-out 0.15s both;
+  }
+
+  @keyframes growBar {
+    from { width: 0; }
+  }
+
+  .timeline-labels {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 8px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  .milestone-markers {
+    position: relative;
+    height: 24px;
+    margin-bottom: 4px;
+  }
+
+  .milestone {
+    position: absolute;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .milestone .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--amber);
+  }
+
+  .milestone .dot.pension-dot {
+    background: var(--green);
+  }
+
+  .milestone .mlabel {
+    font-size: 9px;
+    font-family: var(--mono);
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+
+  /* ── SUMMARY CARDS ── */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin-bottom: 28px;
+  }
+
+  .summary-card {
+    background: white;
+    border-radius: 10px;
+    padding: 18px;
+    border: 1px solid #dde3ea;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+
+  .summary-card .sc-label {
+    font-size: 11px;
+    color: #7a8a99;
+    font-weight: 500;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .summary-card .sc-value {
+    font-family: var(--mono);
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--navy);
+  }
+
+  .summary-card .sc-sub {
+    font-size: 11px;
+    color: #9aacbb;
+    margin-top: 4px;
+  }
+
+  /* ── RESULTS SECTIONS ── */
+  .result-block {
+    background: white;
+    border-radius: 10px;
+    padding: 22px 24px;
+    margin-bottom: 20px;
+    border: 1px solid #dde3ea;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+
+  .result-block h3 {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--amber-dim);
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #edf0f3;
+  }
+
+  /* ── MORTGAGE TABLE ── */
+  .mortgage-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .mortgage-table th {
+    text-align: left;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #9aacbb;
+    padding: 6px 10px;
+    border-bottom: 1px solid #edf0f3;
+  }
+
+  .mortgage-table td {
+    padding: 9px 10px;
+    border-bottom: 1px solid #f5f6f7;
+    color: #2d3e4e;
+  }
+
+  .mortgage-table tr:last-child td { border-bottom: none; }
+
+  .mortgage-table td.mono {
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+
+  .mortgage-table .highlight-row td {
+    background: #fef9ee;
+    font-weight: 500;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 600;
+    font-family: var(--mono);
+  }
+
+  .badge-amber { background: #fef3d0; color: #b07010; }
+  .badge-green { background: #d0f5e8; color: #1a6840; }
+  .badge-red { background: #ffe0e0; color: #b03030; }
+
+  /* ── PENSION TABLE ── */
+  .pension-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin-bottom: 16px;
+  }
+
+  .pension-scenario {
+    background: #f5f8fb;
+    border-radius: 8px;
+    padding: 16px;
+    text-align: center;
+    border: 1px solid #e0e8ef;
+  }
+
+  .ps-rate {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: #7a8a99;
+    margin-bottom: 8px;
+    font-weight: 600;
+  }
+
+  .ps-value {
+    font-family: var(--mono);
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--navy);
+    margin-bottom: 4px;
+  }
+
+  .ps-monthly {
+    font-size: 11px;
+    color: #9aacbb;
+  }
+
+  .ps-value.green { color: #1a8050; }
+  .ps-value.amber-col { color: #b07010; }
+
+  /* ── YEAR BY YEAR ── */
+  .year-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+
+  .year-table th {
+    text-align: left;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #9aacbb;
+    padding: 6px 10px;
+    border-bottom: 1px solid #edf0f3;
+    white-space: nowrap;
+  }
+
+  .year-table td {
+    padding: 7px 10px;
+    border-bottom: 1px solid #f5f6f7;
+    color: #2d3e4e;
+    font-family: var(--mono);
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
+  .year-table tr:last-child td { border-bottom: none; }
+
+  .year-table .paid-off td {
+    background: #edfdf5;
+    color: #2d7a55;
+  }
+
+  .year-table .retired td {
+    background: #fef9e8;
+    font-weight: 600;
+  }
+
+  .action-tag {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--green-dim);
+    background: #d8f5e8;
+    padding: 1px 7px;
+    border-radius: 10px;
+    font-family: var(--sans);
+  }
+
+  /* ── LIFESTYLE SECTION ── */
+  .lifestyle-bar {
+    height: 24px;
+    border-radius: 12px;
+    background: #edf0f3;
+    overflow: hidden;
+    margin: 12px 0 6px;
+    position: relative;
+  }
+
+  .lifestyle-fill {
+    height: 100%;
+    border-radius: 12px;
+    background: linear-gradient(90deg, var(--green), #5ee8a8);
+    display: flex;
+    align-items: center;
+    padding-left: 10px;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--navy);
+    white-space: nowrap;
+    animation: growBar 0.8s ease-out;
+  }
+
+  .lifestyle-threshold {
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 2px;
+    background: var(--amber);
+  }
+
+  .lifestyle-legends {
+    display: flex;
+    gap: 20px;
+    font-size: 11px;
+    color: #7a8a99;
+    margin-top: 6px;
+  }
+
+  .lifestyle-legends span::before {
+    content: '';
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    margin-right: 5px;
+    vertical-align: middle;
+  }
+
+  .ll-you::before { background: var(--green); }
+  .ll-standard::before { background: var(--amber); }
+
+  .warning-box {
+    background: #fff8e8;
+    border: 1px solid #f5d070;
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 12px;
+    color: #8a6010;
+    margin-top: 12px;
+    line-height: 1.6;
+  }
+
+  .good-box {
+    background: #edfdf5;
+    border: 1px solid #70d5a8;
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 12px;
+    color: #1a6040;
+    margin-top: 12px;
+    line-height: 1.6;
+  }
+
+  /* ── OVERPAYMENT SCHEDULE CARDS ── */
+  .schedule-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+  }
+
+  .schedule-card {
+    background: #f5f8fb;
+    border: 1px solid #dde8f0;
+    border-radius: 8px;
+    padding: 14px 12px;
+    position: relative;
+  }
+
+  .schedule-card--highlight {
+    background: #fff8e8;
+    border-color: #e8c060;
+  }
+
+  .sched-year {
+    font-size: 11px;
+    font-weight: 600;
+    color: #5a6a7a;
+    margin-bottom: 10px;
+    text-align: center;
+  }
+
+  .sched-age {
+    font-size: 10px;
+    color: #9aacbb;
+    font-weight: 400;
+  }
+
+  .sched-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 5px;
+  }
+
+  .sched-lbl {
+    font-size: 10px;
+    color: #9aacbb;
+    font-weight: 500;
+  }
+
+  .sched-val {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--navy);
+    text-align: right;
+  }
+
+  .sched-mo {
+    font-size: 10px;
+    color: #9aacbb;
+  }
+
+  .overpay-val {
+    color: #b07010;
+    font-weight: 600;
+  }
+
+  .sched-divider {
+    height: 1px;
+    background: #dde8f0;
+    margin: 7px 0;
+  }
+
+  .schedule-card--highlight .sched-divider {
+    background: #e8c060;
+  }
+
+  .sched-total .sched-lbl {
+    color: #5a6a7a;
+    font-weight: 600;
+  }
+
+  .total-val {
+    font-size: 14px !important;
+    font-weight: 700 !important;
+    color: var(--navy) !important;
+  }
+
+  .sched-badge {
+    display: block;
+    text-align: center;
+    margin-top: 10px;
+    background: var(--amber);
+    color: var(--navy);
+    font-size: 9px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+    .summary-grid { grid-template-columns: 1fr 1fr; }
+    .pension-grid { grid-template-columns: 1fr; }
+    .schedule-grid { grid-template-columns: repeat(3, 1fr); }
+    header { padding: 16px 20px; }
+    .inputs { padding: 20px 16px; }
+    .results { padding: 20px 16px; }
+  }
+
+  @media (max-width: 600px) {
+    .schedule-grid { grid-template-columns: 1fr 1fr; }
+    .summary-grid { grid-template-columns: 1fr; }
+  }
+
+  /* tooltip */
+  [data-tip] {
+    position: relative;
+    cursor: help;
+  }
+  [data-tip]::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: 120%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--navy);
+    color: var(--white);
+    font-size: 11px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s;
+    z-index: 10;
+    max-width: 220px;
+    white-space: normal;
+    text-align: center;
+    line-height: 1.4;
+  }
+  [data-tip]:hover::after { opacity: 1; }
+
+  .info-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--slate);
+    color: var(--text-dim);
+    font-size: 9px;
+    font-weight: 700;
+    cursor: help;
+    font-family: var(--sans);
+    vertical-align: middle;
+    margin-left: 4px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>// retirement.plan</h1>
+  <span>mortgage payoff &amp; pension projection calculator</span>
+</header>
+
+<div class="layout">
+
+  <!-- INPUT PANEL -->
+  <div class="inputs">
+
+    <div>
+      <div class="section-label">Personal</div>
+      <div class="field-row">
+        <div class="field">
+          <label>Current Age</label>
+          <input type="number" id="currentAge" value="35" min="18" max="80">
+        </div>
+        <div class="field">
+          <label>Target Retirement Age</label>
+          <input type="number" id="retireAge" value="60" min="40" max="85">
+        </div>
+      </div>
+      <div class="field">
+        <label>Annual Salary (£)</label>
+        <input type="number" id="salary" value="55000" step="1000">
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">Mortgages</div>
+      <div id="mortgages-container"></div>
+      <button class="add-btn" id="addMortgage">＋ Add another mortgage</button>
+    </div>
+
+    <div>
+      <div class="section-label">Overpayment Strategy</div>
+      <p style="font-size:12px;color:var(--text-dim);margin-bottom:12px;line-height:1.5;">The calculator will work out the minimum monthly overpayment needed in Year 1 to clear all mortgages by your retirement age, then show how it grows each year.</p>
+      <div class="field">
+        <label>
+          Annual overpayment increase %
+          <span class="info-icon" data-tip="Each year your overpayment rises by this %, keeping Year 1 as affordable as possible while still hitting your target">i</span>
+        </label>
+        <input type="number" id="overpayIncrease" value="1" step="0.5" min="0" max="20">
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">Pension</div>
+      <div class="field-row">
+        <div class="field">
+          <label>Current Pot (£)</label>
+          <input type="number" id="pensionPot" value="25000" step="1000">
+        </div>
+        <div class="field">
+          <label>Your Contribution %</label>
+          <input type="number" id="pensionEmpPct" value="12" step="0.5" min="0" max="100">
+        </div>
+      </div>
+      <div class="field">
+        <label>
+          Company Match %
+          <span class="info-icon" data-tip="Employer contribution as a % of your salary. Many employers match 5–10%.">i</span>
+        </label>
+        <input type="number" id="pensionMatch" value="8" step="0.5" min="0" max="100">
+      </div>
+    </div>
+
+    <button class="calc-btn" onclick="calculate()">Calculate Retirement Plan →</button>
+
+  </div>
+
+  <!-- RESULTS PANEL -->
+  <div class="results" id="results-panel">
+    <div class="results-placeholder">
+      <div class="icon">📊</div>
+      <p>Enter your details on the left and hit <strong>Calculate</strong> to see your personalised retirement roadmap.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────
+//  MORTGAGE CARD MANAGEMENT
+// ─────────────────────────────────────────────
+let mortgageCount = 0;
+
+function addMortgage(balance = 250000, rate = 3.5, term = 25) {
+  mortgageCount++;
+  const id = mortgageCount;
+  const container = document.getElementById('mortgages-container');
+  const card = document.createElement('div');
+  card.className = 'mortgage-card';
+  card.id = `mortgage-${id}`;
+  card.innerHTML = `
+    <div class="card-header">
+      <span class="card-label">Mortgage #${id}</span>
+      ${id > 1 ? `<button class="remove-btn" onclick="removeMortgage(${id})" title="Remove">×</button>` : ''}
+    </div>
+    <div class="field">
+      <label>Outstanding Balance (£)</label>
+      <input type="number" class="m-balance" value="${balance}" step="1000">
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Interest Rate (%)</label>
+        <input type="number" class="m-rate" value="${rate}" step="0.1" min="0" max="20">
+      </div>
+      <div class="field">
+        <label>Remaining Term (yrs)</label>
+        <input type="number" class="m-term" value="${term}" step="1" min="1" max="40">
+      </div>
+    </div>
+  `;
+  container.appendChild(card);
+}
+
+function removeMortgage(id) {
+  const el = document.getElementById(`mortgage-${id}`);
+  if (el) el.remove();
+}
+
+document.getElementById('addMortgage').addEventListener('click', () => addMortgage(100000, 4.5, 20));
+addMortgage(250000, 3.5, 25);
+
+// ─────────────────────────────────────────────
+//  HELPERS
+// ─────────────────────────────────────────────
+const fmt  = n => '£' + Math.round(n).toLocaleString('en-GB');
+const fmtD = n => '£' + n.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+function getMortgages() {
+  return Array.from(document.querySelectorAll('.mortgage-card')).map((card, i) => ({
+    id: i + 1,
+    balance : parseFloat(card.querySelector('.m-balance').value) || 0,
+    rate    : parseFloat(card.querySelector('.m-rate').value)    || 0,
+    termYrs : parseInt(card.querySelector('.m-term').value)      || 25,
+  })).filter(m => m.balance > 0);
+}
+
+// Standard fixed monthly payment for a loan (P&I amortisation formula)
+function stdMonthlyPayment(balance, annualRatePct, termYrs) {
+  const r = annualRatePct / 100 / 12;
+  const n = termYrs * 12;
+  if (r === 0) return balance / n;
+  return balance * r * Math.pow(1 + r, n) / (Math.pow(1 + r, n) - 1);
+}
+
+// ─────────────────────────────────────────────
+//  CORE MONTH-BY-MONTH SIMULATION
+//
+//  Each mortgage has a fixed standard monthly payment (computed once from
+//  original balance / rate / term).  Each month we:
+//    1. Apply interest
+//    2. Deduct the standard payment (fully covering interest + reducing principal)
+//    3. Apply any extra overpayment this month to the highest-priority remaining mortgage
+//
+//  extraMonthly1 = the EXTRA payment in month 1 (year 1).
+//  Each calendar year it grows by overpayIncreasePct %.
+//  When a mortgage is paid off its standard payment is freed and added to the
+//  overpayment bucket for the next-priority mortgage.
+// ─────────────────────────────────────────────
+function simulate(mortgages, targetMonths, extraMonthly1, overpayIncreasePct) {
+  // Deep-copy state
+  const ms = mortgages.map(m => ({
+    ...m,
+    balance : m.balance,
+    stdPmt  : stdMonthlyPayment(m.balance, m.rate, m.termYrs),
+    paidOff : false,
+    paidOffMonth : null,
+  }));
+
+  // Sort highest rate first (avalanche) — ms[0] is the priority target
+  ms.sort((a, b) => b.rate - a.rate);
+
+  // Year snapshots for the results table
+  const yearSnaps = [];     // one entry per year
+  let monthBalances = ms.map(m => m.balance); // mutable per-mortgage balances
+
+  let paidOffAllMonth = null;
+
+  for (let month = 1; month <= Math.max(targetMonths, ms.reduce((mx, m) => Math.max(mx, m.termYrs * 12), 0) + 12); month++) {
+    const yearIndex = Math.floor((month - 1) / 12); // 0-based year
+    // Extra overpayment this year (grows by overpayIncreasePct each year)
+    const extraThisYear = extraMonthly1 * Math.pow(1 + overpayIncreasePct / 100, yearIndex);
+
+    // Freed standard payments from already-paid mortgages roll into the bucket
+    let extraBucket = extraThisYear;
+    for (const m of ms) {
+      if (m.paidOff) extraBucket += m.stdPmt; // freed payment cascades
+    }
+
+    // Process each mortgage in priority order
+    for (let i = 0; i < ms.length; i++) {
+      const m = ms[i];
+      if (m.paidOff) continue;
+
+      // Step 1: accrue interest
+      const monthlyRate = m.rate / 100 / 12;
+      const interest    = monthBalances[i] * monthlyRate;
+
+      // Step 2: apply standard payment (principal portion)
+      const principalFromStd = Math.min(m.stdPmt - interest, monthBalances[i]);
+      monthBalances[i] = Math.max(0, monthBalances[i] - principalFromStd);
+
+      // Step 3: apply extra bucket to this (highest-priority active) mortgage
+      if (!m.paidOff) {
+        const extra = Math.min(extraBucket, monthBalances[i]);
+        monthBalances[i] = Math.max(0, monthBalances[i] - extra);
+        extraBucket -= extra; // remainder carries to next mortgage if this one clears
+      }
+
+      if (monthBalances[i] < 0.01) {
+        monthBalances[i] = 0;
+        if (!m.paidOff) {
+          m.paidOff = true;
+          m.paidOffMonth = month;
+        }
+      }
+    }
+
+    // Check if all done
+    const totalRemaining = monthBalances.reduce((s, b) => s + b, 0);
+    if (totalRemaining < 0.01 && paidOffAllMonth === null) {
+      paidOffAllMonth = month;
+    }
+
+    // Snapshot at end of each year
+    if (month % 12 === 0) {
+      // Sum standard payments only for mortgages still active at end of this year
+      const activeStdTotal = ms.reduce((s, m2) => {
+        const stillActive = !m2.paidOff || m2.paidOffMonth > month;
+        return s + (stillActive ? m2.stdPmt : 0);
+      }, 0);
+      yearSnaps.push({
+        year            : yearIndex + 1,
+        totalRemaining  : monthBalances.reduce((s, b) => s + b, 0),
+        balances        : [...monthBalances],
+        extraMonthly    : extraThisYear,   // overpayment on top of std this year
+        activeStdTotal  : activeStdTotal,  // combined standard payment for active mortgages
+      });
+    }
+
+    // Stop once all paid off and we're past the target
+    if (paidOffAllMonth !== null && month >= targetMonths) break;
+  }
+
+  return { yearSnaps, ms, paidOffAllMonth };
+}
+
+// ─────────────────────────────────────────────
+//  BINARY SEARCH — find the minimum extra
+//  monthly overpayment (Year 1) so that all
+//  mortgages clear within targetMonths.
+// ─────────────────────────────────────────────
+function solveExtraMonthly(mortgages, targetMonths, overpayIncreasePct) {
+  // Can they pay off on their own within targetMonths?
+  const { paidOffAllMonth: baseOff } = simulate(mortgages, targetMonths, 0, overpayIncreasePct);
+  if (baseOff !== null && baseOff <= targetMonths) return 0; // no overpayment needed
+
+  const totalDebt = mortgages.reduce((s, m) => s + m.balance, 0);
+  let lo = 0;
+  let hi = totalDebt; // absurd upper bound
+
+  for (let iter = 0; iter < 80; iter++) {
+    if (hi - lo < 0.01) break;           // converged to the penny
+    const mid = (lo + hi) / 2;
+    const { paidOffAllMonth } = simulate(mortgages, targetMonths, mid, overpayIncreasePct);
+    if (paidOffAllMonth !== null && paidOffAllMonth <= targetMonths) {
+      hi = mid;   // feasible — try less
+    } else {
+      lo = mid;   // not enough — try more
+    }
+  }
+
+  // Round up to nearest penny to guarantee clearance
+  return Math.ceil(hi * 100) / 100;
+}
+
+// ─────────────────────────────────────────────
+//  PENSION PROJECTION
+// ─────────────────────────────────────────────
+function projectPension(startPot, annualContrib, years, growthRate) {
+  let pot = startPot;
+  for (let y = 0; y < years; y++) {
+    pot = (pot + annualContrib) * (1 + growthRate / 100);
+  }
+  return pot;
+}
+
+// ─────────────────────────────────────────────
+//  MAIN CALCULATE
+// ─────────────────────────────────────────────
+function calculate() {
+  const currentAge      = parseInt(document.getElementById('currentAge').value)      || 35;
+  const retireAge       = parseInt(document.getElementById('retireAge').value)        || 60;
+  const salary          = parseFloat(document.getElementById('salary').value)         || 50000;
+  const overpayIncrease = parseFloat(document.getElementById('overpayIncrease').value) || 1;
+  const pensionPot      = parseFloat(document.getElementById('pensionPot').value)     || 0;
+  const pensionEmpPct   = parseFloat(document.getElementById('pensionEmpPct').value)  || 12;
+  const pensionMatch    = parseFloat(document.getElementById('pensionMatch').value)    || 8;
+
+  const yearsToRetire = retireAge - currentAge;
+  if (yearsToRetire <= 0) { alert('Retirement age must be greater than current age.'); return; }
+
+  const mortgages = getMortgages();
+  if (mortgages.length === 0) { alert('Please enter at least one mortgage.'); return; }
+
+  const targetMonths         = yearsToRetire * 12;
+  const annualPensionContrib = salary * (pensionEmpPct + pensionMatch) / 100;
+  const totalDebt            = mortgages.reduce((s, m) => s + m.balance, 0);
+
+  // ── 1. Standard monthly payments per mortgage ──────────────────────────────
+  const mortgagesWithStd = mortgages.map(m => ({
+    ...m,
+    stdMonthly: stdMonthlyPayment(m.balance, m.rate, m.termYrs),
+  }));
+  const totalStdMonthly = mortgagesWithStd.reduce((s, m) => s + m.stdMonthly, 0);
+
+  // ── 2. Solve for the extra monthly overpayment (Year 1) ───────────────────
+  const extraMonthly1 = solveExtraMonthly(mortgages, targetMonths, overpayIncrease);
+  const impossible    = extraMonthly1 > totalDebt / 12;
+
+  // ── 3. Run final simulation ────────────────────────────────────────────────
+  const { yearSnaps, ms: simStates, paidOffAllMonth } = simulate(
+    mortgages, targetMonths, extraMonthly1, overpayIncrease
+  );
+
+  // ── 4. Year 1–5 payment schedule ─────────────────────────────────────────
+  // Run a quick simulation to get activeStdTotal for each of years 1-5
+  const scheduleRows = [];
+  for (let yr = 1; yr <= 5; yr++) {
+    const extra = extraMonthly1 * Math.pow(1 + overpayIncrease / 100, yr - 1);
+    // Find the yearSnap for this year, or fall back to totalStdMonthly for years before any payoff
+    const snap = yearSnaps.find(s => s.year === yr);
+    const stdThisYear = snap ? snap.activeStdTotal : totalStdMonthly;
+    scheduleRows.push({
+      year    : yr,
+      age     : currentAge + yr,
+      stdPmt  : stdThisYear,
+      extra   : extra,
+      total   : stdThisYear + extra,
+    });
+  }
+
+  // ── 5. Pension ────────────────────────────────────────────────────────────
+  const pension3      = projectPension(pensionPot, annualPensionContrib, yearsToRetire, 3);
+  const pension5      = projectPension(pensionPot, annualPensionContrib, yearsToRetire, 5);
+  const pension7      = projectPension(pensionPot, annualPensionContrib, yearsToRetire, 7);
+  const pension5Annual = pension5 / 20;
+
+  // PLSA 2024 benchmarks
+  const minStd  = 14400;
+  const modStd  = 31300;
+  const comfStd = 43100;
+
+  // ── 6. Timeline metrics ───────────────────────────────────────────────────
+  const payoffYear = paidOffAllMonth ? Math.ceil(paidOffAllMonth / 12) : yearsToRetire + 1;
+  const timelinePct = Math.min(100, (payoffYear / yearsToRetire) * 100);
+
+  // Sort mortgages high→low rate for display
+  const sorted = [...mortgagesWithStd].sort((a, b) => b.rate - a.rate);
+
+  // ── 7. Build HTML pieces ──────────────────────────────────────────────────
+
+  // Lifestyle bar
+  let pensionColor    = pension5Annual >= comfStd ? 'green' : pension5Annual >= modStd ? 'amber-col' : '';
+  let lifestylePct    = Math.min(100, (pension5Annual / comfStd) * 100);
+  let threshModPct    = (modStd / comfStd) * 100;
+  let stdCommentary   = '';
+  if (pension5Annual >= comfStd) {
+    stdCommentary = `<div class="good-box">✓ On track for a <strong>Comfortable</strong> retirement (${fmt(comfStd)}/yr). At 5% growth, your projected income of ${fmt(pension5Annual)}/yr exceeds this benchmark by ${fmt(pension5Annual - comfStd)}/yr.</div>`;
+  } else if (pension5Annual >= modStd) {
+    stdCommentary = `<div class="warning-box">⚠ On track for a <strong>Moderate</strong> retirement (${fmt(modStd)}/yr). To reach Comfortable (${fmt(comfStd)}/yr), consider increasing contributions by ~${Math.ceil((comfStd - pension5Annual) / salary * 100)}% of salary.</div>`;
+  } else {
+    stdCommentary = `<div class="warning-box">⚠ Projected income of ${fmt(pension5Annual)}/yr falls below the <strong>Minimum</strong> standard (${fmt(minStd)}/yr). Consider increasing contributions — you may need an extra ${fmt(minStd - pension5Annual)}/yr from other sources.</div>`;
+  }
+
+  // Year 1–5 schedule cards
+  const scheduleHtml = scheduleRows.map((r, i) => `
+    <div class="schedule-card ${i === 0 ? 'schedule-card--highlight' : ''}">
+      <div class="sched-year">Year ${r.year} <span class="sched-age">Age ${r.age}</span></div>
+      <div class="sched-row">
+        <span class="sched-lbl">Standard</span>
+        <span class="sched-val">${fmt(r.stdPmt)}<span class="sched-mo">/mo</span></span>
+      </div>
+      <div class="sched-row sched-overpay">
+        <span class="sched-lbl">Overpayment</span>
+        <span class="sched-val overpay-val">${fmtD(r.extra)}<span class="sched-mo">/mo</span></span>
+      </div>
+      <div class="sched-divider"></div>
+      <div class="sched-row sched-total">
+        <span class="sched-lbl">Total</span>
+        <span class="sched-val total-val">${fmtD(r.total)}<span class="sched-mo">/mo</span></span>
+      </div>
+      ${i === 0 ? '<div class="sched-badge">Start here</div>' : ''}
+    </div>`).join('');
+
+  // Mortgage priority table
+  let mortPriorityHtml = '';
+  sorted.forEach((m, i) => {
+    const state    = simStates.find(s => s.id === m.id);
+    const paidMo   = state?.paidOffMonth;
+    const paidYr   = paidMo ? Math.ceil(paidMo / 12) : null;
+    const paidAge  = paidYr ? currentAge + paidYr : null;
+    const naturalPayoff = m.termYrs; // original term
+
+    mortPriorityHtml += `<tr class="${i === 0 ? 'highlight-row' : ''}">
+      <td><span class="badge badge-${i === 0 ? 'red' : 'amber'}">Priority ${i + 1}</span></td>
+      <td class="mono">${fmt(m.balance)}</td>
+      <td class="mono">${m.rate}%</td>
+      <td class="mono">${m.termYrs} yrs</td>
+      <td class="mono">${fmtD(m.stdMonthly)}/mo</td>
+      <td>${paidYr
+        ? `Year ${paidYr} <span style="color:#9aacbb">(age ${paidAge})</span>${paidYr < naturalPayoff ? ` <span class="badge badge-green">${naturalPayoff - paidYr} yrs early</span>` : ''}`
+        : `<span style="color:#e85050">Beyond target</span>`}</td>
+    </tr>`;
+  });
+
+  // Year-by-year roadmap table
+  let yearTableRows = '';
+  for (const snap of yearSnaps) {
+    if (snap.year > yearsToRetire) break;
+    const age = currentAge + snap.year;
+
+    // Which mortgages paid off this year?
+    const freedThisYear = simStates.filter(s => {
+      if (!s.paidOffMonth) return false;
+      return Math.ceil(s.paidOffMonth / 12) === snap.year;
+    });
+
+    let notes = '';
+    if (freedThisYear.length > 0) {
+      notes = freedThisYear.map(s =>
+        `<span class="action-tag">✓ Mortgage #${s.id} (${s.rate}%) paid off</span>`
+      ).join(' ');
+    }
+    if (age === retireAge) notes += `<span class="action-tag" style="background:#d0f5e8;color:#1a6840">🎉 Retirement</span>`;
+
+    const isFree   = snap.totalRemaining < 1;
+    const trClass  = isFree ? 'paid-off' : (age === retireAge ? 'retired' : '');
+    const balance  = isFree
+      ? '<span style="color:#1a8050;font-weight:600">✓ Mortgage-free</span>'
+      : fmt(snap.totalRemaining);
+
+    // Extra might be zero once all paid off
+    const extraDisplay = isFree ? '—' : fmtD(snap.extraMonthly) + '/mo';
+    const stdDisplay   = isFree ? '—' : fmtD(snap.activeStdTotal) + '/mo';
+    const totalDisplay = isFree ? '—' : fmtD(snap.activeStdTotal + snap.extraMonthly) + '/mo';
+
+    yearTableRows += `<tr class="${trClass}">
+      <td>${snap.year}</td>
+      <td>${age}</td>
+      <td>${balance}</td>
+      <td class="mono" style="color:#5a6a7a">${stdDisplay}</td>
+      <td class="mono" style="color:#b07010">${extraDisplay}</td>
+      <td class="mono" style="font-weight:600">${totalDisplay}</td>
+      <td>${notes}</td>
+    </tr>`;
+  }
+
+  // Impossible warning
+  const impossibleWarning = impossible
+    ? `<div class="warning-box" style="margin-bottom:20px;">⚠ <strong>Target may not be achievable with standard overpayments.</strong> Consider extending your retirement age or making a lump-sum reduction.</div>`
+    : '';
+
+  // ── 8. RENDER ─────────────────────────────────────────────────────────────
+  document.getElementById('results-panel').innerHTML = `
+
+    ${impossibleWarning}
+
+    <!-- TIMELINE -->
+    <div class="timeline-section">
+      <div class="timeline-title">// Retirement Timeline — Age ${currentAge} → ${retireAge} (${yearsToRetire} years)</div>
+      <div class="milestone-markers">
+        ${sorted.map(m => {
+          const s     = simStates.find(st => st.id === m.id);
+          const paidYr = s?.paidOffMonth ? Math.ceil(s.paidOffMonth / 12) : yearsToRetire + 1;
+          const pct    = Math.min(96, (paidYr / yearsToRetire) * 100);
+          return `<div class="milestone" style="left:${pct}%">
+            <div class="dot"></div>
+            <div class="mlabel">M#${m.id} free</div>
+          </div>`;
+        }).join('')}
+        <div class="milestone" style="left:99%">
+          <div class="dot pension-dot"></div>
+          <div class="mlabel">Retire</div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--amber);font-family:var(--mono);margin-bottom:4px;">▬ Mortgage burden</div>
+      <div class="timeline-track">
+        <div class="timeline-mortgage" style="width:${timelinePct}%"></div>
+      </div>
+      <div style="font-size:11px;color:var(--green);font-family:var(--mono);margin:8px 0 4px;">▬ Pension growth</div>
+      <div class="timeline-track">
+        <div class="timeline-pension" style="width:100%"></div>
+      </div>
+      <div class="timeline-labels">
+        <span>Age ${currentAge}</span>
+        <span>Age ${Math.round(currentAge + yearsToRetire / 2)}</span>
+        <span>Age ${retireAge}</span>
+      </div>
+    </div>
+
+    <!-- SUMMARY CARDS -->
+    <div class="summary-grid">
+      <div class="summary-card">
+        <div class="sc-label">Total Mortgage Debt</div>
+        <div class="sc-value">${fmt(totalDebt)}</div>
+        <div class="sc-sub">${mortgages.length} mortgage${mortgages.length !== 1 ? 's' : ''} · ${fmt(totalStdMonthly)}/mo standard</div>
+      </div>
+      <div class="summary-card">
+        <div class="sc-label">Year 1 Overpayment Needed</div>
+        <div class="sc-value" style="color:#e8a020">${fmtD(extraMonthly1)}/mo</div>
+        <div class="sc-sub">on top of standard payments · +${overpayIncrease}%/yr</div>
+      </div>
+      <div class="summary-card">
+        <div class="sc-label">Year 1 Total Monthly</div>
+        <div class="sc-value">${fmtD(totalStdMonthly + extraMonthly1)}/mo</div>
+        <div class="sc-sub">standard + overpayment combined</div>
+      </div>
+    </div>
+
+    <!-- PAYMENT SCHEDULE Y1–5 -->
+    <div class="result-block">
+      <h3>Your Payment Schedule — Years 1 to 5</h3>
+      <p style="font-size:12px;color:#7a8a99;margin-bottom:16px;">Your bank's standard payment stays fixed. The overpayment on top starts low and rises by ${overpayIncrease}% each year — front-loading affordability while hitting your retirement target.</p>
+      <div class="schedule-grid">${scheduleHtml}</div>
+      <p style="font-size:11px;color:#9aacbb;margin-top:12px;">All overpayment is directed to the highest-rate mortgage first (avalanche). Once that clears, its freed payment rolls into the next.</p>
+    </div>
+
+    <!-- MORTGAGE PRIORITY -->
+    <div class="result-block">
+      <h3>Mortgage Payoff Order (Avalanche Method)</h3>
+      <p style="font-size:12px;color:#7a8a99;margin-bottom:14px;">Attack highest-rate debt first. Freed payments cascade to the next mortgage automatically.</p>
+      <table class="mortgage-table">
+        <thead>
+          <tr>
+            <th>Priority</th><th>Balance</th><th>Rate</th><th>Term</th><th>Std Payment</th><th>Projected Payoff</th>
+          </tr>
+        </thead>
+        <tbody>${mortPriorityHtml}</tbody>
+      </table>
+    </div>
+
+    <!-- PENSION PROJECTIONS -->
+    <div class="result-block">
+      <h3>Pension Pot at Retirement (Age ${retireAge})</h3>
+      <p style="font-size:12px;color:#7a8a99;margin-bottom:14px;">Starting from ${fmt(pensionPot)}, contributing ${fmt(annualPensionContrib)}/yr (you ${pensionEmpPct}% + employer ${pensionMatch}%) over ${yearsToRetire} years.</p>
+      <div class="pension-grid">
+        <div class="pension-scenario">
+          <div class="ps-rate">Conservative · 3%</div>
+          <div class="ps-value">${fmt(pension3)}</div>
+          <div class="ps-monthly">${fmt(pension3 / 20 / 12)}/mo · 20yr drawdown</div>
+        </div>
+        <div class="pension-scenario">
+          <div class="ps-rate">Moderate · 5%</div>
+          <div class="ps-value ${pensionColor}">${fmt(pension5)}</div>
+          <div class="ps-monthly">${fmt(pension5 / 20 / 12)}/mo · 20yr drawdown</div>
+        </div>
+        <div class="pension-scenario">
+          <div class="ps-rate">Optimistic · 7%</div>
+          <div class="ps-value green">${fmt(pension7)}</div>
+          <div class="ps-monthly">${fmt(pension7 / 20 / 12)}/mo · 20yr drawdown</div>
+        </div>
+      </div>
+      <div style="margin-top:20px;">
+        <div style="font-size:12px;color:#7a8a99;margin-bottom:4px;font-weight:500;">Standard of Living vs Projected Income (5% growth)</div>
+        <div class="lifestyle-bar">
+          <div class="lifestyle-fill" style="width:${lifestylePct}%">${lifestylePct >= 25 ? fmt(pension5Annual) + '/yr' : ''}</div>
+          <div class="lifestyle-threshold" style="left:${threshModPct}%"></div>
+        </div>
+        <div class="lifestyle-legends">
+          <span class="ll-you">Your projected income (${fmt(pension5Annual)}/yr)</span>
+          <span class="ll-standard">Moderate standard (${fmt(modStd)}/yr)</span>
+        </div>
+        <div style="display:flex;gap:16px;margin-top:8px;font-size:11px;color:#9aacbb;">
+          <span>Minimum: ${fmt(minStd)}/yr</span>
+          <span>Moderate: ${fmt(modStd)}/yr</span>
+          <span>Comfortable: ${fmt(comfStd)}/yr</span>
+        </div>
+        ${stdCommentary}
+        <p style="font-size:10px;color:#aabbcc;margin-top:8px;">Benchmarks from PLSA Retirement Living Standards 2024. Drawdown assumes 20-year retirement; adjust for longevity.</p>
+      </div>
+    </div>
+
+    <!-- FULL YEAR-BY-YEAR ROADMAP -->
+    <div class="result-block">
+      <h3>Full Year-by-Year Mortgage Roadmap</h3>
+      <p style="font-size:12px;color:#7a8a99;margin-bottom:14px;">Standard payment is fixed; overpayment grows by ${overpayIncrease}% each year. Debt column shows balance at year-end after both payments.</p>
+      <div style="overflow-x:auto;">
+        <table class="year-table">
+          <thead>
+            <tr>
+              <th>Year</th>
+              <th>Age</th>
+              <th>Remaining Debt</th>
+              <th>Std Payment</th>
+              <th>Overpayment</th>
+              <th>Total Monthly</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>${yearTableRows}</tbody>
+        </table>
+      </div>
+    </div>
+
+    <p style="font-size:10px;color:#9aacbb;text-align:center;padding-bottom:20px;">
+      This tool is for illustrative purposes only and does not constitute financial advice. Figures are estimates and do not account for inflation, tax, state pension, or changes in salary. Consult a qualified financial adviser before making decisions.
+    </p>
+  `;
+}
+</script>
+</body>
+</html>
