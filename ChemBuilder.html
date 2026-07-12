@@ -764,7 +764,16 @@ function drawSkeletalGraph(types,edges,panelX,panelY,panelW,panelH,title){
   const inner={x:panelX+13,y:panelY+27,w:panelW-26,h:panelH-39};
   const scale=Math.min(inner.w/(maxX-minX),inner.h/(maxY-minY));
   const P=i=>({x:inner.x+(inner.w-(maxX-minX)*scale)/2+(pos.get(i).x-minX)*scale,y:inner.y+(inner.h-(maxY-minY)*scale)/2+(pos.get(i).y-minY)*scale});
-  for(const e of g.edges){const a=P(e.a),b=P(e.b);drawSkeletalBond(a.x,a.y,b.x,b.y,e.order);}
+  for(const e of g.edges){
+  let a=P(e.a),b=P(e.b);
+  const dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy)||1;
+  const ux=dx/d,uy=dy/d;
+  const trimA=types[e.a]==="C"?0:(g.hydroxyl.has(e.a)?13:9);
+  const trimB=types[e.b]==="C"?0:(g.hydroxyl.has(e.b)?13:9);
+  a={x:a.x+ux*trimA,y:a.y+uy*trimA};
+  b={x:b.x-ux*trimB,y:b.y-uy*trimB};
+  drawSkeletalBond(a.x,a.y,b.x,b.y,e.order);
+}
   for(const i of g.nodes){
     if(types[i]==="C")continue;
     const q=P(i),label=g.hydroxyl.has(i)?"OH":types[i];
