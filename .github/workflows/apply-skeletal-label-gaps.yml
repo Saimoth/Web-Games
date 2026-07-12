@@ -1,0 +1,46 @@
+name: Apply skeletal label gaps
+
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-skeletal-label-gaps.yml'
+      - '.github/trigger-skeletal-label-gaps.txt'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Add gaps around labelled skeletal atoms
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('ChemBuilder.html')
+          s = p.read_text(encoding='utf-8')
+          old = '  for(const e of g.edges){const a=P(e.a),b=P(e.b);drawSkeletalBond(a.x,a.y,b.x,b.y,e.order);}'
+          new = '''  for(const e of g.edges){
+    let a=P(e.a),b=P(e.b);
+    const dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy)||1;
+    const ux=dx/d,uy=dy/d;
+    const trimA=types[e.a]==="C"?0:(g.hydroxyl.has(e.a)?13:9);
+    const trimB=types[e.b]==="C"?0:(g.hydroxyl.has(e.b)?13:9);
+    a={x:a.x+ux*trimA,y:a.y+uy*trimA};
+    b={x:b.x-ux*trimB,y:b.y-uy*trimB};
+    drawSkeletalBond(a.x,a.y,b.x,b.y,e.order);
+  }'''
+          if old not in s:
+              raise SystemExit('Target skeletal bond loop not found')
+          s = s.replace(old, new, 1)
+          p.write_text(s, encoding='utf-8')
+          PY
+      - name: Commit update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ChemBuilder.html
+          git diff --cached --quiet || git commit -m "Add gaps around skeletal atom labels"
+          git push
