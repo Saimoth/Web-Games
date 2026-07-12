@@ -1,0 +1,167 @@
+name: Apply conventional skeletal bond style
+
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-skeletal-bond-style.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Replace skeletal bond renderer
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path('ChemLibrary.js')
+          s = p.read_text(encoding='utf-8')
+          marker = '// Drawing override loaded after ChemBuilder\'s main script.'
+          if marker in s:
+              s = s[:s.index(marker)].rstrip() + '\n\n'
+
+          s += r'''// Conventional skeletal bond renderer loaded after ChemBuilder's main script.
+// The first bond is full length. Extra bond lines are shorter and closer together.
+
+function skeletalEdgeCycleInfo(edge, edges, nodes, pointForNode) {
+  const adjacency = new Map(nodes.map(id => [id, []]));
+  for (const e of edges) {
+    if (e === edge) continue;
+    if (!adjacency.has(e.a) || !adjacency.has(e.b)) continue;
+    adjacency.get(e.a).push(e.b);
+    adjacency.get(e.b).push(e.a);
+  }
+
+  const queue = [edge.a];
+  const parent = new Map([[edge.a, -1]]);
+  while (queue.length) {
+    const id = queue.shift();
+    if (id === edge.b) break;
+    for (const next of adjacency.get(id) || []) {
+      if (!parent.has(next)) {
+        parent.set(next, id);
+        queue.push(next);
+      }
+    }
+  }
+  if (!parent.has(edge.b)) return null;
+
+  const cycleNodes = [];
+  let id = edge.b;
+  while (id !== -1) {
+    cycleNodes.push(id);
+    if (id === edge.a) break;
+    id = parent.get(id);
+  }
+  if (cycleNodes[cycleNodes.length - 1] !== edge.a) return null;
+
+  let cx = 0, cy = 0;
+  for (const node of cycleNodes) {
+    const p = pointForNode(node);
+    cx += p.x;
+    cy += p.y;
+  }
+  cx /= cycleNodes.length;
+  cy /= cycleNodes.length;
+  return {x: cx, y: cy};
+}
+
+function skeletalAuxiliarySide(edge, graph, pointForNode) {
+  const a = pointForNode(edge.a), b = pointForNode(edge.b);
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const mx = (a.x + b.x) * 0.5, my = (a.y + b.y) * 0.5;
+
+  const ringCentre = skeletalEdgeCycleInfo(edge, graph.edges, graph.nodes, pointForNode);
+  if (ringCentre) {
+    const cross = dx * (ringCentre.y - my) - dy * (ringCentre.x - mx);
+    return cross >= 0 ? 1 : -1;
+  }
+
+  // For an open chain, use neighbouring nodes to choose the visually enclosed side.
+  let score = 0;
+  for (const other of graph.edges) {
+    let neighbour = null;
+    if (other.a === edge.a && other.b !== edge.b) neighbour = other.b;
+    else if (other.b === edge.a && other.a !== edge.b) neighbour = other.a;
+    else if (other.a === edge.b && other.b !== edge.a) neighbour = other.b;
+    else if (other.b === edge.b && other.a !== edge.a) neighbour = other.a;
+    if (neighbour === null) continue;
+    const p = pointForNode(neighbour);
+    score += dx * (p.y - my) - dy * (p.x - mx);
+  }
+  return score < 0 ? -1 : 1;
+}
+
+drawSkeletalBond = function(x1,y1,x2,y2,order,side=1) {
+  const dx=x2-x1,dy=y2-y1,d=Math.hypot(dx,dy)||1;
+  const ux=dx/d,uy=dy/d;
+  const nx=-uy,ny=ux;
+  ctx.strokeStyle="#e4e7ec";
+  ctx.lineCap="round";
+
+  // The first bond always spans the complete connection.
+  drawLine(x1,y1,x2,y2,order===1?2.5:2.2);
+  if(order===1) return;
+
+  const inset=Math.min(7,d*0.18);
+  const spread=2.55;
+  const ax=x1+ux*inset, ay=y1+uy*inset;
+  const bx=x2-ux*inset, by=y2-uy*inset;
+
+  // A double bond gets one shorter line. For rings this is always inward.
+  drawLine(ax+nx*spread*side,ay+ny*spread*side,
+           bx+nx*spread*side,by+ny*spread*side,1.75);
+
+  // A triple bond gets a matching shorter line on the opposite side.
+  if(order>=3) {
+    drawLine(ax-nx*spread*side,ay-ny*spread*side,
+             bx-nx*spread*side,by-ny*spread*side,1.75);
+  }
+};
+
+drawSkeletalGraph = function(types,edges,panelX,panelY,panelW,panelH,title){
+  ctx.save();
+  ctx.fillStyle="rgba(37,40,46,.94)";ctx.strokeStyle="#555c68";ctx.lineWidth=1;
+  ctx.beginPath();ctx.roundRect(panelX,panelY,panelW,panelH,13);ctx.fill();ctx.stroke();
+  ctx.fillStyle="#9299a5";ctx.font="700 10px -apple-system,sans-serif";ctx.textAlign="left";ctx.textBaseline="middle";ctx.fillText(title,panelX+14,panelY+13);
+  const g=skeletalDisplayGraph(types,edges),pos=naturalSkeletalLayout(types,g.edges,g.nodes);
+  if(!g.nodes.length){ctx.restore();return;}
+  let minX=Math.min(...g.nodes.map(i=>pos.get(i).x)),maxX=Math.max(...g.nodes.map(i=>pos.get(i).x));
+  let minY=Math.min(...g.nodes.map(i=>pos.get(i).y)),maxY=Math.max(...g.nodes.map(i=>pos.get(i).y));
+  if(maxX-minX<.2){minX-=.65;maxX+=.65;}if(maxY-minY<.2){minY-=.55;maxY+=.55;}
+  const inner={x:panelX+13,y:panelY+27,w:panelW-26,h:panelH-39};
+  const scale=Math.min(inner.w/(maxX-minX),inner.h/(maxY-minY));
+  const P=i=>({x:inner.x+(inner.w-(maxX-minX)*scale)/2+(pos.get(i).x-minX)*scale,y:inner.y+(inner.h-(maxY-minY)*scale)/2+(pos.get(i).y-minY)*scale});
+
+  for(const e of g.edges){
+    let a=P(e.a),b=P(e.b);
+    const dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy)||1;
+    const ux=dx/d,uy=dy/d;
+    const trimA=types[e.a]==="C"?0:(g.hydroxyl.has(e.a)?13:9);
+    const trimB=types[e.b]==="C"?0:(g.hydroxyl.has(e.b)?13:9);
+    a={x:a.x+ux*trimA,y:a.y+uy*trimA};
+    b={x:b.x-ux*trimB,y:b.y-uy*trimB};
+    const side=e.order>1?skeletalAuxiliarySide(e,g,P):1;
+    drawSkeletalBond(a.x,a.y,b.x,b.y,e.order,side);
+  }
+
+  for(const i of g.nodes){
+    if(types[i]==="C")continue;
+    const q=P(i),label=g.hydroxyl.has(i)?"OH":types[i];
+    ctx.fillStyle=types[i]==="O"?"#ff666d":"#f2f3f5";ctx.font="800 15px -apple-system,sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(label,q.x,q.y);
+  }
+  ctx.restore();
+};
+'''
+          p.write_text(s, encoding='utf-8')
+          PY
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add ChemLibrary.js
+          git commit -m "Use conventional skeletal multiple bonds"
+          git push
