@@ -98,7 +98,7 @@ canvas { width:100%; height:100%; display:block; touch-action:none; }
     <p><b>Bond:</b> move two atoms close together. Move them closer again to increase a single bond to double, then triple.</p>
     <p><b>Strengthen a bond:</b> double-tap an atom. Its eligible bonded neighbours are selected in turn, upgrading single → double → triple.</p>
     <p><b>Skeletal view:</b> the panel in the top-right hides carbon labels and carbon-bound hydrogens, so you can learn the line-angle formula while building.</p>
-    <p><b>Challenge mode:</b> tap Game and choose a difficulty. Easy shows the skeletal target, Medium shows its formula, and Hard gives only the compound name.</p>
+    <p><b>Challenge mode:</b> tap Game and choose a difficulty. Easy shows the target in the top-right skeletal panel, Medium shows its formula, and Hard gives only the compound name.</p>
     <p><b>Delete:</b> drag an atom back into the tray.</p>
     <p>The name is determined from the complete connection pattern. C₂H₆O can therefore be recognised as ethanol or dimethyl ether.</p>
     <button id="closeHelp">Continue</button>
@@ -788,7 +788,6 @@ function frame() {
   ctx.fillStyle="#17191d";ctx.fillRect(0,0,viewW,viewH);
   drawTray();
   drawSkeletalPanel();
-  drawChallengeTarget();
   for (const b of bonds) drawBond(b);
   for (const a of atoms) drawAtom(a);
   requestAnimationFrame(frame);
