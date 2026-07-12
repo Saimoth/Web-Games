@@ -1,0 +1,71 @@
+name: Apply tapered skeletal bonds
+
+on:
+  push:
+    paths:
+      - '.chem-taper-trigger'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Taper skeletal multiple bonds
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path('ChemBuilder.html')
+          s = p.read_text(encoding='utf-8')
+          pattern = re.compile(r'function drawSkeletalBond\(x1,y1,x2,y2,order\) \{.*?\n\}', re.S)
+          replacement = r'''function drawSkeletalBond(x1,y1,x2,y2,order) {
+  const dx=x2-x1,dy=y2-y1,d=Math.hypot(dx,dy)||1;
+  const ux=dx/d,uy=dy/d;
+  const nx=-uy,ny=ux;
+  ctx.strokeStyle="#e4e7ec";
+  ctx.lineCap="round";
+
+  if(order===1){
+    drawLine(x1,y1,x2,y2,2.5);
+    return;
+  }
+
+  // Keep the middle of multiple bonds separated, but merge them into
+  // a single point shortly before each end for a cleaner line-angle look.
+  const taper=Math.min(10,d*0.22);
+  const ax=x1+ux*taper, ay=y1+uy*taper;
+  const bx=x2-ux*taper, by=y2-uy*taper;
+
+  if(order===2){
+    const spread=3.2;
+    drawLine(x1,y1,ax+nx*spread,ay+ny*spread,2);
+    drawLine(ax+nx*spread,ay+ny*spread,bx+nx*spread,by+ny*spread,2);
+    drawLine(bx+nx*spread,by+ny*spread,x2,y2,2);
+    drawLine(x1,y1,ax-nx*spread,ay-ny*spread,2);
+    drawLine(ax-nx*spread,ay-ny*spread,bx-nx*spread,by-ny*spread,2);
+    drawLine(bx-nx*spread,by-ny*spread,x2,y2,2);
+  } else {
+    const spread=5.4;
+    drawLine(x1,y1,x2,y2,1.8);
+    drawLine(x1,y1,ax+nx*spread,ay+ny*spread,1.6);
+    drawLine(ax+nx*spread,ay+ny*spread,bx+nx*spread,by+ny*spread,1.6);
+    drawLine(bx+nx*spread,by+ny*spread,x2,y2,1.6);
+    drawLine(x1,y1,ax-nx*spread,ay-ny*spread,1.6);
+    drawLine(ax-nx*spread,ay-ny*spread,bx-nx*spread,by-ny*spread,1.6);
+    drawLine(bx-nx*spread,by-ny*spread,x2,y2,1.6);
+  }
+}'''
+          s2, count = pattern.subn(replacement, s, count=1)
+          if count != 1:
+              raise SystemExit(f'Expected one drawSkeletalBond function, found {count}')
+          p.write_text(s2, encoding='utf-8')
+          PY
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add ChemBuilder.html
+          git commit -m "Taper skeletal double and triple bonds"
+          git push
