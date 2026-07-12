@@ -3,7 +3,7 @@ name: Apply triggered skeletal bond style
 on:
   push:
     paths:
-      - '.skeletal-style-trigger'
+      - 'skeletal-style-trigger.txt'
 
 permissions:
   contents: write
