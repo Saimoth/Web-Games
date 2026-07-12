@@ -777,7 +777,7 @@ function drawSkeletalPanel() {
   const panelW=Math.min(154,viewW*.40),panelH=122,x=viewW-panelW-9,y=9;
   if(challengeActive&&challengeDifficulty==="easy"&&challengeTemplate){drawSkeletalGraph(challengeTemplate.types,challengeTemplate.edges,x,y,panelW,panelH,"TARGET SKELETAL");return;}
   if(!atoms.length){
-    ctx.save();ctx.fillStyle="rgba(37,40,46,.94)";ctx.strokeStyle="#555c68";ctx.beginPath();ctx.roundRect(x,y,panelW,panelH,13);ctx.fill();ctx.stroke();ctx.fillStyle="#9299a5";ctx.font="700 10px -apple-system,sans-serif";ctx.fillText("SKELETAL",x+14,y+13);ctx.fillStyle="#737a86";ctx.font="12px -apple-system,sans-serif";ctx.textAlign="center";ctx.fillText("Build a molecule",x+panelW/2,y+67);ctx.restore();return;
+    ctx.save();ctx.fillStyle="rgba(37,40,46,.94)";ctx.strokeStyle="#555c68";ctx.beginPath();ctx.roundRect(x,y,panelW,panelH,13);ctx.fill();ctx.stroke();ctx.fillStyle="#9299a5";ctx.font="700 10px -apple-system,sans-serif";ctx.textAlign="left";ctx.textBaseline="middle";ctx.fillText("SKELETAL",x+14,y+13);ctx.fillStyle="#737a86";ctx.font="12px -apple-system,sans-serif";ctx.textAlign="center";ctx.fillText("Build a molecule",x+panelW/2,y+67);ctx.restore();return;
   }
   const comp=components()[0],index=new Map(comp.map((a,i)=>[a,i])),componentEdges=[];
   for(const b of bonds)if(index.has(b.a)&&index.has(b.b))componentEdges.push({a:index.get(b.a),b:index.get(b.b),order:b.order});
