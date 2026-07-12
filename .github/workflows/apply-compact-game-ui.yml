@@ -1,0 +1,49 @@
+name: Apply compact ChemBuilder UI
+
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-compact-game-ui-trigger.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch ChemBuilder UI
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('ChemBuilder.html')
+          s = p.read_text(encoding='utf-8')
+
+          s = s.replace(
+              '#challengePanel { display:none; position:absolute; left:9px; top:9px; z-index:5; width:min(176px,45vw);',
+              '#challengePanel { display:none; position:absolute; left:9px; top:9px; z-index:5; width:min(142px,38vw);'
+          )
+          s = s.replace(
+              'left:calc(min(176px,45vw) + 18px); top:9px;',
+              'left:calc(min(142px,38vw) + 15px); top:9px;'
+          )
+          s = s.replace('<h3>Build Challenge</h3>', '<h3>Game</h3>')
+          s = s.replace('<option value="easy">Easy — skeletal + formula</option>', '<option value="easy">Easy</option>')
+          s = s.replace('<option value="medium">Medium — name + formula</option>', '<option value="medium">Medium</option>')
+          s = s.replace('<option value="hard">Hard — name only</option>', '<option value="hard">Hard</option>')
+
+          # Keep every skeletal heading comfortably inside its rounded frame.
+          s = s.replace('ctx.fillText(title,panelX+10,panelY+12);', 'ctx.fillText(title,panelX+14,panelY+13);')
+          s = s.replace('ctx.fillText("SKELETAL",x+10,y+12);', 'ctx.fillText("SKELETAL",x+14,y+13);')
+
+          p.write_text(s, encoding='utf-8')
+          PY
+      - name: Commit generated HTML
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add ChemBuilder.html
+          git diff --cached --quiet || git commit -m 'Compact game controls and align skeletal title'
+          git push
