@@ -1,0 +1,96 @@
+name: Fix ChemBuilder mode rendering
+
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-mode-render.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch ChemBuilder rendering
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('ChemBuilder.html')
+          s = p.read_text(encoding='utf-8')
+
+          marker = '''function drawSkeletalBond(x1,y1,x2,y2,order) {'''
+          helper = '''function hydroxylInfo(comp) {
+            const compSet = new Set(comp);
+            const hydroxylO = new Set();
+            const hiddenH = new Set();
+
+            for (const oxygen of comp) {
+              if (oxygen.type !== "O") continue;
+              const neighbours = [];
+              for (const b of bonds) {
+                if (b.a === oxygen && compSet.has(b.b)) neighbours.push({atom:b.b, order:b.order});
+                else if (b.b === oxygen && compSet.has(b.a)) neighbours.push({atom:b.a, order:b.order});
+              }
+              const carbon = neighbours.find(n => n.atom.type === "C" && n.order === 1);
+              const hydrogen = neighbours.find(n => n.atom.type === "H" && n.order === 1);
+              if (carbon && hydrogen) {
+                hydroxylO.add(oxygen);
+                hiddenH.add(hydrogen.atom);
+              }
+            }
+            return {hydroxylO, hiddenH};
+          }
+
+'''
+          if 'function hydroxylInfo(comp)' not in s:
+              s = s.replace(marker, helper + marker)
+
+          old = '''function frame() {
+            physics();
+            ctx.clearRect(0,0,viewW,viewH);
+            ctx.fillStyle="#17191d";ctx.fillRect(0,0,viewW,viewH);
+            drawTray();
+            drawSkeletalPanel();
+            for (const b of bonds) drawBond(b);
+            for (const a of atoms) drawAtom(a);
+            requestAnimationFrame(frame);
+          }'''
+          new = '''function frame() {
+            requestAnimationFrame(frame);
+            physics();
+            ctx.clearRect(0,0,viewW,viewH);
+            ctx.fillStyle="#17191d";ctx.fillRect(0,0,viewW,viewH);
+            drawTray();
+            for (const b of bonds) drawBond(b);
+            for (const a of atoms) drawAtom(a);
+            try {
+              drawSkeletalPanel();
+            } catch (error) {
+              console.error("Skeletal panel render error:", error);
+              while (ctx.getTransform && false) {}
+            }
+          }'''
+          if old not in s:
+              raise SystemExit('Frame function did not match expected source')
+          s = s.replace(old, new)
+          p.write_text(s, encoding='utf-8')
+          PY
+      - name: Validate JavaScript syntax
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          s=Path('ChemBuilder.html').read_text(encoding='utf-8')
+          js=re.search(r'<script>(.*)</script>',s,re.S).group(1)
+          Path('/tmp/chem.js').write_text(js,encoding='utf-8')
+          PY
+          node --check /tmp/chem.js
+      - name: Commit fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ChemBuilder.html
+          git diff --cached --quiet || git commit -m "Fix atoms disappearing after mode changes"
+          git push
