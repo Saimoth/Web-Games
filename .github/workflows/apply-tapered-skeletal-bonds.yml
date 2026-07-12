@@ -3,7 +3,8 @@ name: Apply tapered skeletal bonds
 on:
   push:
     paths:
-      - '.chem-taper-trigger'
+      - '.github/workflows/apply-tapered-skeletal-bonds.yml'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -34,8 +35,7 @@ jobs:
     return;
   }
 
-  // Keep the middle of multiple bonds separated, but merge them into
-  // a single point shortly before each end for a cleaner line-angle look.
+  // Keep the centre separated, then converge smoothly into each endpoint.
   const taper=Math.min(10,d*0.22);
   const ax=x1+ux*taper, ay=y1+uy*taper;
   const bx=x2-ux*taper, by=y2-uy*taper;
@@ -62,10 +62,13 @@ jobs:
           s2, count = pattern.subn(replacement, s, count=1)
           if count != 1:
               raise SystemExit(f'Expected one drawSkeletalBond function, found {count}')
-          p.write_text(s2, encoding='utf-8')
+          if s2 == s:
+              print('ChemBuilder already contains tapered skeletal bonds')
+          else:
+              p.write_text(s2, encoding='utf-8')
           PY
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add ChemBuilder.html
-          git commit -m "Taper skeletal double and triple bonds"
+          git diff --cached --quiet || git commit -m "Taper skeletal double and triple bonds"
           git push
