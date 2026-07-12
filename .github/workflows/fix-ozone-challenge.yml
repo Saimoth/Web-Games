@@ -1,0 +1,90 @@
+name: Fix ozone challenge display
+
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-ozone-challenge.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Correct challenge target layout and status
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('ChemBuilder.html')
+          s = p.read_text(encoding='utf-8')
+
+          old = '''function templateLayout(t) {
+  const heavy=t.types.map((x,i)=>x!=="H"?i:-1).filter(i=>i>=0);
+  const pos=new Map();
+  if(!heavy.length)return pos;
+  const heavySet=new Set(heavy),adj=new Map(heavy.map(i=>[i,[]]));
+  for(const e of t.edges)if(heavySet.has(e.a)&&heavySet.has(e.b)){adj.get(e.a).push(e.b);adj.get(e.b).push(e.a);}
+  const root=heavy.reduce((best,i)=>adj.get(i).length>adj.get(best).length?i:best,heavy[0]);'''
+
+          new = '''function templateLayout(t) {
+  const heavy=t.types.map((x,i)=>x!=="H"?i:-1).filter(i=>i>=0);
+  const pos=new Map();
+  if(!heavy.length)return pos;
+  const heavySet=new Set(heavy),adj=new Map(heavy.map(i=>[i,[]]));
+  for(const e of t.edges)if(heavySet.has(e.a)&&heavySet.has(e.b)){adj.get(e.a).push(e.b);adj.get(e.b).push(e.a);}
+
+  // Give acyclic three-heavy-atom molecules an unmistakable bent-chain layout.
+  // This prevents O–O=O and similar targets looking like triangular rings.
+  const heavyEdges=t.edges.filter(e=>heavySet.has(e.a)&&heavySet.has(e.b));
+  if(heavy.length===3 && heavyEdges.length===2){
+    const centre=heavy.find(i=>adj.get(i).length===2);
+    if(centre!==undefined){
+      const ends=adj.get(centre);
+      pos.set(centre,{x:0,y:0.62});
+      pos.set(ends[0],{x:-1,y:-0.38});
+      pos.set(ends[1],{x:1,y:-0.38});
+      return pos;
+    }
+  }
+
+  const root=heavy.reduce((best,i)=>adj.get(i).length>adj.get(best).length?i:best,heavy[0]);'''
+
+          if old not in s:
+              raise SystemExit('templateLayout anchor not found')
+          s = s.replace(old, new, 1)
+
+          old2 = '''  const comps=components(), main=comps[0];
+  const f=formulaOf(main), match=identify(main), v=validity(main);
+  formulaEl.textContent=prettyFormula(f);
+  if (match) {'''
+
+          new2 = '''  const comps=components(), main=comps[0];
+  const f=formulaOf(main), match=identify(main), v=validity(main);
+  formulaEl.textContent=prettyFormula(f);
+
+  // During a challenge, do not judge or reveal the structure in the normal header.
+  // The Check button is the single source of challenge feedback.
+  if (challengeActive) {
+    nameEl.textContent="Challenge build in progress";
+    nameEl.style.color="#c7cad1";
+    detailsEl.textContent="Press Check when you are ready";
+    return;
+  }
+
+  if (match) {'''
+
+          if old2 not in s:
+              raise SystemExit('updateReadout anchor not found')
+          s = s.replace(old2, new2, 1)
+
+          p.write_text(s, encoding='utf-8')
+          PY
+      - name: Commit correction
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ChemBuilder.html
+          git diff --cached --quiet || git commit -m "Fix ozone challenge target and build status"
+          git push
