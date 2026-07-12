@@ -69,6 +69,7 @@ canvas { width:100%; height:100%; display:block; touch-action:none; }
     <p><b>Add:</b> drag C, H or O from the tray.</p>
     <p><b>Bond:</b> move two atoms close together. Move them closer again to increase a single bond to double, then triple.</p>
     <p><b>Strengthen a bond:</b> double-tap an atom. Its eligible bonded neighbours are selected in turn, upgrading single → double → triple.</p>
+    <p><b>Skeletal view:</b> the panel in the top-right hides carbon labels and carbon-bound hydrogens, so you can learn the line-angle formula while building.</p>
     <p><b>Delete:</b> drag an atom back into the tray.</p>
     <p>The name is determined from the complete connection pattern. C₂H₆O can therefore be recognised as ethanol or dimethyl ether.</p>
     <button id="closeHelp">Continue</button>
@@ -573,6 +574,83 @@ function drawAtom(a) {
   ctx.fillStyle=p.text;ctx.font=`800 ${Math.max(13,p.radius*.82)}px -apple-system,sans-serif`;
   ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(a.type,a.x,a.y+1);
 }
+
+function skeletalVisibleAtoms(comp) {
+  const visible = [];
+  for (const a of comp) {
+    if (a.type !== "H") { visible.push(a); continue; }
+    const attached = bonds.find(b => b.a === a || b.b === a);
+    const neighbour = attached ? (attached.a === a ? attached.b : attached.a) : null;
+    if (!neighbour || neighbour.type !== "C") visible.push(a);
+  }
+  return visible;
+}
+
+function drawSkeletalBond(x1,y1,x2,y2,order) {
+  const dx=x2-x1,dy=y2-y1,d=Math.hypot(dx,dy)||1;
+  const nx=-dy/d*3.2,ny=dx/d*3.2;
+  ctx.strokeStyle="#e4e7ec"; ctx.lineCap="round";
+  if(order===1) drawLine(x1,y1,x2,y2,2.5);
+  else if(order===2){
+    drawLine(x1+nx,y1+ny,x2+nx,y2+ny,2);
+    drawLine(x1-nx,y1-ny,x2-nx,y2-ny,2);
+  } else {
+    drawLine(x1,y1,x2,y2,1.8);
+    drawLine(x1+nx*1.7,y1+ny*1.7,x2+nx*1.7,y2+ny*1.7,1.6);
+    drawLine(x1-nx*1.7,y1-ny*1.7,x2-nx*1.7,y2-ny*1.7,1.6);
+  }
+}
+
+function drawSkeletalPanel() {
+  const panelW=Math.min(154,viewW*0.40),panelH=122;
+  const x=viewW-panelW-9,y=9;
+  ctx.save();
+  ctx.fillStyle="rgba(37,40,46,.94)"; ctx.strokeStyle="#555c68"; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.roundRect(x,y,panelW,panelH,13); ctx.fill(); ctx.stroke();
+  ctx.fillStyle="#9299a5"; ctx.font="700 10px -apple-system,sans-serif";
+  ctx.textAlign="left"; ctx.textBaseline="middle"; ctx.fillText("SKELETAL",x+10,y+12);
+
+  if(!atoms.length){
+    ctx.fillStyle="#737a86"; ctx.font="12px -apple-system,sans-serif"; ctx.textAlign="center";
+    ctx.fillText("Build a molecule",x+panelW/2,y+67); ctx.restore(); return;
+  }
+
+  const comp=components()[0];
+  const visible=skeletalVisibleAtoms(comp);
+  if(!visible.length){ctx.restore();return;}
+  const visibleSet=new Set(visible);
+  const skeletalBonds=bonds.filter(b=>visibleSet.has(b.a)&&visibleSet.has(b.b));
+  let minX=Math.min(...visible.map(a=>a.x)),maxX=Math.max(...visible.map(a=>a.x));
+  let minY=Math.min(...visible.map(a=>a.y)),maxY=Math.max(...visible.map(a=>a.y));
+  if(maxX-minX<1){minX-=30;maxX+=30;}
+  if(maxY-minY<1){minY-=22;maxY+=22;}
+  const inner={x:x+12,y:y+25,w:panelW-24,h:panelH-36};
+  const scale=Math.min(inner.w/(maxX-minX),inner.h/(maxY-minY),1.15);
+  const ox=inner.x+(inner.w-(maxX-minX)*scale)/2-minX*scale;
+  const oy=inner.y+(inner.h-(maxY-minY)*scale)/2-minY*scale;
+  const pos=a=>({x:a.x*scale+ox,y:a.y*scale+oy});
+
+  for(const b of skeletalBonds){
+    const a=pos(b.a),c=pos(b.b); drawSkeletalBond(a.x,a.y,c.x,c.y,b.order);
+  }
+
+  const carbonCount=comp.filter(a=>a.type==="C").length;
+  for(const a of visible){
+    const p=pos(a);
+    if(a.type==="C"){
+      if(carbonCount===1 && skeletalBonds.length===0){
+        ctx.fillStyle="#e4e7ec"; ctx.font="700 15px -apple-system,sans-serif";
+        ctx.textAlign="center"; ctx.fillText(prettyFormula(formulaOf(comp)),p.x,p.y);
+      }
+      continue;
+    }
+    ctx.fillStyle=a.type==="O"?"#ff666d":"#f2f3f5";
+    ctx.font="800 15px -apple-system,sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.fillText(a.type,p.x,p.y);
+  }
+  ctx.restore();
+}
+
 function drawTray() {
   const y=viewH-trayHeight;
   ctx.fillStyle="#292d34";ctx.fillRect(0,y,viewW,trayHeight);
@@ -593,6 +671,7 @@ function frame() {
   ctx.clearRect(0,0,viewW,viewH);
   ctx.fillStyle="#17191d";ctx.fillRect(0,0,viewW,viewH);
   drawTray();
+  drawSkeletalPanel();
   for (const b of bonds) drawBond(b);
   for (const a of atoms) drawAtom(a);
   requestAnimationFrame(frame);
