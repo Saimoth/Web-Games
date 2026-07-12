@@ -1,0 +1,36 @@
+name: Fix easy challenge skeletal panel reuse
+
+on:
+  push:
+    paths:
+      - '.github/workflows/reuse-skeletal-panel-v2.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Put easy target in top-right panel
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('ChemBuilder.html')
+          s=p.read_text(encoding='utf-8')
+          marker='''  ctx.textAlign="left"; ctx.textBaseline="middle"; ctx.fillText("SKELETAL",x+10,y+12);\n\n  if(!atoms.length){'''
+          replacement='''  const showingTarget=challengeActive&&challengeDifficulty==="easy"&&challengeTemplate;\n  ctx.textAlign="left"; ctx.textBaseline="middle";\n  ctx.fillText(showingTarget?"TARGET SKELETAL":"SKELETAL",x+10,y+12);\n\n  if(showingTarget){\n    const t=challengeTemplate,pos=templateLayout(t),heavy=[...pos.keys()];\n    if(!heavy.length){ctx.restore();return;}\n    let minX=Math.min(...heavy.map(i=>pos.get(i).x)),maxX=Math.max(...heavy.map(i=>pos.get(i).x));\n    let minY=Math.min(...heavy.map(i=>pos.get(i).y)),maxY=Math.max(...heavy.map(i=>pos.get(i).y));\n    if(maxX-minX<.1){minX-=.6;maxX+=.6;}\n    if(maxY-minY<.1){minY-=.5;maxY+=.5;}\n    const inner={x:x+12,y:y+25,w:panelW-24,h:panelH-36};\n    const scale=Math.min(inner.w/(maxX-minX),inner.h/(maxY-minY));\n    const P=i=>({x:inner.x+(pos.get(i).x-minX)*scale,y:inner.y+(pos.get(i).y-minY)*scale});\n    for(const e of t.edges){\n      if(pos.has(e.a)&&pos.has(e.b)){const a=P(e.a),b=P(e.b);drawSkeletalBond(a.x,a.y,b.x,b.y,e.order);}\n    }\n    for(const i of heavy){\n      if(t.types[i]==="C")continue;\n      const q=P(i);\n      let label=t.types[i];\n      const hs=t.edges.filter(e=>(e.a===i&&t.types[e.b]==="H")||(e.b===i&&t.types[e.a]==="H"));\n      if(t.types[i]==="O"&&hs.length)label="OH";\n      ctx.fillStyle=t.types[i]==="O"?"#ff666d":"#f2f3f5";\n      ctx.font="800 15px -apple-system,sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";\n      ctx.fillText(label,q.x,q.y);\n    }\n    ctx.restore();\n    return;\n  }\n\n  if(!atoms.length){'''
+          if marker not in s:
+              raise SystemExit('Expected skeletal panel marker not found')
+          s=s.replace(marker,replacement,1)
+          s=s.replace('Easy shows the skeletal target, Medium shows its formula, and Hard gives only the compound name.','Easy shows the target in the top-right skeletal panel, Medium shows its formula, and Hard gives only the compound name.')
+          p.write_text(s,encoding='utf-8')
+          PY
+      - name: Commit update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ChemBuilder.html
+          git diff --cached --quiet || git commit -m "Show easy challenge target in skeletal panel"
+          git push
