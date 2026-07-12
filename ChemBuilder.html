@@ -50,11 +50,11 @@ canvas { width:100%; height:100%; display:block; touch-action:none; }
 #help button { width:100%; margin-top:12px; padding:12px; border:0; border-radius:10px; background:#4368a8; color:white; font-weight:700; }
 
 #gameBtn { position:absolute; left:9px; top:9px; z-index:3; border:1px solid #59606d; background:rgba(37,40,46,.95); color:white; border-radius:12px; padding:10px 13px; font-weight:750; font-size:13px; }
-#challengePanel { display:none; position:absolute; left:9px; top:9px; z-index:5; width:min(176px,45vw); background:rgba(37,40,46,.97); border:1px solid #59606d; border-radius:14px; padding:10px; }
+#challengePanel { display:none; position:absolute; left:9px; top:9px; z-index:5; width:min(142px,38vw); background:rgba(37,40,46,.97); border:1px solid #59606d; border-radius:14px; padding:10px; }
 #challengePanel.open, #challengeActions.open { display:block; }
 #challengePanel h3 { font-size:13px; margin-bottom:7px; }
 #challengePanel select { width:100%; height:34px; margin-top:6px; border:0; border-radius:9px; font-weight:700; background:#343943; color:white; padding:0 7px; }
-#challengeActions { display:none; position:absolute; left:calc(min(176px,45vw) + 18px); top:9px; z-index:5; width:64px; background:rgba(37,40,46,.97); border:1px solid #59606d; border-radius:14px; padding:7px; }
+#challengeActions { display:none; position:absolute; left:calc(min(142px,38vw) + 15px); top:9px; z-index:5; width:64px; background:rgba(37,40,46,.97); border:1px solid #59606d; border-radius:14px; padding:7px; }
 #challengeActions button { width:100%; height:42px; border:0; border-radius:9px; background:#454b56; color:white; font-size:11px; font-weight:750; }
 #challengeActions button + button { margin-top:7px; }
 #challengePrompt { margin-top:7px; font-size:12px; line-height:1.3; color:#eef1f5; }
@@ -79,11 +79,11 @@ canvas { width:100%; height:100%; display:block; touch-action:none; }
   <canvas id="gameCanvas"></canvas>
   <button id="gameBtn">Game</button>
   <section id="challengePanel">
-    <h3>Build Challenge</h3>
+    <h3>Game</h3>
     <select id="difficulty">
-      <option value="easy">Easy — skeletal + formula</option>
-      <option value="medium">Medium — name + formula</option>
-      <option value="hard">Hard — name only</option>
+      <option value="easy">Easy</option>
+      <option value="medium">Medium</option>
+      <option value="hard">Hard</option>
     </select>
     <div id="challengePrompt"></div>
     <div id="challengeFormula"></div>
@@ -755,7 +755,7 @@ function drawSkeletalGraph(types,edges,panelX,panelY,panelW,panelH,title){
   ctx.save();
   ctx.fillStyle="rgba(37,40,46,.94)";ctx.strokeStyle="#555c68";ctx.lineWidth=1;
   ctx.beginPath();ctx.roundRect(panelX,panelY,panelW,panelH,13);ctx.fill();ctx.stroke();
-  ctx.fillStyle="#9299a5";ctx.font="700 10px -apple-system,sans-serif";ctx.textAlign="left";ctx.textBaseline="middle";ctx.fillText(title,panelX+10,panelY+12);
+  ctx.fillStyle="#9299a5";ctx.font="700 10px -apple-system,sans-serif";ctx.textAlign="left";ctx.textBaseline="middle";ctx.fillText(title,panelX+14,panelY+13);
   const g=skeletalDisplayGraph(types,edges),pos=naturalSkeletalLayout(types,g.edges,g.nodes);
   if(!g.nodes.length){ctx.restore();return;}
   let minX=Math.min(...g.nodes.map(i=>pos.get(i).x)),maxX=Math.max(...g.nodes.map(i=>pos.get(i).x));
@@ -777,7 +777,7 @@ function drawSkeletalPanel() {
   const panelW=Math.min(154,viewW*.40),panelH=122,x=viewW-panelW-9,y=9;
   if(challengeActive&&challengeDifficulty==="easy"&&challengeTemplate){drawSkeletalGraph(challengeTemplate.types,challengeTemplate.edges,x,y,panelW,panelH,"TARGET SKELETAL");return;}
   if(!atoms.length){
-    ctx.save();ctx.fillStyle="rgba(37,40,46,.94)";ctx.strokeStyle="#555c68";ctx.beginPath();ctx.roundRect(x,y,panelW,panelH,13);ctx.fill();ctx.stroke();ctx.fillStyle="#9299a5";ctx.font="700 10px -apple-system,sans-serif";ctx.fillText("SKELETAL",x+10,y+12);ctx.fillStyle="#737a86";ctx.font="12px -apple-system,sans-serif";ctx.textAlign="center";ctx.fillText("Build a molecule",x+panelW/2,y+67);ctx.restore();return;
+    ctx.save();ctx.fillStyle="rgba(37,40,46,.94)";ctx.strokeStyle="#555c68";ctx.beginPath();ctx.roundRect(x,y,panelW,panelH,13);ctx.fill();ctx.stroke();ctx.fillStyle="#9299a5";ctx.font="700 10px -apple-system,sans-serif";ctx.fillText("SKELETAL",x+14,y+13);ctx.fillStyle="#737a86";ctx.font="12px -apple-system,sans-serif";ctx.textAlign="center";ctx.fillText("Build a molecule",x+panelW/2,y+67);ctx.restore();return;
   }
   const comp=components()[0],index=new Map(comp.map((a,i)=>[a,i])),componentEdges=[];
   for(const b of bonds)if(index.has(b.a)&&index.has(b.b))componentEdges.push({a:index.get(b.a),b:index.get(b.b),order:b.order});
