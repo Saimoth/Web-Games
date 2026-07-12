@@ -1,0 +1,225 @@
+name: Apply automatic challenge and skeletal layout
+
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-auto-challenge-layout.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch ChemBuilder
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          p=Path('ChemBuilder.html')
+          s=p.read_text(encoding='utf-8')
+
+          s=s.replace('''#gameBtn { position:absolute; left:9px; top:9px; z-index:3; border:1px solid #59606d; background:rgba(37,40,46,.95); color:white; border-radius:12px; padding:10px 13px; font-weight:750; font-size:13px; }
+#challengePanel { display:none; position:absolute; left:9px; top:9px; z-index:5; width:min(176px,45vw); background:rgba(37,40,46,.97); border:1px solid #59606d; border-radius:14px; padding:10px; }
+#challengePanel.open { display:block; }
+#challengePanel h3 { font-size:13px; margin-bottom:7px; }
+#challengePanel select, #challengePanel button { width:100%; height:34px; margin-top:6px; border:0; border-radius:9px; font-weight:700; }
+#challengePanel select { background:#343943; color:white; padding:0 7px; }
+#challengePanel button { background:#4368a8; color:white; }
+#challengePanel .secondary { background:#454b56; }
+#challengePrompt { margin-top:7px; font-size:12px; line-height:1.3; color:#eef1f5; }
+#challengeFormula { color:#9fd0ff; font-weight:800; margin-top:3px; }
+#challengeResult { min-height:16px; margin-top:7px; font-size:12px; font-weight:750; }''','''#gameBtn { position:absolute; left:9px; top:9px; z-index:3; border:1px solid #59606d; background:rgba(37,40,46,.95); color:white; border-radius:12px; padding:10px 13px; font-weight:750; font-size:13px; }
+#challengePanel { display:none; position:absolute; left:9px; top:9px; z-index:5; width:min(176px,45vw); background:rgba(37,40,46,.97); border:1px solid #59606d; border-radius:14px; padding:10px; }
+#challengePanel.open, #challengeActions.open { display:block; }
+#challengePanel h3 { font-size:13px; margin-bottom:7px; }
+#challengePanel select { width:100%; height:34px; margin-top:6px; border:0; border-radius:9px; font-weight:700; background:#343943; color:white; padding:0 7px; }
+#challengeActions { display:none; position:absolute; left:calc(min(176px,45vw) + 18px); top:9px; z-index:5; width:64px; background:rgba(37,40,46,.97); border:1px solid #59606d; border-radius:14px; padding:7px; }
+#challengeActions button { width:100%; height:42px; border:0; border-radius:9px; background:#454b56; color:white; font-size:11px; font-weight:750; }
+#challengeActions button + button { margin-top:7px; }
+#challengePrompt { margin-top:7px; font-size:12px; line-height:1.3; color:#eef1f5; }
+#challengeFormula { color:#9fd0ff; font-weight:800; margin-top:3px; }
+#challengeResult { min-height:14px; margin-top:5px; font-size:11px; font-weight:750; }
+#correctFlash { display:none; position:absolute; inset:0; z-index:10; align-items:center; justify-content:center; background:rgba(25,110,58,.88); color:white; text-align:center; font-size:34px; font-weight:850; letter-spacing:.5px; }
+#correctFlash.show { display:flex; }''')
+
+          old='''    <div id="challengeResult"></div>
+    <button id="checkChallenge">Check</button>
+    <button id="nextChallenge" class="secondary">Another</button>
+    <button id="closeChallenge" class="secondary">Close</button>
+  </section>
+
+  <div id="toast"></div>'''
+          new='''    <div id="challengeResult"></div>
+  </section>
+  <section id="challengeActions">
+    <button id="nextChallenge">Another</button>
+    <button id="closeChallenge">Close</button>
+  </section>
+
+  <div id="correctFlash"><div>✓<br>Correct!</div></div>
+  <div id="toast"></div>'''
+          s=s.replace(old,new)
+
+          s=s.replace('let lastChallengeName = "";','''let lastChallengeName = "";
+let challengeCheckTimer = 0;
+let challengeSolved = false;''')
+
+          s=s.replace('function updateReadout() {','''function updateReadout() {
+  if (challengeActive) scheduleChallengeCheck();''')
+
+          start=s.index('function pickChallenge() {')
+          end=s.index('/* ---------- Structure library ---------- */')
+          replacement=r'''function pickChallenge() {
+  const pool=challengePool();
+  let options=pool.filter(t=>t.name!==lastChallengeName);
+  if(!options.length) options=pool;
+  challengeTemplate=options[Math.floor(Math.random()*options.length)];
+  lastChallengeName=challengeTemplate.name;
+  challengeSolved=false;
+  clearTimeout(challengeCheckTimer);
+  document.getElementById("correctFlash").classList.remove("show");
+  clearAll();
+  document.getElementById("challengeResult").textContent="";
+  updateChallengePrompt();
+}
+function updateChallengePrompt() {
+  if(!challengeTemplate)return;
+  challengeDifficulty=document.getElementById("difficulty").value;
+  document.getElementById("challengePrompt").textContent=`Build: ${challengeTemplate.name}`;
+  document.getElementById("challengeFormula").textContent=challengeDifficulty==="hard"?"":prettyFormula(challengeFormulaOfTemplate(challengeTemplate));
+}
+function scheduleChallengeCheck() {
+  if(!challengeActive || !challengeTemplate || challengeSolved) return;
+  clearTimeout(challengeCheckTimer);
+  challengeCheckTimer=setTimeout(checkChallengeAutomatically,180);
+}
+function checkChallengeAutomatically() {
+  if(!challengeActive || !challengeTemplate || challengeSolved || !atoms.length) return;
+  const comps=components();
+  if(comps.length!==1) return;
+  if(!graphIsomorphic(graphForComponent(comps[0]),challengeTemplate)) return;
+  challengeSolved=true;
+  document.getElementById("challengeResult").textContent="";
+  document.getElementById("correctFlash").classList.add("show");
+  navigator.vibrate?.([35,45,55]);
+  setTimeout(()=>{ if(challengeActive && challengeSolved) pickChallenge(); },1900);
+}
+const challengePanel=document.getElementById("challengePanel");
+const challengeActions=document.getElementById("challengeActions");
+document.getElementById("gameBtn").addEventListener("click",()=>{challengeActive=true;challengePanel.classList.add("open");challengeActions.classList.add("open");if(!challengeTemplate)pickChallenge();});
+document.getElementById("closeChallenge").addEventListener("click",()=>{challengeActive=false;challengeSolved=false;clearTimeout(challengeCheckTimer);document.getElementById("correctFlash").classList.remove("show");challengePanel.classList.remove("open");challengeActions.classList.remove("open");updateReadout();});
+document.getElementById("difficulty").addEventListener("change",()=>{updateChallengePrompt();scheduleChallengeCheck();});
+document.getElementById("nextChallenge").addEventListener("click",pickChallenge);
+
+'''
+          s=s[:start]+replacement+s[end:]
+
+          draw_start=s.index('function drawSkeletalPanel() {')
+          draw_end=s.index('function drawChallengeTarget() {')
+          new_draw=r'''function skeletalDisplayGraph(types, edges) {
+  const neighbours=Array.from({length:types.length},()=>[]);
+  for(const e of edges){neighbours[e.a].push(e.b);neighbours[e.b].push(e.a);}
+  const hidden=new Set();
+  const hydroxyl=new Set();
+  for(let i=0;i<types.length;i++){
+    if(types[i]!=="H")continue;
+    const ns=neighbours[i];
+    if(ns.length!==1)continue;
+    const n=ns[0];
+    if(types[n]==="C")hidden.add(i);
+    if(types[n]==="O"){
+      const oxygenNeighbours=neighbours[n];
+      if(oxygenNeighbours.some(k=>types[k]==="C")){hidden.add(i);hydroxyl.add(n);}
+    }
+  }
+  const nodes=types.map((_,i)=>i).filter(i=>!hidden.has(i));
+  const nodeSet=new Set(nodes);
+  const visibleEdges=edges.filter(e=>nodeSet.has(e.a)&&nodeSet.has(e.b));
+  return {nodes,edges:visibleEdges,hydroxyl};
+}
+
+function naturalSkeletalLayout(types, edges, nodes) {
+  const pos=new Map();
+  if(!nodes.length)return pos;
+  if(nodes.length===1){pos.set(nodes[0],{x:0,y:0});return pos;}
+  const set=new Set(nodes),adj=new Map(nodes.map(i=>[i,[]]));
+  for(const e of edges)if(set.has(e.a)&&set.has(e.b)){adj.get(e.a).push(e.b);adj.get(e.b).push(e.a);}
+  const simpleRing=edges.length===nodes.length&&nodes.every(i=>adj.get(i).length===2);
+  if(simpleRing){
+    const order=[nodes[0]],seen=new Set(order);let prev=-1,cur=nodes[0];
+    while(order.length<nodes.length){const next=adj.get(cur).find(n=>n!==prev&&!seen.has(n));if(next===undefined)break;order.push(next);seen.add(next);prev=cur;cur=next;}
+    const radius=Math.max(1,order.length/(2*Math.PI));
+    order.forEach((n,i)=>{const a=-Math.PI/2+i*Math.PI*2/order.length;pos.set(n,{x:Math.cos(a)*radius,y:Math.sin(a)*radius});});
+    return pos;
+  }
+  function farthest(start){const q=[start],parent=new Map([[start,-1]]),dist=new Map([[start,0]]);let best=start;while(q.length){const n=q.shift();if(dist.get(n)>dist.get(best))best=n;for(const k of adj.get(n)){if(!dist.has(k)){dist.set(k,dist.get(n)+1);parent.set(k,n);q.push(k);}}}return {best,parent};}
+  const a=farthest(nodes[0]).best,bfs=farthest(a),backbone=[];let n=bfs.best;
+  while(n!==-1){backbone.push(n);n=bfs.parent.get(n);}
+  backbone.reverse();
+  const backboneSet=new Set(backbone);
+  backbone.forEach((id,i)=>pos.set(id,{x:i,y:i%2?0.42:0}));
+  const placed=new Set(backbone);
+  function placeBranches(parent,from,sign){
+    const children=adj.get(parent).filter(n=>n!==from&&!placed.has(n));
+    children.forEach((child,k)=>{
+      const p=pos.get(parent),base=(sign>0?-1.05:1.05)+(k-(children.length-1)/2)*0.55;
+      pos.set(child,{x:p.x+Math.cos(base),y:p.y+Math.sin(base)});placed.add(child);placeBranches(child,parent,-sign);
+    });
+  }
+  backbone.forEach((id,i)=>placeBranches(id,i?backbone[i-1]:-1,i%2?1:-1));
+  for(const id of nodes)if(!pos.has(id))pos.set(id,{x:0,y:0});
+  return pos;
+}
+
+function drawSkeletalGraph(types,edges,panelX,panelY,panelW,panelH,title){
+  ctx.save();
+  ctx.fillStyle="rgba(37,40,46,.94)";ctx.strokeStyle="#555c68";ctx.lineWidth=1;
+  ctx.beginPath();ctx.roundRect(panelX,panelY,panelW,panelH,13);ctx.fill();ctx.stroke();
+  ctx.fillStyle="#9299a5";ctx.font="700 10px -apple-system,sans-serif";ctx.textAlign="left";ctx.textBaseline="middle";ctx.fillText(title,panelX+10,panelY+12);
+  const g=skeletalDisplayGraph(types,edges),pos=naturalSkeletalLayout(types,g.edges,g.nodes);
+  if(!g.nodes.length){ctx.restore();return;}
+  let minX=Math.min(...g.nodes.map(i=>pos.get(i).x)),maxX=Math.max(...g.nodes.map(i=>pos.get(i).x));
+  let minY=Math.min(...g.nodes.map(i=>pos.get(i).y)),maxY=Math.max(...g.nodes.map(i=>pos.get(i).y));
+  if(maxX-minX<.2){minX-=.65;maxX+=.65;}if(maxY-minY<.2){minY-=.55;maxY+=.55;}
+  const inner={x:panelX+13,y:panelY+27,w:panelW-26,h:panelH-39};
+  const scale=Math.min(inner.w/(maxX-minX),inner.h/(maxY-minY));
+  const P=i=>({x:inner.x+(inner.w-(maxX-minX)*scale)/2+(pos.get(i).x-minX)*scale,y:inner.y+(inner.h-(maxY-minY)*scale)/2+(pos.get(i).y-minY)*scale});
+  for(const e of g.edges){const a=P(e.a),b=P(e.b);drawSkeletalBond(a.x,a.y,b.x,b.y,e.order);}
+  for(const i of g.nodes){
+    if(types[i]==="C")continue;
+    const q=P(i),label=g.hydroxyl.has(i)?"OH":types[i];
+    ctx.fillStyle=types[i]==="O"?"#ff666d":"#f2f3f5";ctx.font="800 15px -apple-system,sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(label,q.x,q.y);
+  }
+  ctx.restore();
+}
+
+function drawSkeletalPanel() {
+  const panelW=Math.min(154,viewW*.40),panelH=122,x=viewW-panelW-9,y=9;
+  if(challengeActive&&challengeDifficulty==="easy"&&challengeTemplate){drawSkeletalGraph(challengeTemplate.types,challengeTemplate.edges,x,y,panelW,panelH,"TARGET SKELETAL");return;}
+  if(!atoms.length){
+    ctx.save();ctx.fillStyle="rgba(37,40,46,.94)";ctx.strokeStyle="#555c68";ctx.beginPath();ctx.roundRect(x,y,panelW,panelH,13);ctx.fill();ctx.stroke();ctx.fillStyle="#9299a5";ctx.font="700 10px -apple-system,sans-serif";ctx.fillText("SKELETAL",x+10,y+12);ctx.fillStyle="#737a86";ctx.font="12px -apple-system,sans-serif";ctx.textAlign="center";ctx.fillText("Build a molecule",x+panelW/2,y+67);ctx.restore();return;
+  }
+  const comp=components()[0],index=new Map(comp.map((a,i)=>[a,i])),componentEdges=[];
+  for(const b of bonds)if(index.has(b.a)&&index.has(b.b))componentEdges.push({a:index.get(b.a),b:index.get(b.b),order:b.order});
+  drawSkeletalGraph(comp.map(a=>a.type),componentEdges,x,y,panelW,panelH,"SKELETAL");
+}
+
+function templateLayout(t){const g=skeletalDisplayGraph(t.types,t.edges);return naturalSkeletalLayout(t.types,g.edges,g.nodes);}
+'''
+          s=s[:draw_start]+new_draw+s[draw_end:]
+
+          s=s.replace('<p><b>Challenge mode:</b> tap Game and choose a difficulty. Easy shows the target in the top-right skeletal panel, Medium shows its formula, and Hard gives only the compound name.</p>','<p><b>Challenge mode:</b> build the requested compound. The game checks automatically after each change and advances after a correct answer.</p>')
+
+          p.write_text(s,encoding='utf-8')
+          PY
+      - name: Commit generated update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ChemBuilder.html
+          git diff --cached --quiet || git commit -m "Auto-check challenges and clean skeletal layout"
+          git push
