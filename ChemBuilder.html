@@ -690,7 +690,36 @@ function drawSkeletalPanel() {
   ctx.fillStyle="rgba(37,40,46,.94)"; ctx.strokeStyle="#555c68"; ctx.lineWidth=1;
   ctx.beginPath(); ctx.roundRect(x,y,panelW,panelH,13); ctx.fill(); ctx.stroke();
   ctx.fillStyle="#9299a5"; ctx.font="700 10px -apple-system,sans-serif";
-  ctx.textAlign="left"; ctx.textBaseline="middle"; ctx.fillText("SKELETAL",x+10,y+12);
+  const showingTarget=challengeActive&&challengeDifficulty==="easy"&&challengeTemplate;
+  ctx.textAlign="left"; ctx.textBaseline="middle";
+  ctx.fillText(showingTarget?"TARGET SKELETAL":"SKELETAL",x+10,y+12);
+
+  if(showingTarget){
+    const t=challengeTemplate,pos=templateLayout(t),heavy=[...pos.keys()];
+    if(!heavy.length){ctx.restore();return;}
+    let minX=Math.min(...heavy.map(i=>pos.get(i).x)),maxX=Math.max(...heavy.map(i=>pos.get(i).x));
+    let minY=Math.min(...heavy.map(i=>pos.get(i).y)),maxY=Math.max(...heavy.map(i=>pos.get(i).y));
+    if(maxX-minX<.1){minX-=.6;maxX+=.6;}
+    if(maxY-minY<.1){minY-=.5;maxY+=.5;}
+    const inner={x:x+12,y:y+25,w:panelW-24,h:panelH-36};
+    const scale=Math.min(inner.w/(maxX-minX),inner.h/(maxY-minY));
+    const P=i=>({x:inner.x+(pos.get(i).x-minX)*scale,y:inner.y+(pos.get(i).y-minY)*scale});
+    for(const e of t.edges){
+      if(pos.has(e.a)&&pos.has(e.b)){const a=P(e.a),b=P(e.b);drawSkeletalBond(a.x,a.y,b.x,b.y,e.order);}
+    }
+    for(const i of heavy){
+      if(t.types[i]==="C")continue;
+      const q=P(i);
+      let label=t.types[i];
+      const hs=t.edges.filter(e=>(e.a===i&&t.types[e.b]==="H")||(e.b===i&&t.types[e.a]==="H"));
+      if(t.types[i]==="O"&&hs.length)label="OH";
+      ctx.fillStyle=t.types[i]==="O"?"#ff666d":"#f2f3f5";
+      ctx.font="800 15px -apple-system,sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";
+      ctx.fillText(label,q.x,q.y);
+    }
+    ctx.restore();
+    return;
+  }
 
   if(!atoms.length){
     ctx.fillStyle="#737a86"; ctx.font="12px -apple-system,sans-serif"; ctx.textAlign="center";
