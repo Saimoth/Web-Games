@@ -1,0 +1,34 @@
+name: Fix skeletal title alignment
+
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-skeletal-title-trigger.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Align empty skeletal title
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('ChemBuilder.html')
+          s = p.read_text(encoding='utf-8')
+          old = 'ctx.fillStyle="#9299a5";ctx.font="700 10px -apple-system,sans-serif";ctx.fillText("SKELETAL",x+14,y+13);ctx.fillStyle="#737a86";ctx.font="12px -apple-system,sans-serif";ctx.textAlign="center";'
+          new = 'ctx.fillStyle="#9299a5";ctx.font="700 10px -apple-system,sans-serif";ctx.textAlign="left";ctx.textBaseline="middle";ctx.fillText("SKELETAL",x+14,y+13);ctx.fillStyle="#737a86";ctx.font="12px -apple-system,sans-serif";ctx.textAlign="center";'
+          if old not in s:
+              raise SystemExit('Expected skeletal title code not found')
+          p.write_text(s.replace(old, new, 1), encoding='utf-8')
+          PY
+      - name: Commit fix
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add ChemBuilder.html
+          git commit -m "Fix skeletal title alignment"
+          git push
