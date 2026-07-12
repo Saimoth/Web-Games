@@ -96,42 +96,96 @@ saturated("Benzyl alcohol",["C","C","C","C","C","C","C","O"],[[0,1,2],[1,2,1],[2
 saturated("Benzaldehyde",["C","C","C","C","C","C","C","O"],[[0,1,2],[1,2,1],[2,3,2],[3,4,1],[4,5,2],[5,0,1],[0,6,1],[6,7,2]],"One Kekulé structure");
 saturated("Benzoic acid",["C","C","C","C","C","C","C","O","O"],[[0,1,2],[1,2,1],[2,3,2],[3,4,1],[4,5,2],[5,0,1],[0,6,1],[6,7,2],[6,8,1]],"One Kekulé structure");
 
-// Drawing override loaded after ChemBuilder's main script.
-// Multiple skeletal bonds stay parallel through the middle, then converge
-// into one clean endpoint at each end.
-drawSkeletalBond = function(x1,y1,x2,y2,order) {
+// Conventional skeletal bond renderer loaded after ChemBuilder's main script.
+function skeletalEdgeCycleInfo(edge, edges, nodes, pointForNode) {
+  const adjacency = new Map(nodes.map(id => [id, []]));
+  for (const e of edges) {
+    if (e === edge) continue;
+    if (!adjacency.has(e.a) || !adjacency.has(e.b)) continue;
+    adjacency.get(e.a).push(e.b);
+    adjacency.get(e.b).push(e.a);
+  }
+  const queue = [edge.a], parent = new Map([[edge.a, -1]]);
+  while (queue.length) {
+    const id = queue.shift();
+    if (id === edge.b) break;
+    for (const next of adjacency.get(id) || []) {
+      if (!parent.has(next)) { parent.set(next, id); queue.push(next); }
+    }
+  }
+  if (!parent.has(edge.b)) return null;
+  const cycleNodes = [];
+  let id = edge.b;
+  while (id !== -1) {
+    cycleNodes.push(id);
+    if (id === edge.a) break;
+    id = parent.get(id);
+  }
+  if (cycleNodes[cycleNodes.length - 1] !== edge.a) return null;
+  let cx = 0, cy = 0;
+  for (const node of cycleNodes) { const p = pointForNode(node); cx += p.x; cy += p.y; }
+  return {x: cx / cycleNodes.length, y: cy / cycleNodes.length};
+}
+
+function skeletalAuxiliarySide(edge, graph, pointForNode) {
+  const a = pointForNode(edge.a), b = pointForNode(edge.b);
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const mx = (a.x + b.x) * 0.5, my = (a.y + b.y) * 0.5;
+  const ringCentre = skeletalEdgeCycleInfo(edge, graph.edges, graph.nodes, pointForNode);
+  if (ringCentre) {
+    return dx * (ringCentre.y - my) - dy * (ringCentre.x - mx) >= 0 ? 1 : -1;
+  }
+  let score = 0;
+  for (const other of graph.edges) {
+    let neighbour = null;
+    if (other.a === edge.a && other.b !== edge.b) neighbour = other.b;
+    else if (other.b === edge.a && other.a !== edge.b) neighbour = other.a;
+    else if (other.a === edge.b && other.b !== edge.a) neighbour = other.b;
+    else if (other.b === edge.b && other.a !== edge.a) neighbour = other.a;
+    if (neighbour === null) continue;
+    const p = pointForNode(neighbour);
+    score += dx * (p.y - my) - dy * (p.x - mx);
+  }
+  return score < 0 ? -1 : 1;
+}
+
+drawSkeletalBond = function(x1,y1,x2,y2,order,side=1) {
   const dx=x2-x1,dy=y2-y1,d=Math.hypot(dx,dy)||1;
-  const ux=dx/d,uy=dy/d;
-  const nx=-uy,ny=ux;
-  ctx.strokeStyle="#e4e7ec";
-  ctx.lineCap="round";
+  const ux=dx/d,uy=dy/d,nx=-uy,ny=ux;
+  ctx.strokeStyle="#e4e7ec";ctx.lineCap="round";
+  drawLine(x1,y1,x2,y2,order===1?2.5:2.2);
+  if(order===1) return;
+  const inset=Math.min(7,d*0.18),spread=2.55;
+  const ax=x1+ux*inset,ay=y1+uy*inset,bx=x2-ux*inset,by=y2-uy*inset;
+  drawLine(ax+nx*spread*side,ay+ny*spread*side,bx+nx*spread*side,by+ny*spread*side,1.75);
+  if(order>=3) drawLine(ax-nx*spread*side,ay-ny*spread*side,bx-nx*spread*side,by-ny*spread*side,1.75);
+};
 
-  if(order===1){
-    drawLine(x1,y1,x2,y2,2.5);
-    return;
+drawSkeletalGraph = function(types,edges,panelX,panelY,panelW,panelH,title){
+  ctx.save();
+  ctx.fillStyle="rgba(37,40,46,.94)";ctx.strokeStyle="#555c68";ctx.lineWidth=1;
+  ctx.beginPath();ctx.roundRect(panelX,panelY,panelW,panelH,13);ctx.fill();ctx.stroke();
+  ctx.fillStyle="#9299a5";ctx.font="700 10px -apple-system,sans-serif";ctx.textAlign="left";ctx.textBaseline="middle";ctx.fillText(title,panelX+14,panelY+13);
+  const g=skeletalDisplayGraph(types,edges),pos=naturalSkeletalLayout(types,g.edges,g.nodes);
+  if(!g.nodes.length){ctx.restore();return;}
+  let minX=Math.min(...g.nodes.map(i=>pos.get(i).x)),maxX=Math.max(...g.nodes.map(i=>pos.get(i).x));
+  let minY=Math.min(...g.nodes.map(i=>pos.get(i).y)),maxY=Math.max(...g.nodes.map(i=>pos.get(i).y));
+  if(maxX-minX<.2){minX-=.65;maxX+=.65;}if(maxY-minY<.2){minY-=.55;maxY+=.55;}
+  const inner={x:panelX+13,y:panelY+27,w:panelW-26,h:panelH-39};
+  const scale=Math.min(inner.w/(maxX-minX),inner.h/(maxY-minY));
+  const P=i=>({x:inner.x+(inner.w-(maxX-minX)*scale)/2+(pos.get(i).x-minX)*scale,y:inner.y+(inner.h-(maxY-minY)*scale)/2+(pos.get(i).y-minY)*scale});
+  for(const e of g.edges){
+    let a=P(e.a),b=P(e.b);
+    const dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy)||1,ux=dx/d,uy=dy/d;
+    const trimA=types[e.a]==="C"?0:(g.hydroxyl.has(e.a)?13:9);
+    const trimB=types[e.b]==="C"?0:(g.hydroxyl.has(e.b)?13:9);
+    a={x:a.x+ux*trimA,y:a.y+uy*trimA};b={x:b.x-ux*trimB,y:b.y-uy*trimB};
+    drawSkeletalBond(a.x,a.y,b.x,b.y,e.order,e.order>1?skeletalAuxiliarySide(e,g,P):1);
   }
-
-  const taper=Math.min(10,d*0.22);
-  const ax=x1+ux*taper, ay=y1+uy*taper;
-  const bx=x2-ux*taper, by=y2-uy*taper;
-
-  if(order===2){
-    const spread=3.2;
-    drawLine(x1,y1,ax+nx*spread,ay+ny*spread,2);
-    drawLine(ax+nx*spread,ay+ny*spread,bx+nx*spread,by+ny*spread,2);
-    drawLine(bx+nx*spread,by+ny*spread,x2,y2,2);
-    drawLine(x1,y1,ax-nx*spread,ay-ny*spread,2);
-    drawLine(ax-nx*spread,ay-ny*spread,bx-nx*spread,by-ny*spread,2);
-    drawLine(bx-nx*spread,by-ny*spread,x2,y2,2);
-    return;
+  for(const i of g.nodes){
+    if(types[i]==="C")continue;
+    const q=P(i),label=g.hydroxyl.has(i)?"OH":types[i];
+    ctx.fillStyle=types[i]==="O"?"#ff666d":"#f2f3f5";ctx.font="800 15px -apple-system,sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(label,q.x,q.y);
   }
-
-  const spread=5.4;
-  drawLine(x1,y1,x2,y2,1.8);
-  drawLine(x1,y1,ax+nx*spread,ay+ny*spread,1.6);
-  drawLine(ax+nx*spread,ay+ny*spread,bx+nx*spread,by+ny*spread,1.6);
-  drawLine(bx+nx*spread,by+ny*spread,x2,y2,1.6);
-  drawLine(x1,y1,ax-nx*spread,ay-ny*spread,1.6);
-  drawLine(ax-nx*spread,ay-ny*spread,bx-nx*spread,by-ny*spread,1.6);
-  drawLine(bx-nx*spread,by-ny*spread,x2,y2,1.6);
+  ctx.restore();
 };
