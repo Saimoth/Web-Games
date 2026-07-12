@@ -1,0 +1,220 @@
+name: Apply ChemBuilder challenge mode
+
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-challenge-mode.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch ChemBuilder
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('ChemBuilder.html')
+          s=p.read_text(encoding='utf-8')
+
+          css='''
+          #gameBtn { position:absolute; left:9px; top:9px; z-index:3; border:1px solid #59606d; background:rgba(37,40,46,.95); color:white; border-radius:12px; padding:10px 13px; font-weight:750; font-size:13px; }
+          #challengePanel { display:none; position:absolute; left:9px; top:9px; z-index:5; width:min(176px,45vw); background:rgba(37,40,46,.97); border:1px solid #59606d; border-radius:14px; padding:10px; }
+          #challengePanel.open { display:block; }
+          #challengePanel h3 { font-size:13px; margin-bottom:7px; }
+          #challengePanel select, #challengePanel button { width:100%; height:34px; margin-top:6px; border:0; border-radius:9px; font-weight:700; }
+          #challengePanel select { background:#343943; color:white; padding:0 7px; }
+          #challengePanel button { background:#4368a8; color:white; }
+          #challengePanel .secondary { background:#454b56; }
+          #challengePrompt { margin-top:7px; font-size:12px; line-height:1.3; color:#eef1f5; }
+          #challengeFormula { color:#9fd0ff; font-weight:800; margin-top:3px; }
+          #challengeResult { min-height:16px; margin-top:7px; font-size:12px; font-weight:750; }
+          '''
+          if '#gameBtn {' not in s:
+              s=s.replace('</style>',css+'</style>')
+
+          html='''
+            <button id="gameBtn">Game</button>
+            <section id="challengePanel">
+              <h3>Build Challenge</h3>
+              <select id="difficulty">
+                <option value="easy">Easy — skeletal + formula</option>
+                <option value="medium">Medium — name + formula</option>
+                <option value="hard">Hard — name only</option>
+              </select>
+              <div id="challengePrompt"></div>
+              <div id="challengeFormula"></div>
+              <div id="challengeResult"></div>
+              <button id="checkChallenge">Check</button>
+              <button id="nextChallenge" class="secondary">Another</button>
+              <button id="closeChallenge" class="secondary">Close</button>
+            </section>
+          '''
+          if 'id="challengePanel"' not in s:
+              s=s.replace('  <canvas id="gameCanvas"></canvas>', '  <canvas id="gameCanvas"></canvas>'+html)
+          if '<b>Challenge mode:</b>' not in s:
+              s=s.replace('<p><b>Delete:</b> drag an atom back into the tray.</p>', '<p><b>Challenge mode:</b> tap Game and choose a difficulty. Easy shows the skeletal target, Medium shows its formula, and Hard gives only the compound name.</p>\n    <p><b>Delete:</b> drag an atom back into the tray.</p>')
+
+          state='''
+
+          let challengeActive = false;
+          let challengeTemplate = null;
+          let challengeDifficulty = "easy";
+          let lastChallengeName = "";
+          '''
+          if 'let challengeActive' not in s:
+              s=s.replace('const DOUBLE_TAP_MS = 360;', 'const DOUBLE_TAP_MS = 360;'+state)
+
+          challenge=r'''
+
+          function challengeFormulaOfTemplate(t) {
+            const count={};
+            for(const type of t.types) count[type]=(count[type]||0)+1;
+            const order=count.C?["C","H",...Object.keys(count).filter(x=>x!=="C"&&x!=="H").sort()]:Object.keys(count).sort();
+            return order.filter(x=>count[x]).map(x=>x+(count[x]>1?count[x]:"")).join("");
+          }
+          function challengePool() {
+            return TEMPLATES.filter(t => t.types.length >= 2 && t.types.length <= 24 && !/atom$/i.test(t.name));
+          }
+          function pickChallenge() {
+            const pool=challengePool();
+            let options=pool.filter(t=>t.name!==lastChallengeName);
+            if(!options.length) options=pool;
+            challengeTemplate=options[Math.floor(Math.random()*options.length)];
+            lastChallengeName=challengeTemplate.name;
+            clearAll();
+            document.getElementById("challengeResult").textContent="";
+            updateChallengePrompt();
+          }
+          function updateChallengePrompt() {
+            if(!challengeTemplate)return;
+            challengeDifficulty=document.getElementById("difficulty").value;
+            document.getElementById("challengePrompt").textContent=`Build: ${challengeTemplate.name}`;
+            document.getElementById("challengeFormula").textContent=challengeDifficulty==="hard"?"":prettyFormula(challengeFormulaOfTemplate(challengeTemplate));
+          }
+          function checkChallenge() {
+            const result=document.getElementById("challengeResult");
+            const comps=components();
+            if(comps.length!==1 || !atoms.length){ result.style.color="#ffc857"; result.textContent="Try again — build one complete molecule."; return; }
+            const correct=graphIsomorphic(graphForComponent(comps[0]),challengeTemplate);
+            if(correct){
+              result.style.color="#5fd17a"; result.textContent="Congratulations — correct!";
+              navigator.vibrate?.([35,45,55]);
+              setTimeout(()=>{ if(challengeActive) pickChallenge(); },1100);
+            } else {
+              result.style.color="#ff9b65"; result.textContent="Not quite — try again.";
+            }
+          }
+          const challengePanel=document.getElementById("challengePanel");
+          document.getElementById("gameBtn").addEventListener("click",()=>{challengeActive=true;challengePanel.classList.add("open");if(!challengeTemplate)pickChallenge();});
+          document.getElementById("closeChallenge").addEventListener("click",()=>{challengeActive=false;challengePanel.classList.remove("open");});
+          document.getElementById("difficulty").addEventListener("change",updateChallengePrompt);
+          document.getElementById("checkChallenge").addEventListener("click",checkChallenge);
+          document.getElementById("nextChallenge").addEventListener("click",pickChallenge);
+          '''
+          if 'function challengeFormulaOfTemplate' not in s:
+              s=s.replace('/* ---------- Structure library ---------- */',challenge+'\n/* ---------- Structure library ---------- */')
+
+          old='''function skeletalVisibleAtoms(comp) {
+            const visible = [];
+            for (const a of comp) {
+              if (a.type !== "H") {
+                visible.push(a);
+                continue;
+              }
+              const attached = bonds.find(b => b.a === a || b.b === a);
+              const neighbour = attached ? (attached.a === a ? attached.b : attached.a) : null;
+              // Hydrogens bonded to carbon are implicit in skeletal formulae.
+              if (!neighbour || neighbour.type !== "C") visible.push(a);
+            }
+            return visible;
+          }
+          '''
+          new='''function hydroxylInfo(comp) {
+            const hiddenH=new Set(), hydroxylO=new Set();
+            for(const o of comp.filter(a=>a.type==="O")){
+              const neighbours=bonds.filter(b=>b.a===o||b.b===o).map(b=>b.a===o?b.b:b.a);
+              const h=neighbours.find(a=>a.type==="H");
+              const c=neighbours.find(a=>a.type==="C");
+              if(h&&c){hiddenH.add(h);hydroxylO.add(o);}
+            }
+            return {hiddenH,hydroxylO};
+          }
+          function skeletalVisibleAtoms(comp) {
+            const {hiddenH}=hydroxylInfo(comp);
+            const visible=[];
+            for(const a of comp){
+              if(hiddenH.has(a))continue;
+              if(a.type!=="H"){visible.push(a);continue;}
+              const attached=bonds.find(b=>b.a===a||b.b===a);
+              const neighbour=attached?(attached.a===a?attached.b:attached.a):null;
+              if(!neighbour||neighbour.type!=="C")visible.push(a);
+            }
+            return visible;
+          }
+          '''
+          if 'function hydroxylInfo' not in s:
+              s=s.replace(old,new)
+              s=s.replace('  const skeletalBonds=bonds.filter(b=>visibleSet.has(b.a)&&visibleSet.has(b.b));','  const {hydroxylO}=hydroxylInfo(comp);\n  const skeletalBonds=bonds.filter(b=>visibleSet.has(b.a)&&visibleSet.has(b.b));')
+              target='    ctx.fillText(a.type,p.x,p.y);'
+              s=s.replace(target,'    ctx.fillText(hydroxylO.has(a)?"OH":a.type,p.x,p.y);',1)
+
+          target_renderer=r'''
+          function templateLayout(t) {
+            const heavy=t.types.map((x,i)=>x!=="H"?i:-1).filter(i=>i>=0);
+            const pos=new Map();
+            if(!heavy.length)return pos;
+            const heavySet=new Set(heavy),adj=new Map(heavy.map(i=>[i,[]]));
+            for(const e of t.edges)if(heavySet.has(e.a)&&heavySet.has(e.b)){adj.get(e.a).push(e.b);adj.get(e.b).push(e.a);}
+            const root=heavy.reduce((best,i)=>adj.get(i).length>adj.get(best).length?i:best,heavy[0]);
+            const queue=[[root,null,0,0]],seen=new Set();
+            while(queue.length){
+              const [i,parent,depth,slot]=queue.shift();if(seen.has(i))continue;seen.add(i);
+              if(parent===null)pos.set(i,{x:0,y:0});
+              else {const pp=pos.get(parent),siblings=adj.get(parent).filter(n=>n!==i);const ang=(depth%2?0.58:-0.58)+(slot-(siblings.length-1)/2)*1.05;pos.set(i,{x:pp.x+Math.cos(ang),y:pp.y+Math.sin(ang)});}
+              adj.get(i).filter(n=>n!==parent&&!seen.has(n)).forEach((n,k)=>queue.push([n,i,depth+1,k]));
+            }
+            for(let step=0;step<45;step++)for(const e of t.edges){if(!pos.has(e.a)||!pos.has(e.b))continue;const a=pos.get(e.a),b=pos.get(e.b),dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy)||1,f=(d-1)*.12;a.x+=dx/d*f;a.y+=dy/d*f;b.x-=dx/d*f;b.y-=dy/d*f;}
+            return pos;
+          }
+          function drawChallengeTarget() {
+            if(!challengeActive||challengeDifficulty!=="easy"||!challengeTemplate)return;
+            const panelW=Math.min(176,viewW*.45),panelH=145,x=9,y=196;
+            ctx.save();ctx.fillStyle="rgba(37,40,46,.94)";ctx.strokeStyle="#59606d";ctx.lineWidth=1;ctx.beginPath();ctx.roundRect(x,y,panelW,panelH,13);ctx.fill();ctx.stroke();
+            ctx.fillStyle="#9299a5";ctx.font="700 10px -apple-system,sans-serif";ctx.textAlign="left";ctx.fillText("TARGET SKELETAL",x+10,y+14);
+            const t=challengeTemplate,pos=templateLayout(t),heavy=[...pos.keys()];if(!heavy.length){ctx.restore();return;}
+            let minX=Math.min(...heavy.map(i=>pos.get(i).x)),maxX=Math.max(...heavy.map(i=>pos.get(i).x)),minY=Math.min(...heavy.map(i=>pos.get(i).y)),maxY=Math.max(...heavy.map(i=>pos.get(i).y));
+            if(maxX-minX<.1){minX-=.6;maxX+=.6}if(maxY-minY<.1){minY-=.5;maxY+=.5}
+            const inner={x:x+14,y:y+29,w:panelW-28,h:panelH-40},scale=Math.min(inner.w/(maxX-minX),inner.h/(maxY-minY));
+            const P=i=>({x:inner.x+(pos.get(i).x-minX)*scale,y:inner.y+(pos.get(i).y-minY)*scale});
+            for(const e of t.edges)if(pos.has(e.a)&&pos.has(e.b)){const a=P(e.a),b=P(e.b);drawSkeletalBond(a.x,a.y,b.x,b.y,e.order);}
+            for(const i of heavy){if(t.types[i]==="C")continue;const p=P(i);let label=t.types[i];const hs=t.edges.filter(e=>(e.a===i&&t.types[e.b]==="H")||(e.b===i&&t.types[e.a]==="H"));if(t.types[i]==="O"&&hs.length)label="OH";ctx.fillStyle=t.types[i]==="O"?"#ff666d":"#f2f3f5";ctx.font="800 15px -apple-system,sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(label,p.x,p.y);}
+            ctx.restore();
+          }
+
+          '''
+          if 'function drawChallengeTarget' not in s:
+              s=s.replace('function drawTray() {',target_renderer+'function drawTray() {')
+              s=s.replace('  drawSkeletalPanel();\n  for (const b of bonds)', '  drawSkeletalPanel();\n  drawChallengeTarget();\n  for (const b of bonds)')
+
+          p.write_text(s,encoding='utf-8')
+          PY
+      - name: Validate JavaScript
+        run: |
+          node - <<'JS'
+          const fs=require('fs');
+          const s=fs.readFileSync('ChemBuilder.html','utf8');
+          const m=s.match(/<script>([\s\S]*)<\/script>/);
+          new Function(m[1]);
+          console.log('JavaScript syntax OK');
+          JS
+      - name: Commit generated update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ChemBuilder.html
+          git diff --cached --quiet || git commit -m "Add hydroxyl skeletal labels and challenge mode"
+          git push
