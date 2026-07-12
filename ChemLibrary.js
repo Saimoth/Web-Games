@@ -95,3 +95,43 @@ saturated("Anisole (methoxybenzene)",["C","C","C","C","C","C","O","C"],[[0,1,2],
 saturated("Benzyl alcohol",["C","C","C","C","C","C","C","O"],[[0,1,2],[1,2,1],[2,3,2],[3,4,1],[4,5,2],[5,0,1],[0,6,1],[6,7,1]],"One Kekulé structure");
 saturated("Benzaldehyde",["C","C","C","C","C","C","C","O"],[[0,1,2],[1,2,1],[2,3,2],[3,4,1],[4,5,2],[5,0,1],[0,6,1],[6,7,2]],"One Kekulé structure");
 saturated("Benzoic acid",["C","C","C","C","C","C","C","O","O"],[[0,1,2],[1,2,1],[2,3,2],[3,4,1],[4,5,2],[5,0,1],[0,6,1],[6,7,2],[6,8,1]],"One Kekulé structure");
+
+// Drawing override loaded after ChemBuilder's main script.
+// Multiple skeletal bonds stay parallel through the middle, then converge
+// into one clean endpoint at each end.
+drawSkeletalBond = function(x1,y1,x2,y2,order) {
+  const dx=x2-x1,dy=y2-y1,d=Math.hypot(dx,dy)||1;
+  const ux=dx/d,uy=dy/d;
+  const nx=-uy,ny=ux;
+  ctx.strokeStyle="#e4e7ec";
+  ctx.lineCap="round";
+
+  if(order===1){
+    drawLine(x1,y1,x2,y2,2.5);
+    return;
+  }
+
+  const taper=Math.min(10,d*0.22);
+  const ax=x1+ux*taper, ay=y1+uy*taper;
+  const bx=x2-ux*taper, by=y2-uy*taper;
+
+  if(order===2){
+    const spread=3.2;
+    drawLine(x1,y1,ax+nx*spread,ay+ny*spread,2);
+    drawLine(ax+nx*spread,ay+ny*spread,bx+nx*spread,by+ny*spread,2);
+    drawLine(bx+nx*spread,by+ny*spread,x2,y2,2);
+    drawLine(x1,y1,ax-nx*spread,ay-ny*spread,2);
+    drawLine(ax-nx*spread,ay-ny*spread,bx-nx*spread,by-ny*spread,2);
+    drawLine(bx-nx*spread,by-ny*spread,x2,y2,2);
+    return;
+  }
+
+  const spread=5.4;
+  drawLine(x1,y1,x2,y2,1.8);
+  drawLine(x1,y1,ax+nx*spread,ay+ny*spread,1.6);
+  drawLine(ax+nx*spread,ay+ny*spread,bx+nx*spread,by+ny*spread,1.6);
+  drawLine(bx+nx*spread,by+ny*spread,x2,y2,1.6);
+  drawLine(x1,y1,ax-nx*spread,ay-ny*spread,1.6);
+  drawLine(ax-nx*spread,ay-ny*spread,bx-nx*spread,by-ny*spread,1.6);
+  drawLine(bx-nx*spread,by-ny*spread,x2,y2,1.6);
+};
