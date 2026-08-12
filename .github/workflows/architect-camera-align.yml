@@ -1,0 +1,68 @@
+name: Align architect camera
+
+on:
+  push:
+    paths:
+      - '.architect-camera-trigger'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lower architect camera by five degrees
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          core = Path('architect-core.js')
+          s = core.read_text(encoding='utf-8')
+
+          replacements = [
+              (
+                  'function setCamera(angle,height=7.3){',
+                  'function setCamera(angle,height=5.8){'
+              ),
+              (
+                  'setCamera(START_CAMERA_ANGLE+orbit*1.36,lerp(7.3,6.65,orbit))',
+                  'setCamera(START_CAMERA_ANGLE+orbit*1.36,lerp(5.8,5.2,orbit))'
+              ),
+          ]
+
+          for old, new in replacements:
+              if old not in s:
+                  raise SystemExit(f'Expected camera code not found: {old}')
+              s = s.replace(old, new, 1)
+
+          core.write_text(s, encoding='utf-8')
+
+          villa = Path('architect-villa.js')
+          s = villa.read_text(encoding='utf-8')
+          old = './architect-core.js?v=3'
+          new = './architect-core.js?v=4'
+          if old not in s:
+              raise SystemExit('Expected architect-core cache reference not found')
+          villa.write_text(s.replace(old, new, 1), encoding='utf-8')
+
+          html = Path('architect.html')
+          s = html.read_text(encoding='utf-8')
+          old = 'architect-villa.js?v=6'
+          new = 'architect-villa.js?v=7'
+          if old not in s:
+              raise SystemExit('Expected architect-villa cache reference not found')
+          html.write_text(s.replace(old, new, 1), encoding='utf-8')
+          PY
+
+      - name: Commit changes
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add architect-core.js architect-villa.js architect.html
+          git commit -m "Lower architect camera for render alignment"
+          git push
