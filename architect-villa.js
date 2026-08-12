@@ -58,12 +58,16 @@ function updatePage(){
   modelEl.style.filter=`blur(${editorMax*1.7}px)`;
   modelEl.style.transform=`translateY(${16-lift}px) scale(${1-scaleLoss-editorMax*.025})`;
 
-  const renderFade=sseg(p,.935,.998)*(1-editorMax);
-  referenceRender.style.opacity=(.96*renderFade).toFixed(3);
-  referenceRender.style.transform=`translateY(${10*(1-renderFade)}px) scale(${1.02-.02*renderFade})`;
-  host.style.opacity=(1-.52*renderFade).toFixed(3);
+  /* Strong final composite: real render clearly visible under the technical model. */
+  const renderFade=sseg(p,.905,.975)*(1-editorMax);
+  referenceRender.style.opacity=renderFade.toFixed(3);
+  referenceRender.style.transform=`translateY(${8*(1-renderFade)}px) scale(${1.015-.015*renderFade})`;
 
-  $("paintLayer").style.opacity=.92*sseg(p,.925,.995)*(1-editorMax);
+  /* At the final stop the design remains as a deliberate tracing-paper overlay. */
+  host.style.opacity=(1-.74*renderFade).toFixed(3);
+
+  /* Keep just a whisper of watercolour so it does not wash out the photograph. */
+  $("paintLayer").style.opacity=.24*sseg(p,.925,.995)*(1-editorMax);
   $("phase").style.opacity=1-editorMax;
 
   let active=phases[0];
