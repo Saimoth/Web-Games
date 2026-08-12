@@ -1,10 +1,9 @@
-import {createArchitectScene} from "./architect-core.js?v=5";
+import {createArchitectScene} from "./architect-core.js?v=3";
 
 const root=document.documentElement;
 const experience=document.getElementById("experience");
 const modelEl=document.getElementById("model");
 const host=document.getElementById("threeHost");
-const referenceRender=document.getElementById("referenceRender");
 const $=id=>document.getElementById(id);
 const clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
 const smoothstep=t=>{t=clamp(t);return t*t*(3-2*t)};
@@ -26,63 +25,7 @@ addEventListener("orientationchange",()=>setTimeout(resizeThree,150));
 resizeThree();
 
 let currentScroll=0;
-function updatePage(){
-  const max=experience.offsetHeight-innerHeight,p=clamp(scrollY/Math.max(1,max));
-  currentScroll=p;
-  root.style.setProperty("--p",p.toFixed(4));
-  $("percent").textContent=String(Math.round(p*100)).padStart(3,"0")+"%";
-
-  const introT=1-sseg(p,.035,.085);
-  opacity("intro",introT);
-  transform("intro",`translateY(${-22*sseg(p,.035,.085)}px)`);
-
-  floatPanel("panelA",p,.095,.12,.155,.175,0,24);
-  floatPanel("panelB",p,.135,.155,.175,.188,-12,18);
-
-  const pc=floatPanel("panelC",p,.30,.33,.39,.42,0,25),
-        pd=floatPanel("panelD",p,.355,.385,.425,.45,-12,20),
-        ed1=editorial("editorialOne",p,.18,.195,.225,.24),
-        ed2=editorial("editorialTwo",p,.465,.485,.525,.545),
-        ed3=editorial("editorialThree",p,.785,.805,.845,.865),
-        editorMax=Math.max(ed1,ed2,ed3),
-        final=sseg(p,.965,1);
-
-  opacity("finalGrid",final);
-  transform("finalGrid",`translateY(${12*(1-final)}px)`);
-
-  const lower=Math.max(pc||0,pd||0),
-        lift=Math.max(48*lower,90*final),
-        scaleLoss=.018*lower+.028*final;
-
-  modelEl.style.opacity=1-editorMax*.96;
-  modelEl.style.filter=`blur(${editorMax*1.7}px)`;
-  modelEl.style.transform=`translateY(${16-lift}px) scale(${1-scaleLoss-editorMax*.025})`;
-
-  /* Strong final composite: real render clearly visible under the technical model. */
-  const renderFade=sseg(p,.905,.975)*(1-editorMax);
-  referenceRender.style.opacity=renderFade.toFixed(3);
-  referenceRender.style.transform=`translateY(${8*(1-renderFade)}px) scale(${1.015-.015*renderFade})`;
-
-  /* At the final stop the design remains as a deliberate tracing-paper overlay. */
-  host.style.opacity=(1-.74*renderFade).toFixed(3);
-
-  /* Keep just a whisper of watercolour so it does not wash out the photograph. */
-  $("paintLayer").style.opacity=.24*sseg(p,.925,.995)*(1-editorMax);
-  $("phase").style.opacity=1-editorMax;
-
-  let active=phases[0];
-  for(const ph of phases)if(p>=ph[0])active=ph;
-  if($("phaseNum").textContent!==active[1]){
-    $("phaseNum").textContent=active[1];
-    $("phaseTitle").textContent=active[2];
-    $("phaseDetail").textContent=active[3];
-    $("phaseTitle").animate([{opacity:.12,transform:"translateY(7px)"},{opacity:1,transform:"translateY(0)"}],{duration:300,easing:"cubic-bezier(.2,.8,.2,1)"});
-  }
-}
-
-let ticking=false;
-addEventListener("scroll",()=>{if(ticking)return;ticking=true;requestAnimationFrame(()=>{updatePage();ticking=false})},{passive:true});
-updatePage();
-
+function updatePage(){const max=experience.offsetHeight-innerHeight,p=clamp(scrollY/Math.max(1,max));currentScroll=p;root.style.setProperty("--p",p.toFixed(4));$("percent").textContent=String(Math.round(p*100)).padStart(3,"0")+"%";const introT=1-sseg(p,.035,.085);opacity("intro",introT);transform("intro",`translateY(${-22*sseg(p,.035,.085)}px)`);floatPanel("panelA",p,.095,.12,.155,.175,0,24);floatPanel("panelB",p,.135,.155,.175,.188,-12,18);const pc=floatPanel("panelC",p,.30,.33,.39,.42,0,25),pd=floatPanel("panelD",p,.355,.385,.425,.45,-12,20),ed1=editorial("editorialOne",p,.18,.195,.225,.24),ed2=editorial("editorialTwo",p,.465,.485,.525,.545),ed3=editorial("editorialThree",p,.785,.805,.845,.865),editorMax=Math.max(ed1,ed2,ed3),final=sseg(p,.965,1);opacity("finalGrid",final);transform("finalGrid",`translateY(${12*(1-final)}px)`);const lower=Math.max(pc||0,pd||0),lift=Math.max(48*lower,90*final),scaleLoss=.018*lower+.028*final;modelEl.style.opacity=1-editorMax*.96;modelEl.style.filter=`blur(${editorMax*1.7}px)`;modelEl.style.transform=`translateY(${16-lift}px) scale(${1-scaleLoss-editorMax*.025})`;$("paintLayer").style.opacity=.92*sseg(p,.925,.995)*(1-editorMax);$("phase").style.opacity=1-editorMax;let active=phases[0];for(const ph of phases)if(p>=ph[0])active=ph;if($("phaseNum").textContent!==active[1]){$("phaseNum").textContent=active[1];$("phaseTitle").textContent=active[2];$("phaseDetail").textContent=active[3];$("phaseTitle").animate([{opacity:.12,transform:"translateY(7px)"},{opacity:1,transform:"translateY(0)"}],{duration:300,easing:"cubic-bezier(.2,.8,.2,1)"})}}
+let ticking=false;addEventListener("scroll",()=>{if(ticking)return;ticking=true;requestAnimationFrame(()=>{updatePage();ticking=false})},{passive:true});updatePage();
 function render(){requestAnimationFrame(render);architect.renderAt(designTimeFromScroll(currentScroll))}
 requestAnimationFrame(render);
