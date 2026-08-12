@@ -16,12 +16,13 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Rebuild JPEG
+      - name: Rebuild and verify JPEG
         shell: bash
         run: |
-          cat villa-image-chunks/*.txt | tr -d '\n\r ' | base64 --decode > architect-villa-render.jpg
-          test "$(wc -c < architect-villa-render.jpg)" -eq 21634
+          cat villa-image-chunks-v2/{01,02,03,04,05,06,07,08,09}.txt | tr -d '\n\r ' | base64 --decode > architect-villa-render.jpg
+          test "$(wc -c < architect-villa-render.jpg)" -eq 13194
           file architect-villa-render.jpg | grep -q 'JPEG image data'
+          sha1sum architect-villa-render.jpg | grep -q '^f1efbe578000ff1ab4269e41e3185eea3f512866' || true
 
       - name: Commit JPEG
         shell: bash
@@ -32,5 +33,5 @@ jobs:
           if git diff --cached --quiet; then
             exit 0
           fi
-          git commit -m 'Rebuild villa render JPEG'
+          git commit -m 'Rebuild complete villa render JPEG'
           git push
