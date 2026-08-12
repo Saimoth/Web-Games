@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Lower architect camera by five degrees
+      - name: Keep build angle and lower final orbit pitch
         shell: bash
         run: |
           python - <<'PY'
@@ -25,12 +25,12 @@ jobs:
 
           replacements = [
               (
-                  'function setCamera(angle,height=7.3){',
-                  'function setCamera(angle,height=5.8){'
+                  'function setCamera(angle,height=5.8){',
+                  'function setCamera(angle,height=7.3){'
               ),
               (
-                  'setCamera(START_CAMERA_ANGLE+orbit*1.36,lerp(7.3,6.65,orbit))',
-                  'setCamera(START_CAMERA_ANGLE+orbit*1.36,lerp(5.8,5.2,orbit))'
+                  'setCamera(START_CAMERA_ANGLE+orbit*1.36,lerp(5.8,5.2,orbit))',
+                  'setCamera(START_CAMERA_ANGLE+orbit*1.36,lerp(7.3,3.8,orbit))'
               ),
           ]
 
@@ -43,16 +43,16 @@ jobs:
 
           villa = Path('architect-villa.js')
           s = villa.read_text(encoding='utf-8')
-          old = './architect-core.js?v=3'
-          new = './architect-core.js?v=4'
+          old = './architect-core.js?v=4'
+          new = './architect-core.js?v=5'
           if old not in s:
               raise SystemExit('Expected architect-core cache reference not found')
           villa.write_text(s.replace(old, new, 1), encoding='utf-8')
 
           html = Path('architect.html')
           s = html.read_text(encoding='utf-8')
-          old = 'architect-villa.js?v=6'
-          new = 'architect-villa.js?v=7'
+          old = 'architect-villa.js?v=7'
+          new = 'architect-villa.js?v=8'
           if old not in s:
               raise SystemExit('Expected architect-villa cache reference not found')
           html.write_text(s.replace(old, new, 1), encoding='utf-8')
@@ -64,5 +64,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add architect-core.js architect-villa.js architect.html
-          git commit -m "Lower architect camera for render alignment"
+          git commit -m "Keep build camera and lower final orbit pitch"
           git push
