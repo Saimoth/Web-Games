@@ -1,4 +1,4 @@
-import {createArchitectScene} from "./architect-core.js?v=3";
+import {createArchitectScene} from "./architect-core.js?v=4";
 
 const root=document.documentElement;
 const experience=document.getElementById("experience");
