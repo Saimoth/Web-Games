@@ -1,0 +1,1656 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b1219">
+  <meta name="description" content="Live spreader allocation and maintenance status board for terminal operations.">
+  <title>Spreader Status Board</title>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #081018;
+      --panel: #101a24;
+      --panel-2: #152331;
+      --line: #2a3a48;
+      --text: #f4f7f9;
+      --muted: #91a1ae;
+      --cyan: #30c5d2;
+      --lime: #a9d83e;
+      --amber: #ffb020;
+      --red: #ef5a55;
+      --blue: #4fa2ff;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      background: var(--bg);
+    }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      min-height: 100svh;
+      background:
+        radial-gradient(
+          circle at 12% 0%,
+          rgba(48, 197, 210, 0.10),
+          transparent 28rem
+        ),
+        var(--bg);
+      color: var(--text);
+      font-family:
+        Inter,
+        ui-sans-serif,
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    button {
+      font: inherit;
+    }
+
+    .app {
+      width: min(100%, 720px);
+      margin: 0 auto;
+      padding-bottom: calc(24px + env(safe-area-inset-bottom));
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding:
+        calc(10px + env(safe-area-inset-top))
+        12px
+        10px;
+      background: rgba(8, 16, 24, 0.92);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(12px);
+    }
+
+    .identity {
+      min-width: 0;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(16px, 4.8vw, 22px);
+      line-height: 1.08;
+      letter-spacing: -0.02em;
+    }
+
+    .sync-line {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .sync-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--lime);
+      box-shadow: 0 0 8px rgba(169, 216, 62, 0.75);
+    }
+
+    .mode-button {
+      flex: 0 0 auto;
+      min-height: 38px;
+      padding: 0 11px;
+      border: 1px solid #365063;
+      border-radius: 9px;
+      color: var(--text);
+      background: #132331;
+      font-weight: 800;
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .mode-button.editing {
+      color: #041012;
+      background: var(--cyan);
+      border-color: var(--cyan);
+    }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+      padding: 10px 8px 8px;
+    }
+
+    .stat {
+      min-width: 0;
+      padding: 8px 4px;
+      text-align: center;
+      background: rgba(16, 26, 36, 0.78);
+      border: 1px solid var(--line);
+      border-radius: 9px;
+    }
+
+    .stat strong {
+      display: block;
+      font-size: 17px;
+      line-height: 1;
+    }
+
+    .stat span {
+      display: block;
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 8px;
+      font-weight: 800;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+    }
+
+    .board {
+      display: grid;
+      grid-template-columns:
+        minmax(92px, 0.9fr)
+        minmax(92px, 0.9fr)
+        minmax(120px, 1.2fr);
+      align-items: start;
+      gap: 6px;
+      padding: 0 8px;
+    }
+
+    .stack {
+      display: grid;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .zone {
+      min-width: 0;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: rgba(16, 26, 36, 0.84);
+    }
+
+    .zone-head {
+      min-height: 42px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 4px;
+      padding: 7px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .edit-on .zone[data-zone] .zone-head {
+      cursor: pointer;
+    }
+
+    .edit-on .zone[data-zone] .zone-head:hover,
+    .edit-on .zone[data-zone] .zone-head:focus-visible {
+      background: rgba(48, 197, 210, 0.09);
+      outline: 1px solid rgba(48, 197, 210, 0.5);
+      outline-offset: -1px;
+    }
+
+    .zone-title {
+      margin: 0;
+      font-size: 9px;
+      line-height: 1.15;
+      font-weight: 900;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .zone-count {
+      min-width: 19px;
+      padding: 3px 5px;
+      border-radius: 999px;
+      background: #233442;
+      color: #bec9d1;
+      text-align: center;
+      font-size: 9px;
+      font-weight: 900;
+    }
+
+    .zone.service .zone-head {
+      box-shadow: inset 3px 0 0 var(--amber);
+    }
+
+    .zone.repair .zone-head {
+      box-shadow: inset 3px 0 0 var(--red);
+    }
+
+    .zone.ready .zone-head {
+      box-shadow: inset 3px 0 0 var(--lime);
+    }
+
+    .zone.cranes .zone-head {
+      box-shadow: inset 3px 0 0 var(--cyan);
+    }
+
+    .drop-list {
+      min-height: 58px;
+      padding: 5px;
+    }
+
+    .drop-list.drag-over {
+      background: rgba(48, 197, 210, 0.08);
+      outline: 1px dashed var(--cyan);
+      outline-offset: -4px;
+    }
+
+    .asset {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 38px;
+      margin-bottom: 5px;
+      padding: 6px 4px;
+      border: 1px solid #344858;
+      border-radius: 7px;
+      background: linear-gradient(180deg, #1d2e3d, #172633);
+      color: var(--text);
+      font-size: clamp(10px, 3vw, 13px);
+      font-weight: 900;
+      letter-spacing: -0.01em;
+      touch-action: manipulation;
+      user-select: none;
+      cursor: grab;
+    }
+
+    .asset:last-child {
+      margin-bottom: 0;
+    }
+
+    .edit-on .asset:active {
+      cursor: grabbing;
+      transform: scale(0.98);
+    }
+
+    .asset.selected {
+      border-color: var(--cyan);
+      box-shadow: 0 0 0 2px rgba(48, 197, 210, 0.25);
+    }
+
+    .asset.dragging {
+      opacity: 0.35;
+    }
+
+    .shift-service {
+      margin: 5px 5px 0;
+      overflow: hidden;
+      border: 2px solid var(--amber);
+      border-radius: 8px;
+      background: rgba(255, 176, 32, 0.08);
+    }
+
+    .shift-title {
+      width: 100%;
+      min-height: 28px;
+      padding: 5px;
+      border: 0;
+      border-bottom: 1px solid rgba(255, 176, 32, 0.45);
+      background: rgba(255, 176, 32, 0.12);
+      color: var(--amber);
+      font-size: 8px;
+      font-weight: 950;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .edit-on .shift-title {
+      cursor: pointer;
+    }
+
+    .edit-on .shift-title:hover,
+    .edit-on .shift-title:focus-visible,
+    .shift-service.drag-over .shift-title {
+      background: var(--amber);
+      color: #181005;
+      outline: 0;
+    }
+
+    .shift-slot {
+      min-height: 46px;
+      padding: 5px;
+    }
+
+    .shift-slot .asset {
+      margin: 0;
+      border-color: rgba(255, 176, 32, 0.65);
+      background:
+        linear-gradient(
+          180deg,
+          rgba(255, 176, 32, 0.16),
+          #192734
+        );
+    }
+
+    .service-queue-label {
+      padding: 8px 7px 0;
+      color: var(--muted);
+      font-size: 7px;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .crane-list {
+      display: grid;
+      gap: 5px;
+      padding: 5px;
+    }
+
+    .crane {
+      min-width: 0;
+      min-height: 48px;
+      display: grid;
+      grid-template-columns: 38px minmax(0, 1fr);
+      align-items: stretch;
+      overflow: hidden;
+      border: 1px solid #354a59;
+      border-radius: 7px;
+      background: #13212c;
+    }
+
+    .crane.drag-over {
+      border-color: var(--cyan);
+      box-shadow: 0 0 0 2px rgba(48, 197, 210, 0.2);
+    }
+
+    .crane-name {
+      display: grid;
+      place-items: center;
+      border-right: 1px solid #354a59;
+      color: var(--cyan);
+      font-size: 10px;
+      font-weight: 950;
+    }
+
+    .crane-slot {
+      min-width: 0;
+      display: grid;
+      place-items: center;
+      padding: 4px;
+    }
+
+    .crane-slot .asset {
+      width: 100%;
+      min-height: 36px;
+      margin: 0;
+      border-color: #376276;
+      background: #183342;
+    }
+
+    .vacant {
+      color: #5e7180;
+      font-size: 8px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .selection-bar {
+      position: fixed;
+      z-index: 30;
+      left: 50%;
+      bottom: calc(10px + env(safe-area-inset-bottom));
+      width: min(calc(100% - 20px), 420px);
+      transform: translateX(-50%);
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 12px;
+      border: 1px solid var(--cyan);
+      border-radius: 12px;
+      background: #102432;
+      box-shadow: 0 12px 38px rgba(0, 0, 0, 0.5);
+      font-size: 11px;
+    }
+
+    .selection-bar.show {
+      display: flex;
+    }
+
+    .selection-bar button {
+      border: 0;
+      color: var(--muted);
+      background: none;
+      font-weight: 800;
+    }
+
+    .footer-tools {
+      display: none;
+      gap: 8px;
+      padding: 12px 8px 0;
+    }
+
+    .edit-on .footer-tools {
+      display: flex;
+    }
+
+    .tool-button {
+      flex: 1;
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #111e29;
+      color: #b6c2ca;
+      font-size: 10px;
+      font-weight: 800;
+    }
+
+    dialog {
+      width: min(calc(100% - 24px), 390px);
+      padding: 0;
+      border: 1px solid #3a5263;
+      border-radius: 14px;
+      background: #111d27;
+      color: var(--text);
+      box-shadow: 0 22px 80px rgba(0, 0, 0, 0.65);
+    }
+
+    dialog::backdrop {
+      background: rgba(2, 7, 11, 0.78);
+      backdrop-filter: blur(3px);
+    }
+
+    .modal-body {
+      padding: 18px;
+    }
+
+    .modal-body h2 {
+      margin: 0 0 6px;
+      font-size: 18px;
+    }
+
+    .modal-body p {
+      margin: 0 0 15px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .choices {
+      display: grid;
+      gap: 8px;
+    }
+
+    .choice {
+      min-height: 46px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: #172633;
+      color: var(--text);
+      font-weight: 850;
+      text-align: left;
+      padding: 0 13px;
+    }
+
+    .choice[data-destination="service"] {
+      border-left: 4px solid var(--amber);
+    }
+
+    .choice[data-destination="repair"] {
+      border-left: 4px solid var(--red);
+    }
+
+    .choice[data-destination="ready"] {
+      border-left: 4px solid var(--lime);
+    }
+
+    .cancel {
+      width: 100%;
+      min-height: 42px;
+      margin-top: 9px;
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      font-weight: 800;
+    }
+
+    .toast {
+      position: fixed;
+      z-index: 50;
+      left: 50%;
+      top: calc(72px + env(safe-area-inset-top));
+      transform: translate(-50%, -12px);
+      opacity: 0;
+      pointer-events: none;
+      padding: 9px 12px;
+      border-radius: 8px;
+      background: #e8f7f9;
+      color: #092028;
+      font-size: 11px;
+      font-weight: 850;
+      transition: 0.18s ease;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+
+    @media (min-width: 520px) {
+      .board {
+        grid-template-columns: 1fr 1fr 1.25fr;
+        gap: 10px;
+        padding: 0 12px;
+      }
+
+      .zone-title {
+        font-size: 11px;
+      }
+
+      .crane {
+        grid-template-columns: 52px 1fr;
+      }
+
+      .crane-name {
+        font-size: 12px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        scroll-behavior: auto !important;
+        transition: none !important;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="app" id="app">
+    <header>
+      <div class="identity">
+        <h1>Spreader Status</h1>
+
+        <div class="sync-line">
+          <span class="sync-dot"></span>
+          <span id="updatedText">Saved on this device</span>
+        </div>
+      </div>
+
+      <button
+        class="mode-button"
+        id="modeButton"
+        type="button"
+      >
+        Supervisor edit
+      </button>
+    </header>
+
+    <section class="summary" aria-label="Status summary">
+      <div class="stat">
+        <strong id="fittedCount">0</strong>
+        <span>Fitted</span>
+      </div>
+
+      <div class="stat">
+        <strong id="readyCount">0</strong>
+        <span>Ready</span>
+      </div>
+
+      <div class="stat">
+        <strong id="serviceCount">0</strong>
+        <span>Service</span>
+      </div>
+
+      <div class="stat">
+        <strong id="repairCount">0</strong>
+        <span>Repair</span>
+      </div>
+    </section>
+
+    <section
+      class="board"
+      aria-label="Spreader allocation board"
+    >
+      <div class="stack">
+        <section
+          class="zone service"
+          data-zone="service"
+        >
+          <div class="zone-head">
+            <h2 class="zone-title">For Service</h2>
+            <span class="zone-count"></span>
+          </div>
+
+          <div
+            class="shift-service"
+            id="shiftServiceTarget"
+          >
+            <button
+              class="shift-title"
+              id="shiftServiceTitle"
+              type="button"
+            >
+              Shift Service
+            </button>
+
+            <div
+              class="shift-slot"
+              id="shiftServiceSlot"
+            ></div>
+          </div>
+
+          <div class="service-queue-label">
+            Service Queue
+          </div>
+
+          <div
+            class="drop-list"
+            data-list="service"
+          ></div>
+        </section>
+
+        <section
+          class="zone repair"
+          data-zone="repair"
+        >
+          <div class="zone-head">
+            <h2 class="zone-title">For Repair</h2>
+            <span class="zone-count"></span>
+          </div>
+
+          <div
+            class="drop-list"
+            data-list="repair"
+          ></div>
+        </section>
+      </div>
+
+      <section
+        class="zone ready"
+        data-zone="ready"
+      >
+        <div class="zone-head">
+          <h2 class="zone-title">Ready for Operation</h2>
+          <span class="zone-count"></span>
+        </div>
+
+        <div
+          class="drop-list"
+          data-list="ready"
+        ></div>
+      </section>
+
+      <section class="zone cranes">
+        <div class="zone-head">
+          <h2 class="zone-title">Quay Cranes</h2>
+          <span class="zone-count">15</span>
+        </div>
+
+        <div
+          class="crane-list"
+          id="craneList"
+        ></div>
+      </section>
+    </section>
+
+    <div class="footer-tools">
+      <button
+        class="tool-button"
+        id="undoButton"
+        type="button"
+      >
+        Undo last move
+      </button>
+
+      <button
+        class="tool-button"
+        id="resetButton"
+        type="button"
+      >
+        Reset demo board
+      </button>
+    </div>
+  </main>
+
+  <div
+    class="selection-bar"
+    id="selectionBar"
+  >
+    <span>
+      <strong id="selectedLabel"></strong>
+      selected — tap a destination
+    </span>
+
+    <button
+      id="cancelSelection"
+      type="button"
+    >
+      Cancel
+    </button>
+  </div>
+
+  <dialog id="swapDialog">
+    <div class="modal-body">
+      <h2 id="swapTitle">
+        Crane already fitted
+      </h2>
+
+      <p id="swapText"></p>
+
+      <div class="choices">
+        <button
+          class="choice"
+          data-destination="service"
+          type="button"
+        >
+          Move removed spreader to For Service
+        </button>
+
+        <button
+          class="choice"
+          data-destination="repair"
+          type="button"
+        >
+          Move removed spreader to For Repair
+        </button>
+
+        <button
+          class="choice"
+          data-destination="ready"
+          type="button"
+        >
+          Move removed spreader to Ready
+        </button>
+      </div>
+
+      <button
+        class="cancel"
+        id="cancelSwap"
+        type="button"
+      >
+        Cancel move
+      </button>
+    </div>
+  </dialog>
+
+  <div
+    class="toast"
+    id="toast"
+    role="status"
+  ></div>
+
+  <script>
+    (() => {
+      const STORAGE_KEY = "spreader-status-board-v1";
+
+      const initialState = () => ({
+        lists: {
+          service: [
+            "CTS16",
+            "CTS17"
+          ],
+          repair: [
+            "CTS18"
+          ],
+          ready: [
+            "CTS19",
+            "CTS20",
+            "CTS21",
+            "CTS22",
+            "CTS23",
+            "CTS24"
+          ]
+        },
+
+        cranes: Object.fromEntries(
+          Array.from(
+            { length: 15 },
+            (_, index) => [
+              `QC${index + 1}`,
+              `CTS${index + 1}`
+            ]
+          )
+        ),
+
+        updated: Date.now()
+      });
+
+      let state = loadState();
+      let editing = false;
+      let selected = null;
+      let dragged = null;
+      let pendingSwap = null;
+      let undoState = null;
+
+      const app =
+        document.getElementById("app");
+
+      const modeButton =
+        document.getElementById("modeButton");
+
+      const selectionBar =
+        document.getElementById("selectionBar");
+
+      const selectedLabel =
+        document.getElementById("selectedLabel");
+
+      const swapDialog =
+        document.getElementById("swapDialog");
+
+      const toast =
+        document.getElementById("toast");
+
+      function loadState() {
+        try {
+          const parsed = JSON.parse(
+            localStorage.getItem(STORAGE_KEY)
+          );
+
+          if (parsed?.lists && parsed?.cranes) {
+            const placed = new Set([
+              ...Object.values(parsed.lists).flat(),
+              ...Object.values(parsed.cranes).filter(Boolean)
+            ]);
+
+            for (let i = 1; i <= 24; i++) {
+              const asset = `CTS${i}`;
+
+              if (!placed.has(asset)) {
+                parsed.lists.ready.push(asset);
+              }
+            }
+
+            return parsed;
+          }
+        } catch (_) {
+          // Ignore invalid saved data and load defaults.
+        }
+
+        return initialState();
+      }
+
+      function saveState(message) {
+        state.updated = Date.now();
+
+        localStorage.setItem(
+          STORAGE_KEY,
+          JSON.stringify(state)
+        );
+
+        if (message) {
+          showToast(message);
+        }
+      }
+
+      function snapshot() {
+        undoState = JSON.stringify(state);
+      }
+
+      function locate(asset) {
+        for (const key of Object.keys(state.lists)) {
+          const index =
+            state.lists[key].indexOf(asset);
+
+          if (index !== -1) {
+            return {
+              type: "list",
+              key,
+              index
+            };
+          }
+        }
+
+        for (
+          const [key, value]
+          of Object.entries(state.cranes)
+        ) {
+          if (value === asset) {
+            return {
+              type: "crane",
+              key
+            };
+          }
+        }
+
+        return null;
+      }
+
+      function removeAsset(asset) {
+        const from = locate(asset);
+
+        if (!from) {
+          return;
+        }
+
+        if (from.type === "list") {
+          state.lists[from.key].splice(
+            from.index,
+            1
+          );
+        } else {
+          state.cranes[from.key] = null;
+        }
+      }
+
+      function assetEl(name) {
+        const element =
+          document.createElement("div");
+
+        element.className =
+          `asset${selected === name ? " selected" : ""}`;
+
+        element.textContent = name;
+        element.dataset.asset = name;
+        element.draggable = editing;
+
+        element.setAttribute(
+          "role",
+          editing ? "button" : "listitem"
+        );
+
+        if (editing) {
+          element.setAttribute(
+            "aria-label",
+            `${name}. Tap, then tap a destination, or drag it.`
+          );
+        }
+
+        element.addEventListener(
+          "click",
+          event => {
+            event.stopPropagation();
+
+            if (!editing) {
+              return;
+            }
+
+            selected =
+              selected === name
+                ? null
+                : name;
+
+            render();
+          }
+        );
+
+        element.addEventListener(
+          "dragstart",
+          event => {
+            if (!editing) {
+              return event.preventDefault();
+            }
+
+            dragged = name;
+            event.dataTransfer.effectAllowed = "move";
+
+            event.dataTransfer.setData(
+              "text/plain",
+              name
+            );
+
+            requestAnimationFrame(() => {
+              element.classList.add("dragging");
+            });
+          }
+        );
+
+        element.addEventListener(
+          "dragend",
+          () => {
+            dragged = null;
+            element.classList.remove("dragging");
+            clearDragStyles();
+          }
+        );
+
+        return element;
+      }
+
+      function renderList(key) {
+        const container =
+          document.querySelector(
+            `[data-list="${key}"]`
+          );
+
+        container.replaceChildren();
+
+        const items =
+          key === "service"
+            ? state.lists.service.slice(1)
+            : state.lists[key];
+
+        items.forEach(name => {
+          container.append(assetEl(name));
+        });
+
+        if (key === "service") {
+          const shiftSlot =
+            document.getElementById(
+              "shiftServiceSlot"
+            );
+
+          shiftSlot.replaceChildren();
+
+          if (state.lists.service[0]) {
+            shiftSlot.append(
+              assetEl(state.lists.service[0])
+            );
+          }
+        }
+
+        document.querySelector(
+          `[data-zone="${key}"] .zone-count`
+        ).textContent =
+          state.lists[key].length;
+      }
+
+      function render() {
+        [
+          "service",
+          "repair",
+          "ready"
+        ].forEach(renderList);
+
+        const craneList =
+          document.getElementById("craneList");
+
+        craneList.replaceChildren();
+
+        Object.keys(state.cranes).forEach(
+          name => {
+            const crane =
+              document.createElement("div");
+
+            crane.className = "crane";
+            crane.dataset.crane = name;
+
+            crane.innerHTML = `
+              <div class="crane-name">
+                ${name}
+              </div>
+
+              <div class="crane-slot"></div>
+            `;
+
+            const slot =
+              crane.querySelector(".crane-slot");
+
+            if (state.cranes[name]) {
+              slot.append(
+                assetEl(state.cranes[name])
+              );
+            } else {
+              slot.innerHTML =
+                '<span class="vacant">Vacant</span>';
+            }
+
+            addCraneTarget(crane, name);
+            craneList.append(crane);
+          }
+        );
+
+        const fitted =
+          Object.values(state.cranes)
+            .filter(Boolean)
+            .length;
+
+        document.getElementById(
+          "fittedCount"
+        ).textContent = fitted;
+
+        document.getElementById(
+          "readyCount"
+        ).textContent =
+          state.lists.ready.length;
+
+        document.getElementById(
+          "serviceCount"
+        ).textContent =
+          state.lists.service.length;
+
+        document.getElementById(
+          "repairCount"
+        ).textContent =
+          state.lists.repair.length;
+
+        document.getElementById(
+          "updatedText"
+        ).textContent =
+          `Updated ${
+            new Date(state.updated)
+              .toLocaleTimeString(
+                [],
+                {
+                  hour: "2-digit",
+                  minute: "2-digit"
+                }
+              )
+          }`;
+
+        selectionBar.classList.toggle(
+          "show",
+          Boolean(editing && selected)
+        );
+
+        selectedLabel.textContent =
+          selected || "";
+
+        document.getElementById(
+          "undoButton"
+        ).disabled = !undoState;
+      }
+
+      function addListTarget(container, key) {
+        container.addEventListener(
+          "dragover",
+          event => {
+            if (editing) {
+              event.preventDefault();
+              container.classList.add("drag-over");
+            }
+          }
+        );
+
+        container.addEventListener(
+          "dragleave",
+          event => {
+            if (!container.contains(event.relatedTarget)) {
+              container.classList.remove("drag-over");
+            }
+          }
+        );
+
+        container.addEventListener(
+          "drop",
+          event => {
+            event.preventDefault();
+            container.classList.remove("drag-over");
+
+            const asset =
+              event.dataTransfer.getData("text/plain")
+              || dragged;
+
+            if (asset) {
+              moveToList(asset, key);
+            }
+          }
+        );
+
+        container.addEventListener(
+          "click",
+          () => {
+            if (editing && selected) {
+              moveToList(selected, key);
+            }
+          }
+        );
+      }
+
+      function addShiftTarget(container) {
+        container.addEventListener(
+          "dragover",
+          event => {
+            if (editing) {
+              event.preventDefault();
+              container.classList.add("drag-over");
+            }
+          }
+        );
+
+        container.addEventListener(
+          "dragleave",
+          event => {
+            if (!container.contains(event.relatedTarget)) {
+              container.classList.remove("drag-over");
+            }
+          }
+        );
+
+        container.addEventListener(
+          "drop",
+          event => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            container.classList.remove("drag-over");
+
+            const asset =
+              event.dataTransfer.getData("text/plain")
+              || dragged;
+
+            if (asset) {
+              makeShiftService(asset);
+            }
+          }
+        );
+      }
+
+      function addCraneTarget(
+        crane,
+        craneName
+      ) {
+        crane.addEventListener(
+          "dragover",
+          event => {
+            if (editing) {
+              event.preventDefault();
+              crane.classList.add("drag-over");
+            }
+          }
+        );
+
+        crane.addEventListener(
+          "dragleave",
+          event => {
+            if (!crane.contains(event.relatedTarget)) {
+              crane.classList.remove("drag-over");
+            }
+          }
+        );
+
+        crane.addEventListener(
+          "drop",
+          event => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            crane.classList.remove("drag-over");
+
+            const asset =
+              event.dataTransfer.getData("text/plain")
+              || dragged;
+
+            if (asset) {
+              moveToCrane(asset, craneName);
+            }
+          }
+        );
+
+        crane.addEventListener(
+          "click",
+          event => {
+            if (
+              !editing
+              || !selected
+              || event.target.closest(".asset")
+            ) {
+              return;
+            }
+
+            moveToCrane(
+              selected,
+              craneName
+            );
+          }
+        );
+      }
+
+      function moveToList(asset, key) {
+        if (!editing) {
+          return;
+        }
+
+        const from = locate(asset);
+
+        if (
+          from?.type === "list"
+          && from.key === key
+          && !(
+            key === "service"
+            && from.index === 0
+          )
+        ) {
+          return clearSelection();
+        }
+
+        snapshot();
+        removeAsset(asset);
+        state.lists[key].push(asset);
+        selected = null;
+
+        saveState(
+          `${asset} moved to ${labelFor(key)}`
+        );
+
+        render();
+      }
+
+      function makeShiftService(asset) {
+        if (!editing) {
+          return;
+        }
+
+        const from = locate(asset);
+
+        if (
+          !from
+          || (
+            from.type === "list"
+            && from.key === "service"
+            && from.index === 0
+          )
+        ) {
+          return clearSelection();
+        }
+
+        const currentShift =
+          state.lists.service[0] || null;
+
+        snapshot();
+
+        if (
+          from.type === "list"
+          && from.key === "service"
+        ) {
+          state.lists.service[0] = asset;
+          state.lists.service[from.index] =
+            currentShift;
+        } else if (currentShift) {
+          if (from.type === "list") {
+            state.lists[from.key][from.index] =
+              currentShift;
+          } else {
+            state.cranes[from.key] =
+              currentShift;
+          }
+
+          state.lists.service[0] = asset;
+        } else {
+          removeAsset(asset);
+          state.lists.service.unshift(asset);
+        }
+
+        selected = null;
+
+        saveState(
+          currentShift
+            ? `${asset} swapped with shift service ${currentShift}`
+            : `${asset} set as shift service`
+        );
+
+        render();
+      }
+
+      function moveToCrane(
+        asset,
+        craneName
+      ) {
+        if (
+          !editing
+          || state.cranes[craneName] === asset
+        ) {
+          return clearSelection();
+        }
+
+        const displaced =
+          state.cranes[craneName];
+
+        if (displaced) {
+          pendingSwap = {
+            asset,
+            craneName,
+            displaced
+          };
+
+          document.getElementById(
+            "swapTitle"
+          ).textContent =
+            `${craneName} has ${displaced}`;
+
+          document.getElementById(
+            "swapText"
+          ).textContent =
+            `Choose where ${displaced} should go when ${asset} is fitted.`;
+
+          swapDialog.showModal();
+          return;
+        }
+
+        snapshot();
+        removeAsset(asset);
+
+        state.cranes[craneName] = asset;
+        selected = null;
+
+        saveState(
+          `${asset} fitted to ${craneName}`
+        );
+
+        render();
+      }
+
+      function completeSwap(destination) {
+        if (!pendingSwap) {
+          return;
+        }
+
+        const {
+          asset,
+          craneName,
+          displaced
+        } = pendingSwap;
+
+        snapshot();
+        removeAsset(asset);
+
+        state.cranes[craneName] = asset;
+        state.lists[destination].push(displaced);
+
+        pendingSwap = null;
+        selected = null;
+
+        swapDialog.close();
+
+        saveState(
+          `${asset} fitted; `
+          + `${displaced} moved to `
+          + `${labelFor(destination)}`
+        );
+
+        render();
+      }
+
+      function labelFor(key) {
+        return {
+          service: "For Service",
+          repair: "For Repair",
+          ready: "Ready"
+        }[key];
+      }
+
+      function clearSelection() {
+        selected = null;
+        render();
+      }
+
+      function clearDragStyles() {
+        document
+          .querySelectorAll(".drag-over")
+          .forEach(element => {
+            element.classList.remove("drag-over");
+          });
+      }
+
+      function showToast(message) {
+        toast.textContent = message;
+        toast.classList.add("show");
+
+        clearTimeout(showToast.timer);
+
+        showToast.timer = setTimeout(
+          () => {
+            toast.classList.remove("show");
+          },
+          2200
+        );
+      }
+
+      modeButton.addEventListener(
+        "click",
+        () => {
+          editing = !editing;
+          selected = null;
+
+          app.classList.toggle(
+            "edit-on",
+            editing
+          );
+
+          modeButton.classList.toggle(
+            "editing",
+            editing
+          );
+
+          modeButton.textContent =
+            editing
+              ? "Finish editing"
+              : "Supervisor edit";
+
+          render();
+        }
+      );
+
+      document
+        .getElementById("cancelSelection")
+        .addEventListener(
+          "click",
+          clearSelection
+        );
+
+      document
+        .getElementById("cancelSwap")
+        .addEventListener(
+          "click",
+          () => {
+            pendingSwap = null;
+            swapDialog.close();
+          }
+        );
+
+      swapDialog
+        .querySelectorAll("[data-destination]")
+        .forEach(button => {
+          button.addEventListener(
+            "click",
+            () => {
+              completeSwap(
+                button.dataset.destination
+              );
+            }
+          );
+        });
+
+      document
+        .getElementById("undoButton")
+        .addEventListener(
+          "click",
+          () => {
+            if (!undoState) {
+              return;
+            }
+
+            const current =
+              JSON.stringify(state);
+
+            state =
+              JSON.parse(undoState);
+
+            undoState = current;
+            selected = null;
+
+            saveState("Last move undone");
+            render();
+          }
+        );
+
+      document
+        .getElementById("resetButton")
+        .addEventListener(
+          "click",
+          () => {
+            if (
+              !confirm(
+                "Reset every spreader to the demonstration layout?"
+              )
+            ) {
+              return;
+            }
+
+            snapshot();
+            state = initialState();
+
+            saveState("Demo board reset");
+            render();
+          }
+        );
+
+      document
+        .querySelectorAll("[data-list]")
+        .forEach(element => {
+          addListTarget(
+            element,
+            element.dataset.list
+          );
+        });
+
+      addShiftTarget(
+        document.getElementById(
+          "shiftServiceTarget"
+        )
+      );
+
+      document
+        .getElementById("shiftServiceTitle")
+        .addEventListener(
+          "click",
+          () => {
+            if (editing && selected) {
+              makeShiftService(selected);
+            }
+          }
+        );
+
+      document
+        .querySelectorAll(".zone[data-zone]")
+        .forEach(zone => {
+          const head =
+            zone.querySelector(".zone-head");
+
+          const key =
+            zone.dataset.zone;
+
+          head.setAttribute(
+            "title",
+            `Move selected spreader to ${labelFor(key)}`
+          );
+
+          head.addEventListener(
+            "click",
+            () => {
+              if (editing && selected) {
+                moveToList(selected, key);
+              }
+            }
+          );
+        });
+
+      render();
+    })();
+  </script>
+</body>
+</html>
