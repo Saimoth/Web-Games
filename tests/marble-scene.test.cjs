@@ -13,7 +13,9 @@ function host(w=390,h=620){
     pixelDensity(){},createCanvas:(width,height)=>{env.width=width;env.height=height;return{elt:el('canvas'),parent(){}};},
     resizeCanvas:(w,h)=>{env.width=w;env.height=h;},drawingContext:ctx2d,deltaTime:1000/60,setTimeout:()=>0,clearTimeout(){},
     localStorage:{getItem(){return this.saved||null;},setItem(k,v){this.saved=v;}}};
-  vm.createContext(env);vm.runInContext(fs.readFileSync(require.resolve('../marble.js'),'utf8'),env);vm.runInContext('setup()',env);
+  vm.createContext(env);vm.runInContext(fs.readFileSync(require.resolve('../marble.js'),'utf8'),env);// p5's global-mode startup assigns its own smooth() after loading the sketch.
+  env.smooth=()=>({renderer:'p5'});
+  vm.runInContext('setup()',env);
   return {run:s=>vm.runInContext(s,env),events,el,env};
 }
 test('scene boots and runs its draw loop at portrait and desktop sizes',()=>{
@@ -58,4 +60,38 @@ test('cancelled touch records already-poured marbles as one undoable action',()=
   h.events.get('canvas:pointerdown')({isPrimary:true,button:0,clientX:150,clientY:100,pointerId:7,preventDefault(){}});
   assert.equal(h.run('world.balls.length'),1);h.events.get('canvas:pointercancel')();
   h.run('undo()');assert.equal(h.run('world.balls.length'),0);assert.equal(h.run('gesture'),null);
+});
+
+test('pointer strokes commit both lines and tracks with p5 globals installed',()=>{
+  for(const mode of ['line','track']){
+    const h=host();h.run("makePreset('empty');setMode('"+mode+"')");
+    const event=(x,y)=>({isPrimary:true,button:0,clientX:x,clientY:y,pointerId:1,preventDefault(){}});
+    h.events.get('canvas:pointerdown')(event(60,180));
+    h.events.get('canvas:pointermove')(event(120,220));
+    h.events.get('canvas:pointermove')(event(210,240));
+    h.events.get('canvas:pointerup')(event(260,260));
+    assert.equal(h.run('paths.length'),1);
+    assert.ok(h.run('Array.isArray(paths[0].points)'));
+    assert.ok(h.run('world.segments.length')>0);
+    h.run('draw();undo();draw();redo();draw()');
+    assert.equal(h.run('paths.length'),1);
+  }
+});
+
+test('starter marbles vary between loads without overlapping walls or each other',()=>{
+  for(const [width,height] of [[320,350],[390,620],[1440,800]]){
+    const h=host(width,height);const first=h.run('JSON.stringify(snapshot().balls.map(b=>[b.x,b.y]))');
+    assert.equal(h.run('world.balls.length'),18);
+    h.run("makePreset('bowl')");
+    assert.notEqual(h.run('JSON.stringify(snapshot().balls.map(b=>[b.x,b.y]))'),first);
+    assert.equal(h.run('world.balls.length'),18);
+    assert.ok(h.run(`world.balls.every((a,i)=>world.balls.every((b,j)=>i===j||distance(a.pos,b.pos)>=a.r+b.r))`));
+    assert.ok(h.run(`world.balls.every(b=>world.segments.every(s=>segmentDistance(s,b.pos)>=b.r+MarblePhysics.WALL_RADIUS))`));
+  }
+});
+
+test('sketch helper functions do not collide with the bundled p5 API',()=>{
+  const api=new Set([...fs.readFileSync(require.resolve('../P5.js'),'utf8').matchAll(/prototype\.([A-Za-z_$][\w$]*)\s*=/g)].map(m=>m[1]));
+  const helpers=[...fs.readFileSync(require.resolve('../marble.js'),'utf8').matchAll(/^function (\w+)\(/gm)].map(m=>m[1]);
+  assert.deepEqual(helpers.filter(name=>api.has(name)&&!['setup','draw'].includes(name)),[]);
 });
