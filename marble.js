@@ -76,7 +76,7 @@ function segmentsOf(points,closed=false){
   }
   return result;
 }
-function smooth(points,closed=false){
+function smoothPolyline(points,closed=false){
   let result=points.map(point);
   for(let pass=0;pass<2;pass++)result=result.map((p,i)=>{
     if(!closed&&(i===0||i===result.length-1))return p;
@@ -135,7 +135,7 @@ function commitStroke(g){
       }
     }
   }
-  paths.push({id:pathId++,type:g.mode,points:smooth(pts,closed),closed});rebuild();return true;
+  paths.push({id:pathId++,type:g.mode,points:smoothPolyline(pts,closed),closed});rebuild();return true;
 }
 function toWorld(e){
   const rect=cnv.elt.getBoundingClientRect();
@@ -239,9 +239,20 @@ function makePreset(name){
     paths.push({id:pathId++,type:'line',closed:false,points:[{x:w*.1,y:h*.82},{x:w*.1,y:h*.94},{x:w*.9,y:h*.94},{x:w*.9,y:h*.82}]});
   }
   rebuild();fitView();clock.reset();
-  if(name!=='empty')for(let row=0;row<3;row++)for(let col=0;col<6;col++){
-    const x=w/2+(col-2.5)*26,y=35+row*26;
-    if(world.canSpawn(x,y))world.addBall(x,y,{hue:COLORS[hueIndex++%COLORS.length]});
+  if(name!=='empty'){
+    // Shuffle spaced cells and jitter inside them: varied placement without overlap
+    // or an unbounded rejection loop on small phone canvases.
+    const gap=30,margin=20;
+    const left=Math.max(margin,w*.18),right=Math.min(w-margin,w*.82);
+    const top=margin,bottom=Math.max(top+gap*2,Math.min(h*.27,180));
+    const cells=[];
+    for(let y=top;y<=bottom;y+=gap)for(let x=left;x<=right;x+=gap)cells.push({x,y});
+    for(let i=cells.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[cells[i],cells[j]]=[cells[j],cells[i]];}
+    for(const cell of cells){
+      if(world.balls.length>=18)break;
+      const x=cell.x+(Math.random()-.5)*5,y=cell.y+(Math.random()-.5)*5;
+      if(world.canSpawn(x,y))world.addBall(x,y,{hue:COLORS[Math.floor(Math.random()*COLORS.length)]});
+    }
   }
 }
 function validateScene(data){
