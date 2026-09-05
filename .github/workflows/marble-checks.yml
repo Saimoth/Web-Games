@@ -1,0 +1,26 @@
+name: Marble checks
+on:
+  push:
+    paths:
+      - 'Marble.html'
+      - 'marble*.js'
+      - 'tests/marble-*.cjs'
+      - '.github/workflows/marble-checks.yml'
+  pull_request:
+    paths:
+      - 'Marble.html'
+      - 'marble*.js'
+      - 'tests/marble-*.cjs'
+      - '.github/workflows/marble-checks.yml'
+permissions:
+  contents: read
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check marble.js && node --check marble-physics.js
+      - run: node --test tests/marble-*.test.cjs
