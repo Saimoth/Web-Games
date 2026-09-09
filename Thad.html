@@ -18,37 +18,209 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;color:
 </head>
 <body>
 <canvas id="game"></canvas>
-<div id="hud">Tap target • next cannon <b id="cannonNo">1</b> • <span id="assetState">loading sprites…</span></div>
+<div id="hud">Tap target • next cannon <b id="cannonNo">1</b> • placeholder geometry</div>
 <div id="rotate"><div><div class="icon">↻</div><div class="title">Turn your iPhone sideways</div><div class="sub">THAD combat test is designed for landscape.</div></div></div>
 <script>
 (()=>{
 'use strict';
-const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
-const cannonNo=document.getElementById('cannonNo'),assetState=document.getElementById('assetState');
-const sheet=new Image();
-let loaded=false,dpr=1,w=0,h=0,target={x:0,y:0},targetSet=false,nextGun=0,lastShotAt=0;
-const shotInterval=1000,beams=[],stars=[];
-const bossCrop={x:8,y:13,w:172,h:230};
-const gunCrop={x:195,y:18,w:53,h:112};
-const mountsUV=[{u:54/172,v:75/230},{u:137/172,v:75/230},{u:54/172,v:177/230},{u:137/172,v:177/230}];
-function rebuildStars(){stars.length=0;let n=Math.max(45,Math.floor(w*h/8500)),seed=1337;const rnd=()=>((seed=Math.imul(seed,1664525)+1013904223|0)>>>0)/4294967296;for(let i=0;i<n;i++)stars.push({x:rnd()*w,y:rnd()*h,r:.35+rnd()*1.1,a:.12+rnd()*.55});}
-function resize(){dpr=Math.min(devicePixelRatio||1,2);w=innerWidth;h=innerHeight;canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);canvas.style.width=w+'px';canvas.style.height=h+'px';ctx.setTransform(dpr,0,0,dpr,0,0);if(!targetSet){target.x=w*.82;target.y=h*.5}rebuildStars();}
-function bossGeometry(){const bh=Math.min(h*.72,320),bw=bh*(bossCrop.w/bossCrop.h);return{x:w*.5-bw*.5,y:h*.5-bh*.5,bw,bh};}
-function drawBackground(){ctx.fillStyle='#000';ctx.fillRect(0,0,w,h);for(const s of stars){ctx.globalAlpha=s.a;ctx.fillStyle='#d8e7ff';ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fill()}ctx.globalAlpha=1;}
-function drawBoss(g){ctx.drawImage(sheet,bossCrop.x,bossCrop.y,bossCrop.w,bossCrop.h,g.x,g.y,g.bw,g.bh);}
-function mountPositions(g){return mountsUV.map(m=>({x:g.x+m.u*g.bw,y:g.y+m.v*g.bh}));}
-function drawTurret(mount,angle,bossH){const th=bossH*.23,tw=th*(gunCrop.w/gunCrop.h);ctx.save();ctx.translate(mount.x,mount.y);ctx.rotate(angle+Math.PI/2);ctx.globalCompositeOperation='screen';ctx.drawImage(sheet,gunCrop.x,gunCrop.y,gunCrop.w,gunCrop.h,-tw*.5,-th*.74,tw,th);ctx.restore();return{x:mount.x+Math.cos(angle)*th*.69,y:mount.y+Math.sin(angle)*th*.69};}
-function drawTarget(now){const p=.5+.5*Math.sin(now*.006),r=13+p*3;ctx.save();ctx.translate(target.x,target.y);ctx.strokeStyle=`rgba(255,70,62,${.55+p*.4})`;ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.moveTo(-22,0);ctx.lineTo(-7,0);ctx.moveTo(22,0);ctx.lineTo(7,0);ctx.moveTo(0,-22);ctx.lineTo(0,-7);ctx.moveTo(0,22);ctx.lineTo(0,7);ctx.stroke();ctx.restore();}
-function fire(muzzle,now){beams.push({x1:muzzle.x,y1:muzzle.y,x2:target.x,y2:target.y,born:now});}
-function drawBeams(now){for(let i=beams.length-1;i>=0;i--){const b=beams[i],age=now-b.born;if(age>280){beams.splice(i,1);continue}const a=1-age/280;ctx.save();ctx.globalCompositeOperation='lighter';ctx.strokeStyle=`rgba(255,30,20,${a*.28})`;ctx.lineWidth=9*a+2;ctx.beginPath();ctx.moveTo(b.x1,b.y1);ctx.lineTo(b.x2,b.y2);ctx.stroke();ctx.strokeStyle=`rgba(255,230,190,${Math.min(1,a*1.8)})`;ctx.lineWidth=1.7;ctx.beginPath();ctx.moveTo(b.x1,b.y1);ctx.lineTo(b.x2,b.y2);ctx.stroke();ctx.restore();}}
-function frame(now){drawBackground();if(loaded){const g=bossGeometry();drawBoss(g);const mounts=mountPositions(g),muzzles=[];for(let i=0;i<4;i++){const a=Math.atan2(target.y-mounts[i].y,target.x-mounts[i].x);muzzles[i]=drawTurret(mounts[i],a,g.bh)}if(targetSet&&now-lastShotAt>=shotInterval){fire(muzzles[nextGun],now);nextGun=(nextGun+1)%4;cannonNo.textContent=String(nextGun+1);lastShotAt=now}drawBeams(now);drawTarget(now)}requestAnimationFrame(frame);}
-function setTarget(e){if(innerHeight>innerWidth)return;const r=canvas.getBoundingClientRect();target.x=Math.max(12,Math.min(w-12,e.clientX-r.left));target.y=Math.max(12,Math.min(h-12,e.clientY-r.top));targetSet=true;lastShotAt=performance.now()-shotInterval;}
-canvas.addEventListener('pointerdown',e=>{e.preventDefault();setTarget(e)},{passive:false});
-addEventListener('resize',resize,{passive:true});addEventListener('orientationchange',()=>setTimeout(resize,180),{passive:true});
-sheet.onload=()=>{loaded=true;assetState.textContent='sprites loaded';resize();};
-sheet.onerror=()=>{assetState.textContent='SPRITE LOAD FAILED';assetState.style.color='#ff5959';};
-sheet.src='./ThadBossSprites.png?v=2';
-resize();requestAnimationFrame(frame);
+const canvas=document.getElementById('game');
+const ctx=canvas.getContext('2d');
+const cannonNo=document.getElementById('cannonNo');
+
+let dpr=1,w=0,h=0;
+let target={x:0,y:0};
+let targetSet=false;
+let nextGun=0;
+let lastShotAt=0;
+const shotInterval=1000;
+const beams=[];
+const stars=[];
+
+function rebuildStars(){
+  stars.length=0;
+  const n=Math.max(45,Math.floor(w*h/8500));
+  let seed=1337;
+  const rnd=()=>((seed=Math.imul(seed,1664525)+1013904223|0)>>>0)/4294967296;
+  for(let i=0;i<n;i++) stars.push({x:rnd()*w,y:rnd()*h,r:.35+rnd()*1.1,a:.12+rnd()*.55});
+}
+
+function resize(){
+  dpr=Math.min(window.devicePixelRatio||1,2);
+  w=window.innerWidth;
+  h=window.innerHeight;
+  canvas.width=Math.round(w*dpr);
+  canvas.height=Math.round(h*dpr);
+  canvas.style.width=w+'px';
+  canvas.style.height=h+'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  if(!targetSet){target.x=w*.82;target.y=h*.5;}
+  rebuildStars();
+}
+
+function bossGeometry(){
+  const size=Math.min(h*.48,230);
+  return {x:w*.5-size*.5,y:h*.5-size*.5,size,cx:w*.5,cy:h*.5};
+}
+
+function mountPositions(g){
+  const inset=g.size*.22;
+  return [
+    {x:g.x+inset,y:g.y+inset},
+    {x:g.x+g.size-inset,y:g.y+inset},
+    {x:g.x+inset,y:g.y+g.size-inset},
+    {x:g.x+g.size-inset,y:g.y+g.size-inset}
+  ];
+}
+
+function drawBackground(){
+  ctx.fillStyle='#000';
+  ctx.fillRect(0,0,w,h);
+  for(const s of stars){
+    ctx.globalAlpha=s.a;
+    ctx.fillStyle='#d8e7ff';
+    ctx.beginPath();
+    ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+    ctx.fill();
+  }
+  ctx.globalAlpha=1;
+}
+
+function drawBoss(g){
+  ctx.save();
+  ctx.fillStyle='#2b3038';
+  ctx.strokeStyle='#76808f';
+  ctx.lineWidth=3;
+  ctx.fillRect(g.x,g.y,g.size,g.size);
+  ctx.strokeRect(g.x,g.y,g.size,g.size);
+
+  ctx.strokeStyle='rgba(255,90,70,.35)';
+  ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.moveTo(g.cx,g.y+12);
+  ctx.lineTo(g.cx,g.y+g.size-12);
+  ctx.moveTo(g.x+12,g.cy);
+  ctx.lineTo(g.x+g.size-12,g.cy);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawTurret(mount,angle,index,g){
+  const len=g.size*.18;
+  const half=g.size*.055;
+
+  ctx.save();
+  ctx.translate(mount.x,mount.y);
+  ctx.rotate(angle);
+
+  ctx.fillStyle=index===nextGun?'#ff594e':'#d7dde5';
+  ctx.strokeStyle='#11161d';
+  ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.moveTo(len,0);
+  ctx.lineTo(-half,-half);
+  ctx.lineTo(-half,half);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle='#20252d';
+  ctx.beginPath();
+  ctx.arc(0,0,half*.72,0,Math.PI*2);
+  ctx.fill();
+  ctx.restore();
+
+  return {x:mount.x+Math.cos(angle)*len,y:mount.y+Math.sin(angle)*len};
+}
+
+function drawTarget(now){
+  const p=.5+.5*Math.sin(now*.006);
+  const r=13+p*3;
+  ctx.save();
+  ctx.translate(target.x,target.y);
+  ctx.strokeStyle=`rgba(255,70,62,${.55+p*.4})`;
+  ctx.lineWidth=1.5;
+  ctx.beginPath();
+  ctx.arc(0,0,r,0,Math.PI*2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(-22,0);ctx.lineTo(-7,0);
+  ctx.moveTo(22,0);ctx.lineTo(7,0);
+  ctx.moveTo(0,-22);ctx.lineTo(0,-7);
+  ctx.moveTo(0,22);ctx.lineTo(0,7);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function fire(gun,muzzle,now){
+  beams.push({gun,x1:muzzle.x,y1:muzzle.y,x2:target.x,y2:target.y,born:now});
+}
+
+function drawBeams(now){
+  for(let i=beams.length-1;i>=0;i--){
+    const b=beams[i];
+    const age=now-b.born;
+    if(age>300){beams.splice(i,1);continue;}
+    const a=1-age/300;
+
+    ctx.save();
+    ctx.globalCompositeOperation='lighter';
+    ctx.strokeStyle=`rgba(255,30,20,${a*.28})`;
+    ctx.lineWidth=9*a+2;
+    ctx.beginPath();
+    ctx.moveTo(b.x1,b.y1);
+    ctx.lineTo(b.x2,b.y2);
+    ctx.stroke();
+
+    ctx.strokeStyle=`rgba(255,235,200,${Math.min(1,a*1.8)})`;
+    ctx.lineWidth=1.8;
+    ctx.beginPath();
+    ctx.moveTo(b.x1,b.y1);
+    ctx.lineTo(b.x2,b.y2);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function frame(now){
+  drawBackground();
+  const g=bossGeometry();
+  drawBoss(g);
+
+  const mounts=mountPositions(g);
+  const muzzles=[];
+
+  for(let i=0;i<4;i++){
+    const angle=Math.atan2(target.y-mounts[i].y,target.x-mounts[i].x);
+    muzzles[i]=drawTurret(mounts[i],angle,i,g);
+  }
+
+  if(targetSet && now-lastShotAt>=shotInterval){
+    fire(nextGun,muzzles[nextGun],now);
+    nextGun=(nextGun+1)%4;
+    cannonNo.textContent=String(nextGun+1);
+    lastShotAt=now;
+  }
+
+  drawBeams(now);
+  drawTarget(now);
+  requestAnimationFrame(frame);
+}
+
+function setTarget(e){
+  if(window.innerHeight>window.innerWidth)return;
+  const r=canvas.getBoundingClientRect();
+  target.x=Math.max(12,Math.min(w-12,e.clientX-r.left));
+  target.y=Math.max(12,Math.min(h-12,e.clientY-r.top));
+  targetSet=true;
+  lastShotAt=performance.now()-shotInterval;
+}
+
+canvas.addEventListener('pointerdown',e=>{e.preventDefault();setTarget(e);},{passive:false});
+window.addEventListener('resize',resize,{passive:true});
+window.addEventListener('orientationchange',()=>setTimeout(resize,180),{passive:true});
+
+resize();
+requestAnimationFrame(frame);
 })();
 </script>
 </body>
