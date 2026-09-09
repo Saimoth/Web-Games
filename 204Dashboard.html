@@ -80,7 +80,7 @@
   </style>
 </head>
 <body>
-  <header class="topbar"><div class="mark" aria-hidden="true">MPE</div><h1>MPE Asset Location Dashboard</h1><span class="prototype">Proof of concept</span></header>
+  <header class="topbar"><div class="mark" aria-hidden="true">MPE</div><h1>MPE Asset Location Dashboard</h1><span class="prototype">Local save</span></header>
   <main>
     <section class="area" aria-labelledby="workshop-title">
       <div class="area-header"><div class="area-heading"><span class="area-index" aria-hidden="true">01</span><h2 id="workshop-title">Workshop</h2></div><span class="count" id="workshop-count">0 / 9 occupied</span></div>
@@ -96,7 +96,7 @@
         <div class="yard-wrap"><div class="yard" id="yard" aria-label="Welders Yard: click an empty position to add an asset"><div class="yard-hint" id="yard-hint"><span class="plus" aria-hidden="true">+</span><span>Click anywhere to place an asset</span></div></div></div>
       </section>
     </div>
-    <footer><span>Click an empty bay to add an asset. Drag yard assets using their top handle.</span><span>Temporary session · Refreshing clears all assets.</span></footer>
+    <footer><span>Click an empty bay to add an asset. Drag yard assets using their top handle.</span><span id="save-status" role="status" aria-live="polite">Changes save automatically in this browser.</span></footer>
     <p class="sr-only" id="announcement" role="status" aria-live="polite"></p>
   </main>
   <dialog id="edit-dialog" aria-labelledby="edit-title" aria-describedby="edit-location">
@@ -116,7 +116,8 @@
   </dialog>
   <script>
     'use strict';
-    // Session-only state. Replace this with backend loading/saving when ready.
+    // One versioned snapshot, stored only in this browser profile on this origin.
+    const storageKey = 'mpe-204-asset-location-dashboard-v1';
     const state = { workshop: Array(9).fill(null), ech: Array(4).fill(null), yard: [] };
     const echLabels = ['S1', 'S2', 'E1', 'E2'];
     const $ = id => document.getElementById(id);
@@ -127,6 +128,44 @@
     let editing = null, nextId = 1, returnFocus = null;
     const announce = message => { $('announcement').textContent = message; };
     const clamp = (n, min, max) => Math.min(Math.max(n, min), Math.max(min, max));
+    function saveStatus(message, failed = false) {
+      $('save-status').textContent = message;
+      $('save-status').style.color = failed ? '#a33131' : '';
+    }
+    function saveState() {
+      try {
+        localStorage.setItem(storageKey, JSON.stringify({ version: 1, workshop: state.workshop, ech: state.ech, yard: state.yard, yardHeight: yard.clientHeight }));
+        saveStatus(`Saved in this browser · ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
+      } catch (error) {
+        saveStatus('Not saved — browser storage is unavailable or full. Keep this page open.', true);
+      }
+    }
+    function restoreState() {
+      let raw;
+      try { raw = localStorage.getItem(storageKey); }
+      catch (error) { saveStatus('Browser storage is unavailable. Changes may be lost when this page closes.', true); return; }
+      if (raw === null) return;
+      try {
+        const saved = JSON.parse(raw);
+        const validAsset = asset => asset && typeof asset.asset === 'string' && asset.asset.trim().length > 0 && typeof asset.description === 'string';
+        const validBays = (bays, length) => Array.isArray(bays) && bays.length === length && bays.every(asset => asset === null || validAsset(asset));
+        if (!saved || saved.version !== 1 || !validBays(saved.workshop, 9) || !validBays(saved.ech, 4) || !Array.isArray(saved.yard) ||
+            !saved.yard.every(asset => validAsset(asset) && Number.isSafeInteger(asset.id) && asset.id > 0 && asset.id < Number.MAX_SAFE_INTEGER &&
+              Number.isFinite(asset.x) && asset.x >= 0 && asset.x <= 1 && Number.isFinite(asset.y) && asset.y >= 0 && asset.y <= 1) ||
+            new Set(saved.yard.map(asset => asset.id)).size !== saved.yard.length || !Number.isFinite(saved.yardHeight) || saved.yardHeight < cardHeight + 2 * gap) {
+          throw new Error('Invalid dashboard snapshot');
+        }
+        // Validate the complete snapshot before changing the live dashboard.
+        state.workshop = saved.workshop;
+        state.ech = saved.ech;
+        state.yard = saved.yard;
+        nextId = state.yard.reduce((next, asset) => Math.max(next, asset.id + 1), 1);
+        yard.style.height = `${saved.yardHeight}px`;
+        saveStatus('Layout restored · Changes save automatically in this browser.');
+      } catch (error) {
+        saveStatus('Saved layout could not be loaded. Adding or editing assets will replace it.', true);
+      }
+    }
     function locationName(target) {
       return target.area === 'yard' ? 'Welders Yard' : target.area === 'workshop' ? `Workshop · Bay ${target.index + 1}` : `ECH · Bay ${echLabels[target.index]}`;
     }
@@ -258,7 +297,7 @@
         if (event.type === 'pointercancel' || !isFree(p.x, p.y, asset.id)) {
           Object.assign(asset, drag.original); placeCard(card, asset);
           announce('Asset returned to its previous position. Choose an empty space.');
-        } else announce(`${asset.asset} repositioned in Welders Yard.`);
+        } else { saveState(); announce(`${asset.asset} repositioned in Welders Yard.`); }
         drag = null; card.classList.remove('dragging');
       }
       handle.onpointerup = finish; handle.onpointercancel = finish; handle.onlostpointercapture = finish;
@@ -268,7 +307,7 @@
         event.preventDefault(); const p = position(asset); const step = event.shiftKey ? 30 : 10;
         const point = normalise(p.x + direction[0] * step, p.y + direction[1] * step);
         const next = position(point);
-        if (isFree(next.x, next.y, asset.id)) { Object.assign(asset, point); placeCard(card, asset); }
+        if (isFree(next.x, next.y, asset.id)) { Object.assign(asset, point); placeCard(card, asset); saveState(); }
       };
     }
     function renderYard() {
@@ -301,14 +340,14 @@
         if (existing) Object.assign(existing, data);
         else state.yard.push({ ...data, id: nextId++, x: target.x, y: target.y });
       } else state[target.area][target.index] = data;
-      editDialog.close(); render(); focusTarget(target);
+      saveState(); editDialog.close(); render(); focusTarget(target);
       announce(`${data.asset} assigned to ${locationName(target)}.`);
     };
     $('remove-asset').onclick = () => {
       const target = editing, asset = getAsset(target);
       if (target.area === 'yard') state.yard = state.yard.filter(a => a.id !== target.id);
       else state[target.area][target.index] = null;
-      editDialog.close(); render(); focusTarget(target);
+      saveState(); editDialog.close(); render(); focusTarget(target);
       announce(`${asset.asset} removed from ${locationName(target)}.`);
     };
     $('cancel-edit').onclick = () => editDialog.close();
@@ -329,6 +368,7 @@
     new ResizeObserver(() => {
       yard.querySelectorAll('.yard-asset').forEach((card, index) => placeCard(card, state.yard[index]));
     }).observe(yard);
+    restoreState();
     render();
   </script>
 </body>
