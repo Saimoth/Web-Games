@@ -1,1 +1,335 @@
-//
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#142b3c">
+  <title>MPE Asset Location Dashboard</title>
+  <style>
+    :root { color-scheme: light; font-family: Arial, Helvetica, sans-serif; color: #183245; background: #edf1f4; --navy: #142b3c; --muted: #586b7a; --line: #cbd5dd; --accent: #eebd42; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    button, input, textarea { font: inherit; }
+    button { cursor: pointer; }
+    button:focus-visible, [tabindex]:focus-visible { outline: 3px solid #247bb1; outline-offset: 3px; }
+    .topbar { min-height: 92px; background: var(--navy); color: white; display: flex; align-items: center; gap: 18px; padding: 22px 32px; border-bottom: 4px solid var(--accent); }
+    .mark { border: 1px solid #6e818d; border-radius: 5px; padding: 11px 9px; font-size: 16px; font-weight: 800; letter-spacing: .08em; color: var(--accent); }
+    h1 { margin: 0; font-size: clamp(22px, 2.1vw, 32px); font-weight: 700; letter-spacing: -.025em; }
+    .prototype { margin-left: auto; font-size: 14px; color: #d4dfe6; white-space: nowrap; border: 1px solid #526674; border-radius: 30px; padding: 7px 12px; }
+    main { max-width: 1920px; margin: auto; padding: 26px 32px 16px; }
+    .area { background: white; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; box-shadow: 0 2px 3px #19314205; }
+    .area-header { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 18px 20px; border-bottom: 1px solid #dae2e8; }
+    .area-heading { display: flex; align-items: center; gap: 12px; }
+    .area-index { font-size: 13px; color: var(--muted); font-weight: 700; border-right: 1px solid var(--line); padding-right: 12px; }
+    h2 { font-size: 20px; margin: 0; letter-spacing: -.02em; }
+    .count { font-size: 14px; color: var(--muted); white-space: nowrap; }
+    .bays { display: grid; gap: 10px; padding: 16px; }
+    .workshop-bays { grid-template-columns: repeat(9, minmax(0, 1fr)); }
+    .bay { min-width: 0; min-height: 225px; border: 1px solid #bdcad4; border-top: 4px solid #8496a3; border-radius: 5px; background: #f7f9fb; display: flex; flex-direction: column; }
+    .bay-label { padding: 12px 10px; font-size: 14px; font-weight: 700; border-bottom: 1px solid #e0e6eb; color: #486070; }
+    .bay-label strong { color: var(--navy); font-size: 19px; margin-left: 3px; }
+    .empty-bay { flex: 1; width: 100%; padding: 20px 6px; border: 0; background: transparent; color: #596f7f; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; font-size: 14px; border-radius: 3px; }
+    .empty-bay:hover { background: #eaf1f6; color: #163f5a; }
+    .plus { display: block; font-size: 26px; line-height: 32px; font-weight: 400; color: #617887; }
+    .bay.occupied { background: #fff; border-top-color: var(--accent); }
+    .asset-content { display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-width: 0; padding: 14px 6px; }
+    .asset-id { font-size: clamp(20px, 1.9vw, 28px); line-height: 1.15; font-weight: 800; overflow-wrap: anywhere; text-align: center; max-width: 100%; margin-bottom: 4px; }
+    .info-button, .edit-button { font-size: 14px; border-radius: 5px; min-height: 32px; padding: 6px 10px; }
+    .info-button { color: #1d4f6f; background: #eaf1f6; border: 1px solid #d2e0e9; }
+    .info-button:hover { background: #dae8f1; }
+    .info-icon { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid currentColor; font-size: 12px; font-weight: bold; margin-right: 4px; }
+    .edit-button { color: #4e6271; border: 1px solid transparent; background: transparent; }
+    .edit-button:hover { background: #edf1f4; color: var(--navy); }
+    .lower { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 22px; margin-top: 22px; }
+    .ech-bays { grid-template-columns: repeat(4, minmax(0, 1fr)); height: 340px; }
+    .ech-bays .bay { min-height: 240px; }
+    .yard-wrap { overflow: auto; }
+    .yard { position: relative; height: 340px; min-width: 440px; cursor: crosshair; background-color: #f4f7f9; background-image: radial-gradient(#b9c8d2 1px, transparent 1px); background-size: 20px 20px; }
+    .yard-hint { pointer-events: none; position: absolute; inset: 0; display: flex; flex-direction: column; gap: 12px; align-items: center; justify-content: center; color: #526b7b; text-align: center; padding: 20px; font-size: 15px; }
+    .yard-hint .plus { font-size: 32px; border: 1px dashed #8dA3b2; border-radius: 8px; height: 50px; width: 50px; line-height: 46px; }
+    .yard-asset { position: absolute; width: 116px; height: 158px; background: white; border: 1px solid #b6c6d1; border-top: 4px solid var(--accent); border-radius: 6px; box-shadow: 0 3px 7px #20364b12; cursor: default; display: flex; flex-direction: column; }
+    .yard-asset .asset-content { padding: 3px 6px 8px; gap: 2px; }
+    .yard-asset .asset-id { font-size: 22px; max-height: 51px; overflow-y: auto; }
+    .drag-handle { border: 0; border-bottom: 1px solid #edf1f4; background: transparent; height: 23px; flex: 0 0 23px; color: #60798a; cursor: grab; touch-action: none; line-height: 17px; letter-spacing: 3px; border-radius: 3px; }
+    .dragging { z-index: 5; box-shadow: 0 8px 20px #20364b30; }
+    .dragging .drag-handle { cursor: grabbing; }
+    .yard-keyboard { border: 0; background: transparent; color: #1d4f6f; font-size: 14px; padding: 0; text-decoration: underline; text-underline-offset: 3px; }
+    footer { display: flex; justify-content: space-between; gap: 16px; padding: 18px 2px 2px; color: var(--muted); font-size: 14px; line-height: 1.5; }
+    dialog { border: 1px solid #bbcbd7; border-radius: 12px; padding: 0; width: min(540px, calc(100% - 32px)); max-height: calc(100dvh - 40px); color: #183245; box-shadow: 0 24px 80px #10253540; }
+    dialog::backdrop { background: #0e2034a3; }
+    .modal-head { padding: 24px 26px 18px; border-bottom: 1px solid #e0e6eb; }
+    .modal-head h2 { font-size: 24px; }
+    .modal-location { margin: 8px 0 0; color: var(--muted); font-size: 14px; }
+    .modal-body { padding: 22px 26px; }
+    label { display: block; font-size: 15px; font-weight: 700; margin-bottom: 9px; }
+    input, textarea { display: block; width: 100%; border: 1px solid #9db1bf; border-radius: 6px; padding: 12px; color: var(--navy); background: white; font-size: 16px; }
+    input:focus, textarea:focus { outline: 3px solid #247bb130; border-color: #247bb1; }
+    textarea { margin-bottom: 0; min-height: 140px; resize: vertical; line-height: 1.5; }
+    .field + .field { margin-top: 21px; }
+    .modal-actions { padding: 18px 26px; border-top: 1px solid #e0e6eb; display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; background: #f7f9fb; }
+    .button { min-height: 42px; border: 1px solid #b9c7d1; border-radius: 6px; background: white; color: #264253; font-weight: 700; font-size: 15px; padding: 10px 16px; }
+    .button:hover { filter: brightness(.96); }
+    .primary { background: var(--navy); color: white; border-color: var(--navy); }
+    .remove { margin-right: auto; color: #a33131; border-color: transparent; background: transparent; padding-left: 0; }
+    #description-text { margin: 0; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 16px; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
+    [hidden] { display: none !important; }
+    @media (min-width: 1500px) and (min-height: 850px) { .bay { min-height: 275px; } .ech-bays, .yard { height: 390px; } }
+    @media (max-width: 1050px) { main { padding: 20px 16px; } .topbar { padding: 20px 16px; } .bays { gap: 6px; padding: 10px; } .lower { gap: 14px; grid-template-columns: 1fr 1fr; } .bay-label { padding: 12px 6px; } .area-header { padding: 16px 12px; } .info-button { padding: 6px; } }
+    @media (max-width: 800px) { .workshop-bays { grid-template-columns: repeat(3, minmax(0, 1fr)); } .bay { min-height: 190px; } .lower { grid-template-columns: 1fr; } .prototype { display: none; } .topbar { gap: 12px; } footer { flex-direction: column; gap: 4px; } }
+  </style>
+</head>
+<body>
+  <header class="topbar"><div class="mark" aria-hidden="true">MPE</div><h1>MPE Asset Location Dashboard</h1><span class="prototype">Proof of concept</span></header>
+  <main>
+    <section class="area" aria-labelledby="workshop-title">
+      <div class="area-header"><div class="area-heading"><span class="area-index" aria-hidden="true">01</span><h2 id="workshop-title">Workshop</h2></div><span class="count" id="workshop-count">0 / 9 occupied</span></div>
+      <div class="bays workshop-bays" id="workshop-bays"></div>
+    </section>
+    <div class="lower">
+      <section class="area" aria-labelledby="ech-title">
+        <div class="area-header"><div class="area-heading"><span class="area-index" aria-hidden="true">02</span><h2 id="ech-title">ECH</h2></div><span class="count" id="ech-count">0 / 4 occupied</span></div>
+        <div class="bays ech-bays" id="ech-bays"></div>
+      </section>
+      <section class="area" aria-labelledby="yard-title">
+        <div class="area-header"><div class="area-heading"><span class="area-index" aria-hidden="true">03</span><h2 id="yard-title">Welders Yard</h2></div><button class="yard-keyboard" id="add-yard" type="button">+ Add asset</button></div>
+        <div class="yard-wrap"><div class="yard" id="yard" aria-label="Welders Yard: click an empty position to add an asset"><div class="yard-hint" id="yard-hint"><span class="plus" aria-hidden="true">+</span><span>Click anywhere to place an asset</span></div></div></div>
+      </section>
+    </div>
+    <footer><span>Click an empty bay to add an asset. Drag yard assets using their top handle.</span><span>Temporary session · Refreshing clears all assets.</span></footer>
+    <p class="sr-only" id="announcement" role="status" aria-live="polite"></p>
+  </main>
+  <dialog id="edit-dialog" aria-labelledby="edit-title" aria-describedby="edit-location">
+    <form id="asset-form">
+      <div class="modal-head"><h2 id="edit-title">Add asset</h2><p class="modal-location" id="edit-location"></p></div>
+      <div class="modal-body">
+        <div class="field"><label for="asset-input">Asset number</label><input id="asset-input" name="asset" placeholder="e.g. V125, ECH25, T16, RS15" required maxlength="24" autocomplete="off" spellcheck="false"></div>
+        <div class="field"><label for="description-input">Description / reason for visit</label><textarea id="description-input" name="description" placeholder="e.g. Electrical PM, or details of faults and work required"></textarea></div>
+      </div>
+      <div class="modal-actions"><button class="button remove" id="remove-asset" type="button" hidden>Remove asset</button><button class="button" id="cancel-edit" type="button">Cancel</button><button class="button primary" type="submit">Apply</button></div>
+    </form>
+  </dialog>
+  <dialog id="info-dialog" aria-labelledby="info-title" aria-describedby="info-location">
+    <div class="modal-head"><h2 id="info-title"></h2><p class="modal-location" id="info-location"></p></div>
+    <div class="modal-body"><p id="description-text"></p></div>
+    <div class="modal-actions"><button class="button primary" id="close-info" type="button" autofocus>Close</button></div>
+  </dialog>
+  <script>
+    'use strict';
+    // Session-only state. Replace this with backend loading/saving when ready.
+    const state = { workshop: Array(9).fill(null), ech: Array(4).fill(null), yard: [] };
+    const echLabels = ['S1', 'S2', 'E1', 'E2'];
+    const $ = id => document.getElementById(id);
+    const editDialog = $('edit-dialog');
+    const infoDialog = $('info-dialog');
+    const yard = $('yard');
+    const cardWidth = 116, cardHeight = 158, gap = 10;
+    let editing = null, nextId = 1, returnFocus = null;
+    const announce = message => { $('announcement').textContent = message; };
+    const clamp = (n, min, max) => Math.min(Math.max(n, min), Math.max(min, max));
+    function locationName(target) {
+      return target.area === 'yard' ? 'Welders Yard' : target.area === 'workshop' ? `Workshop · Bay ${target.index + 1}` : `ECH · Bay ${echLabels[target.index]}`;
+    }
+    function getAsset(target) {
+      return target.area === 'yard' ? state.yard.find(a => a.id === target.id) : state[target.area][target.index];
+    }
+    function openEditor(target, trigger) {
+      editing = target;
+      returnFocus = trigger || document.activeElement;
+      const asset = getAsset(target);
+      $('edit-title').textContent = asset ? 'Edit asset' : 'Add asset';
+      $('edit-location').textContent = locationName(target);
+      $('asset-input').value = asset?.asset || '';
+      $('asset-input').setCustomValidity('');
+      $('description-input').value = asset?.description || '';
+      $('remove-asset').hidden = !asset;
+      editDialog.showModal();
+      $('asset-input').focus();
+    }
+    function showInfo(target, trigger) {
+      const asset = getAsset(target);
+      if (!asset) return;
+      returnFocus = trigger;
+      $('info-title').textContent = asset.asset;
+      $('info-location').textContent = locationName(target);
+      $('description-text').textContent = asset.description || 'No description added.';
+      infoDialog.showModal();
+    }
+    function assetContent(asset, target) {
+      const content = document.createElement('div');
+      content.className = 'asset-content';
+      const name = document.createElement('div');
+      name.className = 'asset-id';
+      name.textContent = asset.asset;
+      const info = document.createElement('button');
+      info.type = 'button'; info.className = 'info-button';
+      info.innerHTML = '<span class="info-icon" aria-hidden="true">i</span> Info';
+      info.setAttribute('aria-label', `Information for ${asset.asset}`);
+      info.onclick = () => showInfo(target, info);
+      const edit = document.createElement('button');
+      edit.type = 'button'; edit.className = 'edit-button'; edit.textContent = 'Edit';
+      edit.setAttribute('aria-label', `Edit ${asset.asset}`);
+      edit.onclick = () => openEditor(target, edit);
+      content.append(name, info, edit);
+      return content;
+    }
+    function renderBays(area) {
+      const container = $(area + '-bays');
+      container.replaceChildren();
+      state[area].forEach((asset, index) => {
+        const target = { area, index };
+        const bay = document.createElement('div');
+        bay.className = 'bay' + (asset ? ' occupied' : '');
+        const label = document.createElement('div');
+        label.className = 'bay-label';
+        label.innerHTML = `BAY <strong>${area === 'workshop' ? index + 1 : echLabels[index]}</strong>`;
+        bay.append(label);
+        if (asset) bay.append(assetContent(asset, target));
+        else {
+          const add = document.createElement('button');
+          add.type = 'button'; add.className = 'empty-bay';
+          add.innerHTML = '<span class="plus" aria-hidden="true">+</span><span>Add asset</span>';
+          add.setAttribute('aria-label', `Add asset to ${locationName(target)}`);
+          add.onclick = () => openEditor(target, add);
+          bay.append(add);
+        }
+        // The bay label and remaining background are also valid click targets.
+        bay.onclick = event => { if (!event.target.closest('button')) openEditor(target, bay.querySelector('button')); };
+        container.append(bay);
+      });
+      $(area + '-count').textContent = `${state[area].filter(Boolean).length} / ${state[area].length} occupied`;
+    }
+    function position(asset) {
+      return { x: gap + asset.x * Math.max(0, yard.clientWidth - cardWidth - 2 * gap), y: gap + asset.y * Math.max(0, yard.clientHeight - cardHeight - 2 * gap) };
+    }
+    function normalise(x, y) {
+      return { x: clamp((x - gap) / Math.max(1, yard.clientWidth - cardWidth - 2 * gap), 0, 1), y: clamp((y - gap) / Math.max(1, yard.clientHeight - cardHeight - 2 * gap), 0, 1) };
+    }
+    function isFree(x, y, ignoreId) {
+      return state.yard.every(asset => {
+        if (asset.id === ignoreId) return true;
+        const p = position(asset);
+        return x + cardWidth + gap <= p.x || p.x + cardWidth + gap <= x || y + cardHeight + gap <= p.y || p.y + cardHeight + gap <= y;
+      });
+    }
+    function findSpace(x, y) {
+      const maxX = yard.clientWidth - cardWidth - gap, maxY = yard.clientHeight - cardHeight - gap;
+      x = clamp(x, gap, maxX); y = clamp(y, gap, maxY);
+      if (isFree(x, y)) return normalise(x, y);
+      const candidates = [];
+      for (let cy = gap; cy <= maxY; cy += 8) for (let cx = gap; cx <= maxX; cx += 8) {
+        if (isFree(cx, cy)) candidates.push({ x: cx, y: cy, d: (cx-x)**2 + (cy-y)**2 });
+      }
+      candidates.sort((a,b) => a.d-b.d);
+      return candidates.length ? normalise(candidates[0].x, candidates[0].y) : null;
+    }
+    function addYard(x, y, trigger) {
+      let point = findSpace(x, y);
+      if (!point) {
+        // Extend the open yard if all available positions are occupied.
+        const oldPositions = state.yard.map(asset => ({ asset, ...position(asset) }));
+        yard.style.height = `${yard.clientHeight + cardHeight + gap}px`;
+        oldPositions.forEach(p => Object.assign(p.asset, normalise(p.x, p.y)));
+        renderYard();
+        point = findSpace(x, yard.clientHeight - cardHeight - gap);
+      }
+      if (point) openEditor({ area: 'yard', ...point }, trigger);
+    }
+    function placeCard(card, asset) {
+      const p = position(asset);
+      card.style.left = `${p.x}px`; card.style.top = `${p.y}px`;
+    }
+    function attachDrag(card, handle, asset) {
+      let drag = null;
+      handle.onpointerdown = event => {
+        if (event.button !== 0) return;
+        event.preventDefault(); handle.focus();
+        drag = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, original: { x: asset.x, y: asset.y }, ...position(asset) };
+        handle.setPointerCapture(event.pointerId); card.classList.add('dragging');
+      };
+      handle.onpointermove = event => {
+        if (!drag || event.pointerId !== drag.pointerId) return;
+        Object.assign(asset, normalise(drag.x + event.clientX - drag.startX, drag.y + event.clientY - drag.startY));
+        placeCard(card, asset);
+      };
+      function finish(event) {
+        if (!drag) return;
+        const p = position(asset);
+        if (event.type === 'pointercancel' || !isFree(p.x, p.y, asset.id)) {
+          Object.assign(asset, drag.original); placeCard(card, asset);
+          announce('Asset returned to its previous position. Choose an empty space.');
+        } else announce(`${asset.asset} repositioned in Welders Yard.`);
+        drag = null; card.classList.remove('dragging');
+      }
+      handle.onpointerup = finish; handle.onpointercancel = finish; handle.onlostpointercapture = finish;
+      handle.onkeydown = event => {
+        const directions = { ArrowLeft: [-1,0], ArrowRight: [1,0], ArrowUp: [0,-1], ArrowDown: [0,1] };
+        const direction = directions[event.key]; if (!direction) return;
+        event.preventDefault(); const p = position(asset); const step = event.shiftKey ? 30 : 10;
+        const point = normalise(p.x + direction[0] * step, p.y + direction[1] * step);
+        const next = position(point);
+        if (isFree(next.x, next.y, asset.id)) { Object.assign(asset, point); placeCard(card, asset); }
+      };
+    }
+    function renderYard() {
+      yard.querySelectorAll('.yard-asset').forEach(card => card.remove());
+      $('yard-hint').hidden = state.yard.length > 0;
+      state.yard.forEach(asset => {
+        const card = document.createElement('div'); card.className = 'yard-asset';
+        const handle = document.createElement('button'); handle.type = 'button'; handle.className = 'drag-handle'; handle.textContent = '⠿';
+        handle.setAttribute('aria-label', `Move ${asset.asset}. Drag or use arrow keys.`);
+        handle.title = 'Drag to move · Arrow keys when focused';
+        card.append(handle, assetContent(asset, { area: 'yard', id: asset.id }));
+        card.onclick = event => event.stopPropagation();
+        yard.append(card); placeCard(card, asset); attachDrag(card, handle, asset);
+      });
+    }
+    function render() { renderBays('workshop'); renderBays('ech'); renderYard(); }
+    function focusTarget(target) {
+      if (target.area === 'yard') $('add-yard').focus();
+      else $(target.area + '-bays').children[target.index].querySelector('button').focus();
+    }
+    $('asset-input').oninput = () => $('asset-input').setCustomValidity('');
+    $('asset-form').onsubmit = event => {
+      event.preventDefault();
+      const name = $('asset-input').value.trim();
+      if (!name) { $('asset-input').setCustomValidity('Enter an asset number.'); $('asset-input').reportValidity(); return; }
+      const target = editing;
+      const data = { asset: name.toUpperCase(), description: $('description-input').value.trim() };
+      if (target.area === 'yard') {
+        const existing = getAsset(target);
+        if (existing) Object.assign(existing, data);
+        else state.yard.push({ ...data, id: nextId++, x: target.x, y: target.y });
+      } else state[target.area][target.index] = data;
+      editDialog.close(); render(); focusTarget(target);
+      announce(`${data.asset} assigned to ${locationName(target)}.`);
+    };
+    $('remove-asset').onclick = () => {
+      const target = editing, asset = getAsset(target);
+      if (target.area === 'yard') state.yard = state.yard.filter(a => a.id !== target.id);
+      else state[target.area][target.index] = null;
+      editDialog.close(); render(); focusTarget(target);
+      announce(`${asset.asset} removed from ${locationName(target)}.`);
+    };
+    $('cancel-edit').onclick = () => editDialog.close();
+    $('close-info').onclick = () => infoDialog.close();
+    for (const dialog of [editDialog, infoDialog]) {
+      dialog.addEventListener('close', () => { if (returnFocus?.isConnected) returnFocus.focus(); });
+      dialog.addEventListener('click', event => {
+        const r = dialog.getBoundingClientRect();
+        if (event.target === dialog && (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom)) dialog.close();
+      });
+    }
+    yard.onclick = event => {
+      if (event.target.closest('.yard-asset')) return;
+      const r = yard.getBoundingClientRect();
+      addYard(event.clientX - r.left - cardWidth/2, event.clientY - r.top - cardHeight/2, $('add-yard'));
+    };
+    $('add-yard').onclick = () => addYard(gap, gap, $('add-yard'));
+    new ResizeObserver(() => {
+      yard.querySelectorAll('.yard-asset').forEach((card, index) => placeCard(card, state.yard[index]));
+    }).observe(yard);
+    render();
+  </script>
+</body>
+</html>
