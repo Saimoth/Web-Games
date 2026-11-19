@@ -523,9 +523,10 @@ function softwareRenderer() {
         const ux = vertices[b]-vertices[a], uy = vertices[b+1]-vertices[a+1], uz = vertices[b+2]-vertices[a+2];
         const vx = vertices[c]-vertices[a], vy = vertices[c+1]-vertices[a+1], vz = vertices[c+2]-vertices[a+2];
         normal.set(uy*vz-uz*vy, uz*vx-ux*vz, ux*vy-uy*vx).normalize();
-        const faceHeight = (vertices[a+2] + vertices[b+2] + vertices[c+2]) / 3;
-        const shade = (0.62 + 0.50 * Math.max(0, normal.dot(light))) * (0.72 + 0.28 * faceHeight / modelHeight);
-        const red = 108 * shade, green = 189 * shade, blue = 174 * shade;
+        const lightShade = 0.62 + 0.50 * Math.max(0, normal.dot(light));
+        const baseShade = lightShade * (0.72 + 0.28 * vertices[a+2] / modelHeight);
+        const shadeU = lightShade * 0.28 * uz / modelHeight;
+        const shadeV = lightShade * 0.28 * vz / modelHeight;
         const dz1 = screen[b+2] - screen[a+2], dz2 = screen[c+2] - screen[a+2];
         for (let y = y0; y <= y1; y++) {
           const dy = y + 0.5 - ay;
@@ -539,9 +540,10 @@ function softwareRenderer() {
             if (z >= depth[pixel]) continue;
             depth[pixel] = z;
             const color = pixel * 4;
-            pixels.data[color] = red;
-            pixels.data[color+1] = green;
-            pixels.data[color+2] = blue;
+            const shade = baseShade + u*shadeU + v*shadeV;
+            pixels.data[color] = 108 * shade;
+            pixels.data[color+1] = 189 * shade;
+            pixels.data[color+2] = 174 * shade;
             pixels.data[color+3] = 255;
           }
         }
