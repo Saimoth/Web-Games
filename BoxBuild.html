@@ -1,1 +1,723 @@
-//
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111923">
+<title>BoxBuild — Enclosure designer</title>
+<style>
+:root{color-scheme:dark;--bg:#111923;--card:#1a2532;--line:#364658;--ink:#edf5fc;--muted:#b0c0d0;--mint:#9aebd1;--dark:#112820}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,sans-serif}
+button,input,select{font:inherit}
+button{cursor:pointer}
+button,input,select{border:1px solid var(--line);border-radius:9px;min-height:44px}
+button{padding:0 12px;color:var(--ink);background:#263545;font-weight:650}
+button:hover{border-color:var(--mint)}
+button:disabled{opacity:.5;cursor:default}
+:focus-visible{outline:2px solid var(--mint);outline-offset:2px}
+header,main{width:min(1320px,100%);margin:auto;padding:0 24px}
+header{min-height:84px;display:flex;align-items:center;justify-content:space-between;gap:15px}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{display:grid;place-items:center;width:43px;height:43px;background:var(--mint);color:var(--dark);border-radius:11px}
+h1,h2,p{margin:0}
+h1{font-size:1.36rem;line-height:1.1;letter-spacing:-.035em}
+h2{font-size:1.06rem;letter-spacing:-.015em}
+.subtitle,.hint,.measure{color:var(--muted);font-size:.83rem}
+.subtitle{display:block;margin-top:3px}
+.exports,.toolbar,.row-actions{display:flex;gap:8px}
+.primary{background:var(--mint);color:var(--dark);border-color:var(--mint)}
+main{display:grid;grid-template-columns:minmax(0,1fr) minmax(340px,395px);gap:20px;align-items:start;padding-bottom:max(20px,env(safe-area-inset-bottom))}
+.viewer,.card{border:1px solid var(--line);border-radius:15px;overflow:hidden;background:var(--card)}
+.viewer{position:sticky;top:16px}
+.panel-head,.viewer-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 15px}
+.viewer-foot{min-height:47px;border-top:1px solid var(--line);flex-wrap:wrap}
+#viewport{position:relative;height:clamp(340px,66vh,720px);background:#121c28;overflow:hidden}
+canvas{display:block;width:100%;height:100%;touch-action:pan-y}
+#viewport.placing canvas{cursor:crosshair}
+#viewport-message{position:absolute;inset:0;display:grid;place-items:center;text-align:center;color:var(--muted);padding:20px;pointer-events:none}
+#viewport-message[hidden]{display:none}
+#status.error{color:#ffc0aa}
+#status:empty{display:none}
+.editor{display:grid;gap:14px;min-width:0}
+.card{padding:15px}
+.card>.hint{margin-top:5px}
+.fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;margin-top:13px}
+label.field{display:grid;align-content:start;gap:4px;font-size:.84rem;font-weight:600;color:#d6e2ef}
+input:not([type=checkbox]),select{width:100%;background:#111c27;color:var(--ink);padding:6px 9px;font-size:16px;font-variant-numeric:tabular-nums}
+.check{display:flex;align-items:center;gap:9px;min-height:44px;margin-top:7px;font-size:.9rem}
+.check input{accent-color:var(--mint);width:18px;height:18px;min-height:0}
+[aria-invalid=true]{border-color:#ffac92!important}
+.inline{display:flex;align-items:center;justify-content:space-between;gap:8px}
+#features{display:grid;gap:9px;margin-top:12px}
+.feature{background:#202e3d;border:1px solid var(--line);border-radius:10px}
+.feature[open]{padding-bottom:11px}
+summary{cursor:pointer;padding:10px 11px;min-height:44px;font-weight:650}
+.feature .fields,.feature .check,.feature .row-actions{margin-left:11px;margin-right:11px}
+.row-actions{margin-top:9px;justify-content:space-between}
+.danger{color:#ffb8a6}
+.place[aria-pressed=true]{background:var(--mint);color:var(--dark)}
+#empty{margin-top:10px}
+@media(max-width:790px){
+header,main{padding-left:12px;padding-right:12px}
+header{min-height:68px}
+main{grid-template-columns:1fr;gap:12px}
+.viewer{position:static}
+#viewport{height:clamp(245px,41dvh,490px)}
+.panel-head,.viewer-foot{padding:7px 10px}
+.card{padding:12px}
+}
+@media(max-width:365px){.subtitle{display:none}.brand{gap:7px}.exports{gap:5px}.exports button{padding:0 8px}}
+</style>
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js"}}
+</script>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <span class="logo" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 2 22 7.5v9L12 22 2 16.5v-9L12 2Z M2 7.5 12 13l10-5.5 M12 13v9 M7 4.75l10 5.5"/></svg></span>
+    <div><h1>BoxBuild</h1><span class="subtitle">Enclosure designer</span></div>
+  </div>
+  <div class="exports" aria-label="Download model">
+    <button class="primary" data-format="stl" disabled>↓ STL</button>
+    <button data-format="obj" disabled>↓ OBJ</button>
+  </div>
+</header>
+<main>
+  <section class="viewer" aria-label="Model preview">
+    <div class="panel-head"><h2>3D preview</h2><div class="toolbar">
+      <button id="top" disabled>Top</button><button id="fit" disabled>Fit 3D</button>
+    </div></div>
+    <div id="viewport"><div id="viewport-message">Loading 3D tools…</div></div>
+    <div class="viewer-foot"><span id="measure" class="measure"></span><span id="status" class="hint" role="status" aria-live="polite"></span></div>
+  </section>
+  <div class="editor">
+    <section class="card" aria-labelledby="enclosure-title">
+      <h2 id="enclosure-title">Enclosure</h2>
+      <p class="hint">Inside dimensions are measured from the floor and walls. Corner radius is measured on the outside.</p>
+      <div id="dimensions" class="fields"></div>
+    </section>
+    <section class="card" aria-labelledby="features-title">
+      <h2 id="features-title">Mounting points</h2>
+      <p class="hint">X and Y are measured to the centre of each post from the inside left and front walls.</p>
+      <div class="toolbar" style="margin-top:12px">
+        <button data-add="standoff">+ Stand-off</button><button data-add="column">+ Lid column</button>
+      </div>
+      <div id="features"></div>
+      <p id="empty" class="hint">Add a stand-off for a PCB or a full-height column for a lid screw.</p>
+    </section>
+    <section class="card" aria-labelledby="design-title">
+      <h2 id="design-title">Design file</h2>
+      <p class="hint">Save an editable copy to open on another device. Your latest valid design also stays in this browser.</p>
+      <div class="toolbar" style="margin-top:12px">
+        <button id="save-design" disabled>Save design</button><button id="open-design">Open design</button>
+        <input id="design-file" type="file" accept=".json,application/json" hidden>
+      </div>
+      <p id="file-status" class="hint" role="status"></p>
+    </section>
+  </div>
+</main>
+<script>
+window.setTimeout(() => {
+  if (!window.boxBuildStarted) {
+    document.querySelector('#viewport-message').textContent = 'Could not load the 3D tools. Check your connection and reload.';
+  }
+}, 12000);
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/controls/OrbitControls.js';
+import createManifold from 'https://cdn.jsdelivr.net/npm/manifold-3d@3.2.1/manifold.js';
+
+const byId = id => document.getElementById(id);
+const defaults = { width: 80, depth: 55, height: 26, wall: 2, floor: 2, radius: 4, divisions: 8 };
+const dimensionFields = [
+  ['width', 'Inside width (mm)', 5, 1000, 0.1],
+  ['depth', 'Inside depth (mm)', 5, 1000, 0.1],
+  ['height', 'Inside height (mm)', 1, 500, 0.1],
+  ['wall', 'Wall thickness (mm)', 0.4, 50, 0.1],
+  ['floor', 'Floor thickness (mm)', 0.4, 50, 0.1],
+  ['radius', 'Corner radius (mm)', 0, 550, 0.1],
+  ['divisions', 'Divisions per corner', 1, 48, 1],
+];
+const storageKey = 'boxbuild.design.v1';
+function loadDesign() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(storageKey));
+    if (saved?.dimensions && Array.isArray(saved.posts)) {
+      return { dimensions: { ...defaults, ...saved.dimensions }, posts: saved.posts };
+    }
+  } catch {}
+  return { dimensions: { ...defaults }, posts: [] };
+}
+let design = loadDesign();
+const viewport = byId('viewport');
+const previewMessage = byId('viewport-message');
+const status = byId('status');
+const downloadButtons = [...document.querySelectorAll('[data-format], #save-design')];
+let currentMesh, kernel, preview, placing, pendingUpdate;
+let view = '3d';
+
+function numberField([key, name, min, max, step], data, update) {
+  const label = document.createElement('label');
+  label.className = 'field';
+  label.textContent = name;
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.inputMode = step === 1 ? 'numeric' : 'decimal';
+  Object.assign(input, { min, max, step: step === 1 ? 1 : 'any', value: data[key], required: true });
+  input.dataset.key = key;
+  input.addEventListener('input', () => {
+    data[key] = input.valueAsNumber;
+    update?.();
+    queueUpdate();
+  });
+  label.append(input);
+  return label;
+}
+
+function renderDimensions() {
+  byId('dimensions').replaceChildren(...dimensionFields.map(field => numberField(field, design.dimensions)));
+}
+renderDimensions();
+
+function postFields(post) {
+  const fields = [
+    ['x', 'X from left (mm)', 0, 1000, 0.1],
+    ['y', 'Y from front (mm)', 0, 1000, 0.1],
+    ['diameter', 'Outside diameter (mm)', 1, 100, 0.1],
+    ['hole', 'Pilot hole Ø (mm)', 0, 98, 0.1],
+  ];
+  if (post.type === 'standoff') fields.push(['height', 'Height above floor (mm)', 0.5, 500, 0.1]);
+  return fields;
+}
+
+function renderPosts(openPost) {
+  const container = byId('features');
+  container.replaceChildren();
+  let standOffs = 0, columns = 0;
+  for (const post of design.posts) {
+    const column = post.type === 'column';
+    const row = document.createElement('details');
+    row.className = 'feature';
+    row.open = post === openPost;
+    const summary = document.createElement('summary');
+    const name = column ? `Lid column ${++columns}` : `Stand-off ${++standOffs}`;
+    const updateSummary = () => {
+      summary.textContent = `${name} · ${Number.isFinite(post.x) ? post.x : '–'}, ${Number.isFinite(post.y) ? post.y : '–'} mm`;
+    };
+    post.label = name;
+    updateSummary();
+    row.append(summary);
+    const fields = document.createElement('div');
+    fields.className = 'fields';
+    for (const field of postFields(post)) fields.append(numberField(field, post, updateSummary));
+    row.append(fields);
+    if (column) {
+      const label = document.createElement('label');
+      label.className = 'check';
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.checked = post.reinforce;
+      checkbox.addEventListener('change', () => {
+        post.reinforce = checkbox.checked;
+        sideLabel.hidden = !checkbox.checked;
+        queueUpdate();
+      });
+      label.append(checkbox, ' Fill gap to wall');
+      row.append(label);
+      const sideLabel = document.createElement('div');
+      sideLabel.style.margin = '0 11px 8px';
+      sideLabel.hidden = !checkbox.checked;
+      const sideField = document.createElement('label');
+      sideField.className = 'field';
+      sideField.textContent = 'Join to';
+      const select = document.createElement('select');
+      for (const [value, title] of [
+        ['auto','Nearest wall(s)'], ['left','Left'], ['right','Right'], ['front','Front'], ['back','Back'],
+        ['front-left','Front and left'], ['front-right','Front and right'],
+        ['back-left','Back and left'], ['back-right','Back and right'],
+      ]) select.add(new Option(title, value));
+      select.value = post.side || 'auto';
+      select.addEventListener('change', () => {
+        post.side = select.value;
+        queueUpdate();
+      });
+      sideField.append(select);
+      sideLabel.append(sideField);
+      row.append(sideLabel);
+    }
+    const actions = document.createElement('div');
+    actions.className = 'row-actions';
+    const place = document.createElement('button');
+    place.className = 'place';
+    place.textContent = 'Place on preview';
+    place.disabled = !preview;
+    place.setAttribute('aria-pressed', 'false');
+    place.addEventListener('click', () => {
+      if (placing?.post === post) {
+        stopPlacing();
+        return;
+      }
+      stopPlacing();
+      placing = { post, button: place, row, updateSummary };
+      place.setAttribute('aria-pressed', 'true');
+      viewport.classList.add('placing');
+      setView('top');
+      showStatus('Tap inside the box to set the post centre.');
+      viewport.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    });
+    const remove = document.createElement('button');
+    remove.className = 'danger';
+    remove.textContent = 'Remove';
+    remove.setAttribute('aria-label', `Remove ${name}`);
+    remove.addEventListener('click', () => {
+      stopPlacing(false);
+      design.posts.splice(design.posts.indexOf(post), 1);
+      renderPosts();
+      queueUpdate();
+    });
+    actions.append(place, remove);
+    row.append(actions);
+    container.append(row);
+  }
+  byId('empty').hidden = design.posts.length > 0;
+}
+
+function nextPost(type) {
+  const { width, depth, height, radius, wall } = design.dimensions;
+  const diameter = 5;
+  const inset = Math.max(4, Math.max(0, radius - wall) * (1 - Math.SQRT1_2) + diameter / 2 + 1);
+  const round = value => Math.round(value * 100) / 100;
+  const atX = fraction => round(Math.min(width, Math.max(0, width * fraction))) || 0;
+  const atY = fraction => round(Math.min(depth, Math.max(0, depth * fraction))) || 0;
+  const left = round(Math.min(width / 2, inset)) || 0;
+  const front = round(Math.min(depth / 2, inset)) || 0;
+  const defaults = type === 'column'
+    ? [[left, front], [round(width - left), front], [round(width - left), round(depth - front)], [left, round(depth - front)]]
+    : [[atX(.27), atY(.27)], [atX(.73), atY(.27)], [atX(.73), atY(.73)], [atX(.27), atY(.73)]];
+  const [x, y] = defaults.find(([x, y]) => design.posts.every(post =>
+    Math.hypot(post.x - x, post.y - y) > (post.diameter + diameter) / 2
+  )) || [atX(.5), atY(.5)];
+  return { type, x, y, diameter, height: Math.min(5, height) || 5,
+    hole: type === 'column' ? 2.5 : 0, reinforce: false, side: 'auto' };
+}
+
+for (const button of document.querySelectorAll('[data-add]')) {
+  button.addEventListener('click', () => {
+    stopPlacing(false);
+    const post = nextPost(button.dataset.add);
+    design.posts.push(post);
+    renderPosts(post);
+    queueUpdate();
+  });
+}
+
+function stopPlacing(announce = true) {
+  if (!placing) return;
+  placing.button.setAttribute('aria-pressed', 'false');
+  placing = null;
+  viewport.classList.remove('placing');
+  if (announce && currentMesh) showStatus(previewHint());
+}
+
+function showStatus(message, error = false) {
+  status.textContent = message;
+  status.classList.toggle('error', error);
+}
+
+function validateDesign() {
+  for (const input of document.querySelectorAll('[aria-invalid]')) input.removeAttribute('aria-invalid');
+  const d = design.dimensions;
+  function fieldsValid(fields, values, container, prefix) {
+    for (const [key, label, min, max, step] of fields) {
+      const value = values[key];
+      if (!Number.isFinite(value) || value < min || value > max || (step === 1 && !Number.isInteger(value))) {
+        container.querySelector(`[data-key="${key}"]`)?.setAttribute('aria-invalid','true');
+        throw new Error(`${prefix}${label} must be ${step === 1 ? 'a whole number ' : ''}between ${min} and ${max}.`);
+      }
+    }
+  }
+  fieldsValid(dimensionFields, d, byId('dimensions'), '');
+  const maxRadius = Math.min(d.width, d.depth) / 2 + d.wall;
+  if (d.radius > maxRadius) {
+    byId('dimensions').querySelector('[data-key="radius"]').setAttribute('aria-invalid','true');
+    throw new Error(`Corner radius must be at most ${formatNumber(maxRadius)} mm.`);
+  }
+  const inner = roundedRectangle(0, 0, d.width, d.depth, Math.max(0, d.radius - d.wall), d.divisions);
+  const rows = byId('features').children;
+  for (const [index, post] of design.posts.entries()) {
+    const row = rows[index];
+    fieldsValid(postFields(post), post, row, `${post.label}: `);
+    const invalid = (keys, message) => {
+      for (const key of keys) row.querySelector(`[data-key="${key}"]`).setAttribute('aria-invalid','true');
+      throw new Error(`${post.label}: ${message}`);
+    };
+    if (!insideProfile(post.x, post.y, inner)) invalid(['x','y'], 'Move the centre inside the enclosure.');
+    if (post.type === 'standoff' && post.height > d.height) invalid(['height'], 'Height exceeds the inside height.');
+    if (post.hole > 0 && post.hole > post.diameter - 0.8) invalid(['hole'], 'Leave at least 0.4 mm of material around the pilot hole.');
+    if (post.hole > 0 && !insideProfile(post.x, post.y, inner, post.hole / 2)) {
+      invalid(['x','y','hole'], 'Move the pilot hole clear of the inside wall.');
+    }
+    for (const other of design.posts.slice(0, index)) {
+      const distance = Math.hypot(post.x - other.x, post.y - other.y);
+      if (distance < (post.diameter + other.diameter) / 2 + 0.01) {
+        invalid(['x','y'], `Move the post clear of ${other.label.toLowerCase()}.`);
+      }
+    }
+  }
+}
+
+function formatNumber(value) {
+  return Number(value.toFixed(3)).toString();
+}
+
+function roundedRectangle(x, y, width, depth, radius, divisions) {
+  if (!radius) return [[x,y],[x+width,y],[x+width,y+depth],[x,y+depth]];
+  const centres = [[x+width-radius,y+radius],[x+width-radius,y+depth-radius],
+    [x+radius,y+depth-radius],[x+radius,y+radius]];
+  const points = [];
+  for (const [corner, [cx, cy]] of centres.entries()) {
+    for (let step = 0; step <= divisions; step++) {
+      const angle = (corner - 1 + step / divisions) * Math.PI / 2;
+      const point = [cx + radius * Math.cos(angle), cy + radius * Math.sin(angle)];
+      const previous = points.at(-1);
+      if (!previous || Math.hypot(point[0] - previous[0], point[1] - previous[1]) > 1e-8) points.push(point);
+    }
+  }
+  if (Math.hypot(points[0][0] - points.at(-1)[0], points[0][1] - points.at(-1)[1]) < 1e-8) points.pop();
+  return points;
+}
+
+function insideProfile(x, y, points, margin = 0) {
+  return points.every(([ax, ay], index) => {
+    const [bx, by] = points[(index + 1) % points.length];
+    const dx = bx - ax, dy = by - ay;
+    return dx * (y - ay) - dy * (x - ax) >= Math.hypot(dx, dy) * margin - 1e-8;
+  });
+}
+
+function buildMesh({ CrossSection, Manifold }, { dimensions: d, posts }) {
+  const owned = [];
+  const keep = object => { owned.push(object); return object; };
+  const w = d.wall;
+  const top = d.height + d.floor;
+  const overlap = Math.min(0.05, d.floor / 4);
+  try {
+    const prism = (outline, height, z = 0) => {
+      const shape = keep(CrossSection.ofPolygons([outline]));
+      const extruded = keep(shape.extrude(height));
+      return z ? keep(extruded.translate([0, 0, z])) : extruded;
+    };
+    const outer = prism(roundedRectangle(-w, -w, d.width + 2*w, d.depth + 2*w, d.radius, d.divisions), top);
+    const opening = prism(roundedRectangle(0, 0, d.width, d.depth, Math.max(0, d.radius - w), d.divisions), d.height + overlap, d.floor);
+    const shell = keep(outer.subtract(opening));
+    const cylinder = (height, radius, x, y, z) => {
+      const solid = keep(Manifold.cylinder(height, radius, radius, 48));
+      return keep(solid.translate([x, y, z]));
+    };
+    const pieces = [shell];
+    const holes = [];
+    for (const post of posts) {
+      const { x, y, diameter, type, reinforce, hole, side } = post;
+      const height = type === 'column' ? d.height : post.height;
+      const solids = [cylinder(height + overlap, diameter / 2, x, y, d.floor - overlap)];
+      if (type === 'column' && reinforce) {
+        const gaps = { left: x, right: d.width - x, front: y, back: d.depth - y };
+        const closest = Math.min(...Object.values(gaps));
+        const sides = side && /^(left|right|front|back|front-left|front-right|back-left|back-right)$/.test(side) ? side.split('-') : Object.keys(gaps).filter(key => gaps[key] <= closest + 1);
+        for (const wall of sides) {
+          const half = diameter / 2;
+          const vertical = wall === 'left' || wall === 'right';
+          const x0 = vertical ? (wall === 'left' ? -w : x) : x - half;
+          const x1 = vertical ? (wall === 'left' ? x : d.width + w) : x + half;
+          const y0 = vertical ? y - half : (wall === 'front' ? -w : y);
+          const y1 = vertical ? y + half : (wall === 'front' ? y : d.depth + w);
+          const block = keep(Manifold.cube([x1-x0, y1-y0, height + overlap]));
+          solids.push(keep(block.translate([x0, y0, d.floor-overlap])));
+        }
+      }
+      const postSolid = solids.length === 1 ? solids[0] : keep(Manifold.union(solids));
+      pieces.push(keep(postSolid.intersect(outer)));
+      if (hole > 0) holes.push(cylinder(height + overlap, hole / 2, x, y, d.floor));
+    }
+    const joined = pieces.length === 1 ? shell : keep(Manifold.union(pieces));
+    const box = holes.length ? keep(joined.subtract(keep(Manifold.union(holes)))) : joined;
+    if (box.status() !== 'NoError' || box.isEmpty()) throw new Error('These dimensions could not produce a solid model.');
+    const mesh = box.getMesh();
+    const vertices = new Float32Array(mesh.numVert * 3);
+    for (let index = 0; index < mesh.numVert; index++) {
+      const base = index * mesh.numProp;
+      vertices.set(mesh.vertProperties.subarray(base, base + 3), index * 3);
+    }
+    return { vertices, indices: new Uint32Array(mesh.triVerts) };
+  } finally {
+    for (const object of owned.reverse()) object.delete();
+  }
+}
+
+function makePreview() {
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setClearColor(0x121c28);
+  renderer.domElement.setAttribute('aria-label', 'Interactive 3D model. Drag to rotate, pinch or scroll to zoom.');
+  viewport.prepend(renderer.domElement);
+  const scene = new THREE.Scene();
+  const camera = new THREE.OrthographicCamera(-50, 50, 50, -50, 0.1, 10000);
+  camera.up.set(0, 0, 1);
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = false;
+  controls.minZoom = 0.15;
+  controls.maxZoom = 12;
+  const render = () => renderer.render(scene, camera);
+  controls.addEventListener('change', render);
+  scene.add(new THREE.HemisphereLight(0xdbeaff, 0x687b86, 2.3));
+  const key = new THREE.DirectionalLight(0xfff1df, 2.45);
+  key.position.set(-1, -2, 3);
+  scene.add(key);
+  const fill = new THREE.DirectionalLight(0x7bb5ec, 1.25);
+  fill.position.set(2, 1, 2);
+  scene.add(fill);
+  const material = new THREE.MeshStandardMaterial({ color: 0x63baa9, roughness: 0.82, flatShading: true });
+  const model = new THREE.Mesh(new THREE.BufferGeometry(), material);
+  const edges = new THREE.LineSegments(new THREE.BufferGeometry(),
+    new THREE.LineBasicMaterial({ color: 0x183b3b, transparent: true, opacity: 0.48 }));
+  scene.add(model, edges);
+  const grid = new THREE.GridHelper(1, 22, 0x42576b, 0x263747);
+  grid.rotation.x = Math.PI / 2;
+  grid.position.z = -0.07;
+  scene.add(grid);
+  const ray = new THREE.Raycaster();
+  const projection = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+  let sceneSize = 85;
+  let aspect = 1;
+
+  const updateFrustum = () => {
+    const halfHeight = sceneSize * 0.67 * Math.max(1, 1 / aspect);
+    camera.left = -halfHeight * aspect;
+    camera.right = halfHeight * aspect;
+    camera.top = halfHeight;
+    camera.bottom = -halfHeight;
+    camera.updateProjectionMatrix();
+  };
+
+  new ResizeObserver(() => {
+    const { clientWidth, clientHeight } = viewport;
+    if (!clientWidth || !clientHeight) return;
+    aspect = clientWidth / clientHeight;
+    renderer.setSize(clientWidth, clientHeight, false);
+    updateFrustum();
+    render();
+  }).observe(viewport);
+
+  renderer.domElement.addEventListener('click', event => {
+    if (!placing) return;
+    const bounds = renderer.domElement.getBoundingClientRect();
+    ray.setFromCamera({
+      x: (event.clientX - bounds.left) / bounds.width * 2 - 1,
+      y: -(event.clientY - bounds.top) / bounds.height * 2 + 1,
+    }, camera);
+    const point = ray.ray.intersectPlane(projection, new THREE.Vector3());
+    const { width, depth, radius, wall, divisions } = design.dimensions;
+    if (!point || !insideProfile(point.x, point.y, roundedRectangle(0, 0, width, depth, Math.max(0, radius - wall), divisions))) {
+      showStatus('Tap inside the box to set the post centre.');
+      return;
+    }
+    const { post, row, updateSummary } = placing;
+    post.x = Number(point.x.toFixed(2));
+    post.y = Number(point.y.toFixed(2));
+    row.querySelector('[data-key="x"]').value = post.x;
+    row.querySelector('[data-key="y"]').value = post.y;
+    updateSummary();
+    stopPlacing(false);
+    renderModel();
+    if (matchMedia('(max-width: 790px)').matches) row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  });
+
+  return {
+    setMesh(mesh) {
+      model.geometry.dispose();
+      edges.geometry.dispose();
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.BufferAttribute(mesh.vertices, 3));
+      geometry.setIndex(new THREE.BufferAttribute(mesh.indices, 1));
+      geometry.computeVertexNormals();
+      model.geometry = geometry;
+      edges.geometry = new THREE.EdgesGeometry(geometry, 26);
+      geometry.computeBoundingBox();
+      const bounds = geometry.boundingBox;
+      const size = bounds.getSize(new THREE.Vector3());
+      grid.position.set((bounds.min.x + bounds.max.x) / 2, (bounds.min.y + bounds.max.y) / 2, -0.07);
+      grid.scale.setScalar(Math.max(size.x, size.y) * 3);
+      render();
+    },
+    fit(mode) {
+      const { width, depth, height, wall, floor } = design.dimensions;
+      sceneSize = Math.max(width + 2*wall, depth + 2*wall, height + floor);
+      controls.target.set(width / 2, depth / 2, (height + floor) / 2);
+      const direction = mode === 'top' ? new THREE.Vector3(0, -0.00001, 1) : new THREE.Vector3(0.85, -1.25, 1.02);
+      camera.position.copy(controls.target).addScaledVector(direction.normalize(), sceneSize * 3);
+      camera.zoom = 1;
+      controls.enableRotate = mode !== 'top';
+      updateFrustum();
+      controls.update();
+      render();
+    },
+  };
+}
+
+function setView(mode) {
+  if (!preview || !currentMesh) return;
+  view = mode;
+  preview.fit(mode);
+  byId('top').setAttribute('aria-pressed', String(mode === 'top'));
+  showStatus(previewHint());
+}
+
+function previewHint() {
+  if (placing) return 'Tap inside the box to set the post centre.';
+  if (!preview) return 'Model ready to export.';
+  return view === 'top' ? 'Top view · Pinch or scroll to zoom' : 'Drag to orbit · Pinch or scroll to zoom';
+}
+
+function queueUpdate() {
+  clearTimeout(pendingUpdate);
+  for (const button of downloadButtons) button.disabled = true;
+  pendingUpdate = setTimeout(renderModel, 110);
+}
+
+let previousSize;
+function renderModel() {
+  clearTimeout(pendingUpdate);
+  if (!kernel) return;
+  const d = design.dimensions;
+  try {
+    validateDesign();
+    currentMesh = buildMesh(kernel, design);
+    try { localStorage.setItem(storageKey, JSON.stringify(design)); } catch {}
+    if (preview) {
+      preview.setMesh(currentMesh);
+      const size = [d.width, d.depth, d.height, d.wall, d.floor].join(',');
+      if (size !== previousSize) setView(view);
+      previousSize = size;
+      byId('top').disabled = false;
+      byId('fit').disabled = false;
+    }
+    byId('measure').textContent = `${[d.width + 2*d.wall, d.depth + 2*d.wall, d.height + d.floor].map(formatNumber).join(' × ')} mm outside`;
+    showStatus(previewHint());
+  } catch (error) {
+    currentMesh = null;
+    byId('measure').textContent = preview && previousSize ? 'Showing last valid model' : '';
+    showStatus(error.message || 'Check the highlighted dimensions.', true);
+  }
+  for (const button of downloadButtons) button.disabled = !currentMesh;
+}
+
+function makeSTL({ vertices, indices }) {
+  const faces = indices.length / 3;
+  const buffer = new ArrayBuffer(84 + faces * 50);
+  const data = new DataView(buffer);
+  new Uint8Array(buffer).set(new TextEncoder().encode('BoxBuild | dimensions in mm'));
+  data.setUint32(80, faces, true);
+  for (let i = 0; i < indices.length; i += 3) {
+    const a = indices[i] * 3, b = indices[i + 1] * 3, c = indices[i + 2] * 3;
+    const ux = vertices[b]-vertices[a], uy = vertices[b+1]-vertices[a+1], uz = vertices[b+2]-vertices[a+2];
+    const vx = vertices[c]-vertices[a], vy = vertices[c+1]-vertices[a+1], vz = vertices[c+2]-vertices[a+2];
+    const normal = [uy*vz-uz*vy, uz*vx-ux*vz, ux*vy-uy*vx];
+    const length = Math.hypot(...normal) || 1;
+    let offset = 84 + (i / 3) * 50;
+    for (const component of normal) {
+      data.setFloat32(offset, component / length, true);
+      offset += 4;
+    }
+    for (const index of [a, b, c]) {
+      for (let axis = 0; axis < 3; axis++) {
+        data.setFloat32(offset, vertices[index + axis], true);
+        offset += 4;
+      }
+    }
+  }
+  return buffer;
+}
+
+function makeOBJ({ vertices, indices }) {
+  const rows = ['# BoxBuild | coordinates in millimetres', 'o Enclosure'];
+  for (let i = 0; i < vertices.length; i += 3) rows.push(`v ${vertices[i]} ${vertices[i+1]} ${vertices[i+2]}`);
+  for (let i = 0; i < indices.length; i += 3) rows.push(`f ${indices[i]+1} ${indices[i+1]+1} ${indices[i+2]+1}`);
+  return rows.join('\n') + '\n';
+}
+
+function downloadFile(data, extension, mimeType) {
+  const url = URL.createObjectURL(new Blob([data], { type: mimeType }));
+  const link = document.createElement('a');
+  link.href = url;
+  const { width, depth, height } = design.dimensions;
+  link.download = `BoxBuild-${width}x${depth}x${height}mm.${extension}`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+for (const button of document.querySelectorAll('[data-format]')) button.addEventListener('click', () => {
+  if (!currentMesh) return;
+  const { format } = button.dataset;
+  downloadFile(format === 'stl' ? makeSTL(currentMesh) : makeOBJ(currentMesh), format, 'application/octet-stream');
+});
+
+byId('save-design').addEventListener('click', () => {
+  if (currentMesh) downloadFile(JSON.stringify({ ...design, version: 1 }, null, 2), 'json', 'application/json');
+});
+const fileInput = byId('design-file');
+byId('open-design').addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', async () => {
+  const file = fileInput.files[0];
+  if (!file) return;
+  fileInput.value = '';
+  const message = byId('file-status');
+  try {
+    const saved = JSON.parse(await file.text());
+    const hasNumbers = (data, fields) => data && fields.every(([key]) => Number.isFinite(data[key]));
+    if (saved?.version !== 1 || !hasNumbers(saved.dimensions, dimensionFields) || !Array.isArray(saved.posts)
+      || !saved.posts.every(post => post && ['standoff', 'column'].includes(post.type) && hasNumbers(post, postFields(post)))) {
+      throw new Error('That file is not a BoxBuild design.');
+    }
+    stopPlacing(false);
+    design = { dimensions: saved.dimensions, posts: saved.posts };
+    renderDimensions();
+    renderPosts();
+    renderModel();
+    message.textContent = currentMesh ? `Opened ${file.name}.` : 'Design opened. Check the highlighted dimensions.';
+  } catch (error) {
+    message.textContent = error instanceof SyntaxError ? 'That file is not a BoxBuild design.' : error.message;
+  }
+});
+
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape') stopPlacing();
+});
+byId('top').addEventListener('click', () => setView('top'));
+byId('fit').addEventListener('click', () => {
+  stopPlacing();
+  setView('3d');
+});
+renderPosts();
+try {
+  kernel = await createManifold();
+  kernel.setup();
+  window.boxBuildStarted = true;
+  try {
+    preview = makePreview();
+    previewMessage.hidden = true;
+  } catch {
+    previewMessage.textContent = '3D preview needs WebGL. You can still edit and export your box.';
+  }
+  for (const button of document.querySelectorAll('.place')) button.disabled = !preview;
+  renderModel();
+} catch {
+  window.boxBuildStarted = true;
+  previewMessage.textContent = 'Could not load the model generator. Check your connection and reload.';
+}
+</script>
+</body>
+</html>
