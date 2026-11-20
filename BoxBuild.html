@@ -129,6 +129,10 @@ main{grid-template-columns:1fr;gap:12px}
       <h2 id="lid-title">Lid</h2>
       <div id="lid-settings"></div>
     </section>
+    <section class="card" aria-labelledby="cable-title">
+      <h2 id="cable-title">Cable entry</h2>
+      <div id="cable-settings"></div>
+    </section>
     <section class="card" aria-labelledby="design-title">
       <h2 id="design-title">Design file</h2>
       <p class="hint">Save an editable copy to open on another device. Your latest valid design also stays in this browser.</p>
@@ -164,6 +168,12 @@ const dimensionFields = [
   ['radius', 'Corner radius (mm)', 0, 550, 0.1],
 ];
 const storageKey = 'boxbuild.design.v1';
+const cableDefaults = { enabled: false, side: 'top', diameter: 4.4, offset: 0 };
+const cableSides = [['top','Top'], ['bottom','Bottom'], ['left','Left'], ['right','Right']];
+const cableFields = [
+  ['diameter', 'Opening diameter (mm)', 0.1, 500, 0.1],
+  ['offset', 'Offset from centre (mm)', -1000, 1000, 0.1],
+];
 const lidDefaults = { enabled: true, thickness: 2, countersink: true, sinkDepth: 2,
   overlap: 'both', lipHeight: 2, lipThickness: 1, clearance: 0.2 };
 const lidThicknessField = ['thickness', 'Lid thickness (mm)', 0.4, 50, 0.1];
@@ -218,7 +228,7 @@ function restoreDesign(saved) {
     // Pre-lid designs previously opened with the flat lid defaults.
     Object.assign(lid, { countersink: false, overlap: 'none', lipHeight: 1 });
   }
-  return { dimensions, posts, lid };
+  return { dimensions, posts, lid, cable: { ...cableDefaults, ...saved.cable } };
 }
 function createDefaultDesign() {
   return restoreDesign({ posts: [lidSupportDefaults] });
@@ -347,6 +357,24 @@ function renderLid() {
     lid.enabled = checked;
     options.hidden = !checked;
   }), options);
+}
+
+function renderCable() {
+  const cable = design.cable;
+  const fields = document.createElement('div');
+  fields.className = 'fields';
+  const side = selectField('Side in Top view', cableSides, cable.side, value => { cable.side = value; });
+  fields.append(side, ...cableFields.map(field => numberField(field, cable)));
+  const hint = document.createElement('p');
+  hint.className = 'hint lid-option';
+  hint.textContent = '0 mm centres the slot. In Top view, a negative offset moves it left on Top or Bottom, and down on Left or Right.';
+  const controls = document.createElement('div');
+  controls.hidden = !cable.enabled;
+  controls.append(fields, hint);
+  byId('cable-settings').replaceChildren(checkboxField('Add cable entry', cable.enabled, enabled => {
+    cable.enabled = enabled;
+    controls.hidden = !enabled;
+  }), controls);
 }
 
 function renderPosts(openPost) {
@@ -586,6 +614,7 @@ function validateDesign() {
     byId('dimensions').querySelector('[data-key="radius"]').setAttribute('aria-invalid','true');
     throw new Error(`Corner radius must be at most ${formatNumber(maxRadius)} mm.`);
   }
+  if (design.cable.enabled) fieldsValid(cableFields, design.cable, byId('cable-settings'), 'Cable entry: ');
   const inner = roundedRectangle(0, 0, d.width, d.depth, Math.max(0, d.radius - d.wall));
   const rows = byId('features').children;
   const placed = [];
@@ -662,7 +691,35 @@ function insideProfile(x, y, points, margin = 0) {
   });
 }
 
-function buildParts({ CrossSection, Manifold }, { dimensions: d, posts, lid }) {
+function cablePassage(d, cable, lid, overlap) {
+  const { side, diameter } = cable;
+  if (!cableSides.some(([key]) => key === side)) throw new Error('Choose a side for the cable entry.');
+  if (!Number.isFinite(diameter) || diameter <= 0 || diameter >= d.height) {
+    throw new Error('The cable entry diameter must fit above the box floor.');
+  }
+  const horizontal = side === 'top' || side === 'bottom';
+  const span = horizontal ? d.width : d.depth;
+  const across = horizontal ? d.depth : d.width;
+  const centre = span / 2 + cable.offset;
+  const radius = diameter / 2;
+  const endMargin = Math.max(0, d.radius - d.wall);
+  if (!Number.isFinite(centre) || centre-radius < endMargin || centre+radius > span-endMargin) {
+    throw new Error('Move the cable entry within the straight part of the selected wall, or reduce its diameter.');
+  }
+  const hasInsideLip = lid?.enabled && ['inside', 'both'].includes(lid.overlap);
+  const hasOutsideLip = lid?.enabled && ['outside', 'both'].includes(lid.overlap);
+  const inside = Math.min(across / 2, Math.max(radius, hasInsideLip ? lid.clearance + lid.lipThickness : 0) + overlap);
+  const outside = d.wall + (hasOutsideLip ? lid.clearance + lid.lipThickness : 0) + overlap;
+  const origin = {
+    top: [centre, d.depth + outside, 0],
+    bottom: [centre, inside, 0],
+    left: [-outside, centre, 0],
+    right: [d.width - inside, centre, 0],
+  }[side];
+  return { radius, length: inside + outside, origin, rotation: horizontal ? 0 : 90 };
+}
+
+function buildParts({ CrossSection, Manifold }, { dimensions: d, posts, lid, cable }) {
   const owned = [];
   const keep = object => { owned.push(object); return object; };
   const w = d.wall;
@@ -684,6 +741,24 @@ function buildParts({ CrossSection, Manifold }, { dimensions: d, posts, lid }) {
       const solid = keep(Manifold.cylinder(height, radius, radius, circleSegments(radius)));
       return keep(solid.translate([x, y, z]));
     };
+    const passage = cable?.enabled ? cablePassage(d, cable, lid, overlap) : null;
+    const passageTool = (profile, height) => {
+      const rotated = keep(prism(profile, passage.length).rotate([90, 0, passage.rotation]));
+      const [x, y] = passage.origin;
+      return keep(rotated.translate([x, y, height]));
+    };
+    let cableNotch;
+    if (passage) {
+      const radius = passage.radius;
+      const segments = circleSegments(radius) / 2;
+      const profile = [[-radius, overlap], [-radius, -radius]];
+      for (let i = 1; i <= segments; i++) {
+        const angle = Math.PI * i / segments;
+        profile.push([-radius * Math.cos(angle), -radius * (1 + Math.sin(angle))]);
+      }
+      profile.push([radius, overlap]);
+      cableNotch = passageTool(profile, top);
+    }
     const pieces = [shell];
     const holes = [];
     for (const post of posts) {
@@ -752,10 +827,15 @@ function buildParts({ CrossSection, Manifold }, { dimensions: d, posts, lid }) {
       } else {
         support = cylinder(height + overlap, half, x, y, bottom);
       }
-      pieces.push(keep(support.intersect(outer)));
+      const clipped = keep(support.intersect(outer));
+      if (cableNotch && keep(clipped.intersect(cableNotch)).volume() > 1e-7) {
+        throw new Error('The cable entry crosses a mounting support. Move the slot along the wall.');
+      }
+      pieces.push(clipped);
       if (hole > 0) holes.push(cylinder(d.floor + height - holeBottom + overlap, hole / 2, x, y, holeBottom));
     }
     const joined = pieces.length === 1 ? shell : keep(Manifold.union(pieces));
+    if (cableNotch) holes.push(cableNotch);
     const box = holes.length ? keep(joined.subtract(keep(Manifold.union(holes)))) : joined;
     // Keep the sagitta of fine segments on large rounded corners when removing numerical slivers.
     const toleranceFor = radius => Math.min(0.0001, curveStep**2 / (16 * Math.max(1, radius)));
@@ -810,7 +890,13 @@ function buildParts({ CrossSection, Manifold }, { dimensions: d, posts, lid }) {
     }
     if (rimProfiles.length) {
       const rim = rimProfiles.length === 1 ? rimProfiles[0] : keep(CrossSection.union(rimProfiles));
-      const lip = extrude(rim, lipHeight + overlap, thickness - overlap);
+      let lip = extrude(rim, lipHeight + overlap, thickness - overlap);
+      if (passage) {
+        // Keep the lid plate intact and open the full height of the lips for fitting over the cable.
+        const r = passage.radius;
+        const relief = passageTool([[-r,-2*overlap], [r,-2*overlap], [r,lipHeight+overlap], [-r,lipHeight+overlap]], thickness);
+        lip = keep(lip.subtract(relief));
+      }
       lidSolid = keep(lidSolid.add(lip));
     }
     const lidHoles = [];
@@ -1179,7 +1265,7 @@ function renderModel() {
   const d = design.dimensions;
   try {
     const posts = validateDesign();
-    currentMesh = buildParts(kernel, { dimensions: d, posts, lid: design.lid });
+    currentMesh = buildParts(kernel, { dimensions: d, posts, lid: design.lid, cable: design.cable });
     for (const option of partsSelect.options) option.disabled = !currentMesh.lid && option.value !== 'box';
     if (partsSelect.selectedOptions[0]?.disabled) partsSelect.value = 'box';
     partsSelect.disabled = false;
@@ -1269,6 +1355,7 @@ function showDesign(nextDesign) {
   renderDimensions();
   renderPosts();
   renderLid();
+  renderCable();
   renderModel();
 }
 
@@ -1321,6 +1408,7 @@ byId('fit').addEventListener('click', () => {
 });
 renderPosts();
 renderLid();
+renderCable();
 try {
   kernel = await createManifold();
   kernel.setup();
