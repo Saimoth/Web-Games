@@ -46,6 +46,11 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y}
 label.field{display:grid;align-content:start;gap:4px;font-size:.84rem;font-weight:600;color:#d6e2ef}
 input:not([type=checkbox]),select{width:100%;background:#111c27;color:var(--ink);padding:6px 9px;font-size:16px;font-variant-numeric:tabular-nums}
 .check{display:flex;align-items:center;gap:9px;min-height:44px;margin-top:7px;font-size:.9rem}
+.mirror-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));margin:0 11px}
+.feature .mirror-options .check{margin-left:0;margin-right:0}
+.attach-options{margin:0 11px 8px}
+.feature .attach-options .fields{margin-left:0;margin-right:0}
+.attach-options .hint{margin-top:6px}
 .check input{accent-color:var(--mint);width:18px;height:18px;min-height:0}
 [aria-invalid=true]{border-color:#ffac92!important}
 .inline{display:flex;align-items:center;justify-content:space-between;gap:8px}
@@ -100,7 +105,7 @@ main{grid-template-columns:1fr;gap:12px}
     </section>
     <section class="card" aria-labelledby="features-title">
       <h2 id="features-title">Mounting points</h2>
-      <p class="hint">X and Y are measured to the centre of each post from the inside left and front walls.</p>
+      <p class="hint">X and Y locate each post from the inside left and front walls. Mirror X copies it left to right. Mirror Y copies it front to back.</p>
       <div class="toolbar" style="margin-top:12px">
         <button data-add="standoff">+ Stand-off</button><button data-add="column">+ Lid column</button>
       </div>
@@ -142,11 +147,31 @@ const dimensionFields = [
   ['divisions', 'Divisions per corner', 1, 48, 1],
 ];
 const storageKey = 'boxbuild.design.v1';
+const supportDefaults = { supportDepth: 10, chamferAngle: 45 };
+const supportFields = [
+  ['supportDepth', 'Support depth (mm)', 1, 500, 0.1],
+  ['chamferAngle', 'Chamfer (° from vertical)', 1, 45, 0.1],
+];
+const wallOptions = [
+  ['auto','Nearest wall(s)'], ['left','Left'], ['right','Right'], ['front','Front'], ['back','Back'],
+  ['front-left','Front and left'], ['front-right','Front and right'],
+  ['back-left','Back and left'], ['back-right','Back and right'],
+];
+
+function restoreDesign(saved) {
+  const dimensions = { ...defaults, ...saved.dimensions };
+  const posts = saved.posts.map(post => {
+    if (post.type !== 'column') return post;
+    const supportDepth = post.reinforce ? dimensions.height : supportDefaults.supportDepth;
+    return { ...supportDefaults, supportDepth, ...post };
+  });
+  return { dimensions, posts };
+}
 function loadDesign() {
   try {
     const saved = JSON.parse(localStorage.getItem(storageKey));
     if (saved?.dimensions && Array.isArray(saved.posts)) {
-      return { dimensions: { ...defaults, ...saved.dimensions }, posts: saved.posts };
+      return restoreDesign(saved);
     }
   } catch {}
   return { dimensions: { ...defaults }, posts: [] };
@@ -193,6 +218,20 @@ function postFields(post) {
   return fields;
 }
 
+function checkboxField(name, checked, update) {
+  const label = document.createElement('label');
+  label.className = 'check';
+  const checkbox = document.createElement('input');
+  checkbox.type = 'checkbox';
+  checkbox.checked = Boolean(checked);
+  checkbox.addEventListener('change', () => {
+    update(checkbox.checked);
+    queueUpdate();
+  });
+  label.append(checkbox, name);
+  return label;
+}
+
 function renderPosts(openPost) {
   const container = byId('features');
   container.replaceChildren();
@@ -205,7 +244,8 @@ function renderPosts(openPost) {
     const summary = document.createElement('summary');
     const name = column ? `Lid column ${++columns}` : `Stand-off ${++standOffs}`;
     const updateSummary = () => {
-      summary.textContent = `${name} · ${Number.isFinite(post.x) ? post.x : '–'}, ${Number.isFinite(post.y) ? post.y : '–'} mm`;
+      const axes = [post.mirrorX ? 'X' : '', post.mirrorY ? 'Y' : ''].filter(Boolean).join('/');
+      summary.textContent = `${name} · ${Number.isFinite(post.x) ? post.x : '–'}, ${Number.isFinite(post.y) ? post.y : '–'} mm${axes ? ` · Mirror ${axes}` : ''}`;
     };
     post.label = name;
     updateSummary();
@@ -214,39 +254,45 @@ function renderPosts(openPost) {
     fields.className = 'fields';
     for (const field of postFields(post)) fields.append(numberField(field, post, updateSummary));
     row.append(fields);
+    const mirrors = document.createElement('div');
+    mirrors.className = 'mirror-options';
+    mirrors.setAttribute('role', 'group');
+    mirrors.setAttribute('aria-label', 'Mirror across the centre of the box');
+    for (const axis of ['X', 'Y']) {
+      const key = `mirror${axis}`;
+      mirrors.append(checkboxField(`Mirror ${axis}`, post[key], checked => {
+        post[key] = checked;
+        updateSummary();
+      }));
+    }
+    row.append(mirrors);
     if (column) {
-      const label = document.createElement('label');
-      label.className = 'check';
-      const checkbox = document.createElement('input');
-      checkbox.type = 'checkbox';
-      checkbox.checked = post.reinforce;
-      checkbox.addEventListener('change', () => {
-        post.reinforce = checkbox.checked;
-        sideLabel.hidden = !checkbox.checked;
-        queueUpdate();
-      });
-      label.append(checkbox, ' Fill gap to wall');
-      row.append(label);
-      const sideLabel = document.createElement('div');
-      sideLabel.style.margin = '0 11px 8px';
-      sideLabel.hidden = !checkbox.checked;
+      const attachment = document.createElement('div');
+      attachment.className = 'attach-options';
+      attachment.hidden = !post.reinforce;
+      row.append(checkboxField('Attach to wall(s)', post.reinforce, checked => {
+        post.reinforce = checked;
+        attachment.hidden = !checked;
+      }));
       const sideField = document.createElement('label');
       sideField.className = 'field';
       sideField.textContent = 'Join to';
       const select = document.createElement('select');
-      for (const [value, title] of [
-        ['auto','Nearest wall(s)'], ['left','Left'], ['right','Right'], ['front','Front'], ['back','Back'],
-        ['front-left','Front and left'], ['front-right','Front and right'],
-        ['back-left','Back and left'], ['back-right','Back and right'],
-      ]) select.add(new Option(title, value));
+      for (const [value, title] of wallOptions) select.add(new Option(title, value));
       select.value = post.side || 'auto';
       select.addEventListener('change', () => {
         post.side = select.value;
         queueUpdate();
       });
       sideField.append(select);
-      sideLabel.append(sideField);
-      row.append(sideLabel);
+      const support = document.createElement('div');
+      support.className = 'fields';
+      for (const field of supportFields) support.append(numberField(field, post));
+      const hint = document.createElement('p');
+      hint.className = 'hint';
+      hint.textContent = 'Depth is measured down from the rim to the start of the chamfer. The chamfer continues below it and stops at the floor if needed.';
+      attachment.append(sideField, support, hint);
+      row.append(attachment);
     }
     const actions = document.createElement('div');
     actions.className = 'row-actions';
@@ -297,11 +343,14 @@ function nextPost(type) {
   const defaults = type === 'column'
     ? [[left, front], [round(width - left), front], [round(width - left), round(depth - front)], [left, round(depth - front)]]
     : [[atX(.27), atY(.27)], [atX(.73), atY(.27)], [atX(.73), atY(.73)], [atX(.27), atY(.73)]];
-  const [x, y] = defaults.find(([x, y]) => design.posts.every(post =>
+  const occupied = design.posts.flatMap(post => mirrorPosts(post, design.dimensions));
+  const [x, y] = defaults.find(([x, y]) => occupied.every(post =>
     Math.hypot(post.x - x, post.y - y) > (post.diameter + diameter) / 2
   )) || [atX(.5), atY(.5)];
-  return { type, x, y, diameter, height: Math.min(5, height) || 5,
-    hole: type === 'column' ? 2.5 : 0, reinforce: false, side: 'auto' };
+  const post = { type, x, y, diameter };
+  return type === 'column'
+    ? { ...post, hole: 2.5, reinforce: false, side: 'auto', ...supportDefaults }
+    : { ...post, hole: 0, height: Math.min(5, height) || 5 };
 }
 
 for (const button of document.querySelectorAll('[data-add]')) {
@@ -327,6 +376,29 @@ function showStatus(message, error = false) {
   status.classList.toggle('error', error);
 }
 
+function mirrorPosts(post, { width, depth }) {
+  const explicit = wallOptions.some(([value]) => value === post.side && value !== 'auto');
+  const sides = explicit ? post.side.split('-') : [];
+  const copies = [];
+  for (const flipX of post.mirrorX ? [false, true] : [false]) {
+    for (const flipY of post.mirrorY ? [false, true] : [false]) {
+      const x = flipX ? width - post.x : post.x;
+      const y = flipY ? depth - post.y : post.y;
+      const wallSides = sides.map(side => {
+        if (flipX && side === 'left') return 'right';
+        if (flipX && side === 'right') return 'left';
+        if (flipY && side === 'front') return 'back';
+        if (flipY && side === 'back') return 'front';
+        return side;
+      });
+      const existing = copies.find(copy => Math.hypot(copy.x - x, copy.y - y) < 1e-7);
+      if (existing) existing.wallSides = [...new Set([...existing.wallSides, ...wallSides])];
+      else copies.push({ ...post, x, y, wallSides, mirrored: flipX || flipY });
+    }
+  }
+  return copies;
+}
+
 function validateDesign() {
   for (const input of document.querySelectorAll('[aria-invalid]')) input.removeAttribute('aria-invalid');
   const d = design.dimensions;
@@ -347,26 +419,34 @@ function validateDesign() {
   }
   const inner = roundedRectangle(0, 0, d.width, d.depth, Math.max(0, d.radius - d.wall), d.divisions);
   const rows = byId('features').children;
+  const placed = [];
   for (const [index, post] of design.posts.entries()) {
     const row = rows[index];
     fieldsValid(postFields(post), post, row, `${post.label}: `);
+    if (post.type === 'column' && post.reinforce) fieldsValid(supportFields, post, row, `${post.label}: `);
     const invalid = (keys, message) => {
       for (const key of keys) row.querySelector(`[data-key="${key}"]`).setAttribute('aria-invalid','true');
       throw new Error(`${post.label}: ${message}`);
     };
-    if (!insideProfile(post.x, post.y, inner)) invalid(['x','y'], 'Move the centre inside the enclosure.');
     if (post.type === 'standoff' && post.height > d.height) invalid(['height'], 'Height exceeds the inside height.');
     if (post.hole > 0 && post.hole > post.diameter - 0.8) invalid(['hole'], 'Leave at least 0.4 mm of material around the pilot hole.');
-    if (post.hole > 0 && !insideProfile(post.x, post.y, inner, post.hole / 2)) {
-      invalid(['x','y','hole'], 'Move the pilot hole clear of the inside wall.');
-    }
-    for (const other of design.posts.slice(0, index)) {
-      const distance = Math.hypot(post.x - other.x, post.y - other.y);
-      if (distance < (post.diameter + other.diameter) / 2 + 0.01) {
-        invalid(['x','y'], `Move the post clear of ${other.label.toLowerCase()}.`);
+    for (const copy of mirrorPosts(post, d)) {
+      const location = copy.mirrored ? 'mirrored post' : 'post';
+      if (!insideProfile(copy.x, copy.y, inner)) invalid(['x','y'], `Move the ${location} inside the enclosure.`);
+      if (post.hole > 0 && !insideProfile(copy.x, copy.y, inner, post.hole / 2)) {
+        invalid(['x','y','hole'], `Move the ${location}’s pilot hole clear of the inside wall.`);
       }
+      for (const other of placed) {
+        const distance = Math.hypot(copy.x - other.x, copy.y - other.y);
+        if (distance < (copy.diameter + other.diameter) / 2 + 0.01) {
+          const target = other.label === post.label ? 'its mirrored partner' : other.label.toLowerCase();
+          invalid(['x','y'], `Move the ${location} clear of ${target}.`);
+        }
+      }
+      placed.push(copy);
     }
   }
+  return placed;
 }
 
 function formatNumber(value) {
@@ -420,27 +500,56 @@ function buildMesh({ CrossSection, Manifold }, { dimensions: d, posts }) {
     const pieces = [shell];
     const holes = [];
     for (const post of posts) {
-      const { x, y, diameter, type, reinforce, hole, side } = post;
+      const { x, y, diameter, type, reinforce, hole, wallSides } = post;
       const height = type === 'column' ? d.height : post.height;
-      const solids = [cylinder(height + overlap, diameter / 2, x, y, d.floor - overlap)];
+      const bottom = d.floor - overlap;
+      const half = diameter / 2;
+      const core = cylinder(height + overlap, half, x, y, bottom);
+      let support = core;
+      let holeBottom = d.floor;
       if (type === 'column' && reinforce) {
-        const gaps = { left: x, right: d.width - x, front: y, back: d.depth - y };
-        const closest = Math.min(...Object.values(gaps));
-        const sides = side && /^(left|right|front|back|front-left|front-right|back-left|back-right)$/.test(side) ? side.split('-') : Object.keys(gaps).filter(key => gaps[key] <= closest + 1);
-        for (const wall of sides) {
-          const half = diameter / 2;
-          const vertical = wall === 'left' || wall === 'right';
-          const x0 = vertical ? (wall === 'left' ? -w : x) : x - half;
-          const x1 = vertical ? (wall === 'left' ? x : d.width + w) : x + half;
-          const y0 = vertical ? y - half : (wall === 'front' ? -w : y);
-          const y1 = vertical ? y + half : (wall === 'front' ? y : d.depth + w);
-          const block = keep(Manifold.cube([x1-x0, y1-y0, height + overlap]));
-          solids.push(keep(block.translate([x0, y0, d.floor-overlap])));
+        const shelf = Math.max(d.floor, top - post.supportDepth);
+        holeBottom = shelf;
+        const runPerRise = Math.tan(post.chamferAngle * Math.PI / 180);
+        const walls = {
+          left: { gap: x, origin: [0, y + half, 0], rotation: 0 },
+          right: { gap: d.width - x, origin: [d.width, y - half, 0], rotation: 180 },
+          front: { gap: y, origin: [x - half, 0, 0], rotation: 90 },
+          back: { gap: d.depth - y, origin: [x + half, d.depth, 0], rotation: -90 },
+        };
+        const nearest = Math.min(...Object.values(walls).map(wall => wall.gap));
+        const sides = wallSides?.length ? wallSides : Object.keys(walls).filter(key => walls[key].gap <= nearest + 1);
+        const span = Math.max(d.width, d.depth) + 2*w + diameter;
+        const bridges = [];
+        const ramps = [];
+        for (const side of sides) {
+          const { gap, origin, rotation } = walls[side];
+          // In this plane the first coordinate runs in from the wall and the second is height.
+          const towardWall = solid => {
+            const rotated = keep(solid.rotate([90, 0, rotation]));
+            return keep(rotated.translate(origin));
+          };
+          bridges.push(towardWall(prism([[-w,bottom], [gap,bottom], [gap,top], [-w,top]], diameter)));
+          if (shelf === d.floor) continue;
+          // At the shelf the ramp reaches the far edge of the post.
+          const reach = gap + half;
+          const startZ = Math.max(bottom, shelf - (reach + w) / runPerRise);
+          const startU = reach - (shelf - startZ) * runPerRise;
+          const topU = reach + (top - shelf) * runPerRise;
+          const ramp = [[-w, startZ]];
+          if (startU > -w + 1e-8) ramp.push([startU, startZ]);
+          ramp.push([topU, top], [-w, top]);
+          const wideRamp = keep(prism(ramp, 2*span).translate([0, 0, -span]));
+          ramps.push(towardWall(wideRamp));
+        }
+        support = keep(Manifold.union([core, ...bridges]));
+        if (ramps.length) {
+          const cut = ramps.length === 1 ? ramps[0] : keep(Manifold.union(ramps));
+          support = keep(support.intersect(cut));
         }
       }
-      const postSolid = solids.length === 1 ? solids[0] : keep(Manifold.union(solids));
-      pieces.push(keep(postSolid.intersect(outer)));
-      if (hole > 0) holes.push(cylinder(height + overlap, hole / 2, x, y, d.floor));
+      pieces.push(keep(support.intersect(outer)));
+      if (hole > 0) holes.push(cylinder(d.floor + height - holeBottom + overlap, hole / 2, x, y, holeBottom));
     }
     const joined = pieces.length === 1 ? shell : keep(Manifold.union(pieces));
     const box = holes.length ? keep(joined.subtract(keep(Manifold.union(holes)))) : joined;
@@ -695,8 +804,8 @@ function renderModel() {
   if (!kernel) return;
   const d = design.dimensions;
   try {
-    validateDesign();
-    currentMesh = buildMesh(kernel, design);
+    const posts = validateDesign();
+    currentMesh = buildMesh(kernel, { dimensions: d, posts });
     try { localStorage.setItem(storageKey, JSON.stringify(design)); } catch {}
     if (preview) {
       preview.setMesh(currentMesh);
@@ -785,7 +894,7 @@ fileInput.addEventListener('change', async () => {
       throw new Error('That file is not a BoxBuild design.');
     }
     stopPlacing(false);
-    design = { dimensions: saved.dimensions, posts: saved.posts };
+    design = restoreDesign(saved);
     renderDimensions();
     renderPosts();
     renderModel();
