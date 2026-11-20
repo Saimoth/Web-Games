@@ -31,6 +31,10 @@ main{display:grid;grid-template-columns:minmax(0,1fr) minmax(340px,395px);gap:20
 .viewer,.card{border:1px solid var(--line);border-radius:15px;overflow:hidden;background:var(--card)}
 .viewer{position:sticky;top:16px}
 .panel-head,.viewer-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 15px}
+.panel-head{flex-wrap:wrap}
+.panel-head .toolbar{align-items:center}
+.panel-head select{width:auto;max-width:135px;padding-inline:7px}
+[hidden]{display:none!important}
 .viewer-foot{min-height:47px;border-top:1px solid var(--line);flex-wrap:wrap}
 #viewport{position:relative;height:clamp(340px,66vh,720px);background:#121c28;overflow:hidden}
 canvas{display:block;width:100%;height:100%;touch-action:pan-y}
@@ -49,6 +53,9 @@ input:not([type=checkbox]),select{width:100%;background:#111c27;color:var(--ink)
 .mirror-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));margin:0 11px}
 .feature .mirror-options .check{margin-left:0;margin-right:0}
 .attach-options{margin:0 11px 8px}
+.feature .layout-field{margin:0 11px}
+.lid-option{margin-top:12px}
+.lid-option .hint{margin-top:6px}
 .feature .attach-options .fields{margin-left:0;margin-right:0}
 .attach-options .hint{margin-top:6px}
 .check input{accent-color:var(--mint);width:18px;height:18px;min-height:0}
@@ -92,6 +99,9 @@ main{grid-template-columns:1fr;gap:12px}
 <main>
   <section class="viewer" aria-label="Model preview">
     <div class="panel-head"><h2>3D preview</h2><div class="toolbar">
+      <select id="parts" aria-label="View and export parts" disabled>
+        <option value="both">Box + lid</option><option value="box">Box only</option><option value="lid">Lid only</option>
+      </select>
       <button id="top" disabled>Top</button><button id="fit" disabled>Fit 3D</button>
     </div></div>
     <div id="viewport"><div id="viewport-message">Loading 3D tools…</div></div>
@@ -107,10 +117,14 @@ main{grid-template-columns:1fr;gap:12px}
       <h2 id="features-title">Mounting points</h2>
       <p class="hint">X and Y locate each post from the inside left and front walls. Mirror X copies it left to right. Mirror Y copies it front to back.</p>
       <div class="toolbar" style="margin-top:12px">
-        <button data-add="standoff">+ Stand-off</button><button data-add="column">+ Lid column</button>
+        <button data-add="standoff">+ Stand-off</button><button data-add="column">+ Lid support</button>
       </div>
       <div id="features"></div>
-      <p id="empty" class="hint">Add a stand-off for a PCB or a full-height column for a lid screw.</p>
+      <p id="empty" class="hint">Add a stand-off for a PCB or a support for a lid screw.</p>
+    </section>
+    <section class="card" aria-labelledby="lid-title">
+      <h2 id="lid-title">Lid</h2>
+      <div id="lid-settings"></div>
     </section>
     <section class="card" aria-labelledby="design-title">
       <h2 id="design-title">Design file</h2>
@@ -147,6 +161,23 @@ const dimensionFields = [
   ['divisions', 'Divisions per corner', 1, 48, 1],
 ];
 const storageKey = 'boxbuild.design.v1';
+const lidDefaults = { enabled: true, thickness: 2, countersink: false, sinkDepth: 2,
+  overlap: 'none', lipHeight: 1, lipThickness: 1, clearance: 0.2 };
+const lidThicknessField = ['thickness', 'Lid thickness (mm)', 0.4, 50, 0.1];
+const sinkDepthField = ['sinkDepth', 'Countersink depth (mm)', 0.1, 50, 0.1];
+const lipFields = [
+  ['lipHeight', 'Lip height (mm)', 0.1, 50, 0.1],
+  ['lipThickness', 'Lip thickness (mm)', 0.1, 50, 0.1],
+  ['clearance', 'Clearance per side (mm)', 0, 10, 0.1],
+];
+const positionFields = [
+  ['x', 'X from left (mm)', 0, 1000, 0.1],
+  ['y', 'Y from front (mm)', 0, 1000, 0.1],
+];
+const spacingFields = [
+  ['spacingX', 'Width between centres (mm)', 0.1, 1000, 0.1],
+  ['spacingY', 'Depth between centres (mm)', 0.1, 1000, 0.1],
+];
 const supportDefaults = { supportDepth: 10, chamferAngle: 45 };
 const supportFields = [
   ['supportDepth', 'Support depth (mm)', 1, 500, 0.1],
@@ -160,12 +191,21 @@ const wallOptions = [
 
 function restoreDesign(saved) {
   const dimensions = { ...defaults, ...saved.dimensions };
-  const posts = saved.posts.map(post => {
+  const posts = saved.posts.map(source => {
+    const post = {
+      spacingX: Math.max(0.1, Math.abs(dimensions.width - 2*source.x)),
+      spacingY: Math.max(0.1, Math.abs(dimensions.depth - 2*source.y)),
+      ...source,
+    };
+    if (source.layout === 'pattern') {
+      post.x ??= (dimensions.width - source.spacingX) / 2;
+      post.y ??= (dimensions.depth - source.spacingY) / 2;
+    }
     if (post.type !== 'column') return post;
     const supportDepth = post.reinforce ? dimensions.height : supportDefaults.supportDepth;
     return { ...supportDefaults, supportDepth, ...post };
   });
-  return { dimensions, posts };
+  return { dimensions, posts, lid: { ...lidDefaults, ...saved.lid } };
 }
 function loadDesign() {
   try {
@@ -174,12 +214,13 @@ function loadDesign() {
       return restoreDesign(saved);
     }
   } catch {}
-  return { dimensions: { ...defaults }, posts: [] };
+  return restoreDesign({ posts: [] });
 }
 let design = loadDesign();
 const viewport = byId('viewport');
 const previewMessage = byId('viewport-message');
 const status = byId('status');
+const partsSelect = byId('parts');
 const downloadButtons = [...document.querySelectorAll('[data-format], #save-design')];
 let currentMesh, kernel, preview, placing, pendingUpdate;
 let view = '3d';
@@ -209,8 +250,6 @@ renderDimensions();
 
 function postFields(post) {
   const fields = [
-    ['x', 'X from left (mm)', 0, 1000, 0.1],
-    ['y', 'Y from front (mm)', 0, 1000, 0.1],
     ['diameter', 'Outside diameter (mm)', 1, 100, 0.1],
     ['hole', 'Pilot hole Ø (mm)', 0, 98, 0.1],
   ];
@@ -232,30 +271,117 @@ function checkboxField(name, checked, update) {
   return label;
 }
 
+function selectField(name, options, value, update) {
+  const field = document.createElement('label');
+  field.className = 'field';
+  field.textContent = name;
+  const select = document.createElement('select');
+  for (const [key, label] of options) select.add(new Option(label, key));
+  select.value = value;
+  select.addEventListener('change', () => {
+    update(select.value);
+    queueUpdate();
+  });
+  field.append(select);
+  return field;
+}
+
+function activeLidFields(lid) {
+  if (!lid.enabled) return [];
+  return [lidThicknessField, ...(lid.countersink ? [sinkDepthField] : []),
+    ...(lid.overlap !== 'none' ? lipFields : [])];
+}
+
+function renderLid() {
+  const lid = design.lid;
+  const root = byId('lid-settings');
+  const options = document.createElement('div');
+  const plate = document.createElement('div');
+  plate.className = 'fields';
+  plate.append(numberField(lidThicknessField, lid));
+  const sinkField = numberField(sinkDepthField, lid);
+  sinkField.hidden = !lid.countersink;
+  plate.append(sinkField);
+  options.append(checkboxField('45° countersinks', lid.countersink, checked => {
+    lid.countersink = checked;
+    sinkField.hidden = !checked;
+  }), plate);
+  const overlap = selectField('Locating lip', [
+    ['none', 'None'], ['inside', 'Inside overlap'], ['outside', 'Outside overlap'],
+  ], lid.overlap, value => {
+    lid.overlap = value;
+    lip.hidden = value === 'none';
+  });
+  overlap.classList.add('lid-option');
+  const lip = document.createElement('div');
+  lip.className = 'lid-option';
+  lip.hidden = lid.overlap === 'none';
+  const fields = document.createElement('div');
+  fields.className = 'fields';
+  for (const field of lipFields) fields.append(numberField(field, lid));
+  lip.append(fields);
+  const hint = document.createElement('p');
+  hint.className = 'hint lid-option';
+  hint.textContent = 'The lid is shown face down. Through-holes match the lid support pilot holes.';
+  options.append(overlap, lip, hint);
+  options.hidden = !lid.enabled;
+  root.replaceChildren(checkboxField('Include lid', lid.enabled, checked => {
+    lid.enabled = checked;
+    options.hidden = !checked;
+  }), options);
+}
+
 function renderPosts(openPost) {
   const container = byId('features');
   container.replaceChildren();
-  let standOffs = 0, columns = 0;
+  let standOffs = 0, supports = 0;
   for (const post of design.posts) {
-    const column = post.type === 'column';
+    const isSupport = post.type === 'column';
     const row = document.createElement('details');
     row.className = 'feature';
     row.open = post === openPost;
     const summary = document.createElement('summary');
-    const name = column ? `Lid column ${++columns}` : `Stand-off ${++standOffs}`;
+    const name = isSupport ? `Lid support ${++supports}` : `Stand-off ${++standOffs}`;
     const updateSummary = () => {
+      if (post.layout === 'pattern') {
+        const spacingLabel = [post.spacingX, post.spacingY].map(value => Number.isFinite(value) ? formatNumber(value) : '–').join(' × ');
+        summary.textContent = `${name} · 4-hole pattern · ${spacingLabel} mm`;
+        return;
+      }
       const axes = [post.mirrorX ? 'X' : '', post.mirrorY ? 'Y' : ''].filter(Boolean).join('/');
       summary.textContent = `${name} · ${Number.isFinite(post.x) ? post.x : '–'}, ${Number.isFinite(post.y) ? post.y : '–'} mm${axes ? ` · Mirror ${axes}` : ''}`;
     };
     post.label = name;
     updateSummary();
     row.append(summary);
+    const pattern = () => post.layout === 'pattern';
+    const layout = selectField('Layout', [['position', 'Position and mirrors'], ['pattern', 'Centred four-hole pattern']], post.layout || 'position', value => {
+      stopPlacing(false);
+      post.layout = value;
+      position.hidden = pattern();
+      spacing.hidden = !pattern();
+      mirrors.hidden = pattern();
+      place.hidden = pattern();
+      updateSummary();
+    });
+    layout.classList.add('layout-field');
+    row.append(layout);
+    const position = document.createElement('div');
+    position.className = 'fields';
+    position.hidden = pattern();
+    for (const field of positionFields) position.append(numberField(field, post, updateSummary));
+    const spacing = document.createElement('div');
+    spacing.className = 'fields';
+    spacing.hidden = !pattern();
+    for (const field of spacingFields) spacing.append(numberField(field, post, updateSummary));
+    row.append(position, spacing);
     const fields = document.createElement('div');
     fields.className = 'fields';
     for (const field of postFields(post)) fields.append(numberField(field, post, updateSummary));
     row.append(fields);
     const mirrors = document.createElement('div');
     mirrors.className = 'mirror-options';
+    mirrors.hidden = pattern();
     mirrors.setAttribute('role', 'group');
     mirrors.setAttribute('aria-label', 'Mirror across the centre of the box');
     for (const axis of ['X', 'Y']) {
@@ -266,7 +392,7 @@ function renderPosts(openPost) {
       }));
     }
     row.append(mirrors);
-    if (column) {
+    if (isSupport) {
       const attachment = document.createElement('div');
       attachment.className = 'attach-options';
       attachment.hidden = !post.reinforce;
@@ -300,6 +426,7 @@ function renderPosts(openPost) {
     place.className = 'place';
     place.textContent = 'Place on preview';
     place.disabled = !preview;
+    place.hidden = pattern();
     place.setAttribute('aria-pressed', 'false');
     place.addEventListener('click', () => {
       if (placing?.post === post) {
@@ -310,6 +437,7 @@ function renderPosts(openPost) {
       placing = { post, button: place, row, updateSummary };
       place.setAttribute('aria-pressed', 'true');
       viewport.classList.add('placing');
+      refreshPreview();
       setView('top');
       showStatus('Tap inside the box to set the post centre.');
       viewport.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
@@ -347,7 +475,9 @@ function nextPost(type) {
   const [x, y] = defaults.find(([x, y]) => occupied.every(post =>
     Math.hypot(post.x - x, post.y - y) > (post.diameter + diameter) / 2
   )) || [atX(.5), atY(.5)];
-  const post = { type, x, y, diameter };
+  const spacingX = round(width - 2*(type === 'column' ? left : atX(.27)));
+  const spacingY = round(depth - 2*(type === 'column' ? front : atY(.27)));
+  const post = { type, x, y, diameter, spacingX: Math.max(0.1, spacingX), spacingY: Math.max(0.1, spacingY) };
   return type === 'column'
     ? { ...post, hole: 2.5, reinforce: false, side: 'auto', ...supportDefaults }
     : { ...post, hole: 0, height: Math.min(5, height) || 5 };
@@ -368,6 +498,7 @@ function stopPlacing(announce = true) {
   placing.button.setAttribute('aria-pressed', 'false');
   placing = null;
   viewport.classList.remove('placing');
+  if (currentMesh) refreshPreview();
   if (announce && currentMesh) showStatus(previewHint());
 }
 
@@ -380,10 +511,13 @@ function mirrorPosts(post, { width, depth }) {
   const explicit = wallOptions.some(([value]) => value === post.side && value !== 'auto');
   const sides = explicit ? post.side.split('-') : [];
   const copies = [];
-  for (const flipX of post.mirrorX ? [false, true] : [false]) {
-    for (const flipY of post.mirrorY ? [false, true] : [false]) {
-      const x = flipX ? width - post.x : post.x;
-      const y = flipY ? depth - post.y : post.y;
+  const pattern = post.layout === 'pattern';
+  const baseX = pattern ? (width - post.spacingX) / 2 : post.x;
+  const baseY = pattern ? (depth - post.spacingY) / 2 : post.y;
+  for (const flipX of pattern || post.mirrorX ? [false, true] : [false]) {
+    for (const flipY of pattern || post.mirrorY ? [false, true] : [false]) {
+      const x = flipX ? width - baseX : baseX;
+      const y = flipY ? depth - baseY : baseY;
       const wallSides = sides.map(side => {
         if (flipX && side === 'left') return 'right';
         if (flipX && side === 'right') return 'left';
@@ -412,6 +546,17 @@ function validateDesign() {
     }
   }
   fieldsValid(dimensionFields, d, byId('dimensions'), '');
+  const lid = design.lid;
+  const lidForm = byId('lid-settings');
+  fieldsValid(activeLidFields(lid), lid, lidForm, 'Lid: ');
+  if (lid.enabled && lid.countersink && lid.sinkDepth > lid.thickness) {
+    lidForm.querySelector('[data-key="sinkDepth"]').setAttribute('aria-invalid', 'true');
+    throw new Error('Countersink depth must fit within the lid thickness.');
+  }
+  if (lid.enabled && lid.overlap === 'inside' && lid.lipHeight > d.height) {
+    lidForm.querySelector('[data-key="lipHeight"]').setAttribute('aria-invalid', 'true');
+    throw new Error('The inside lip must fit above the box floor.');
+  }
   const maxRadius = Math.min(d.width, d.depth) / 2 + d.wall;
   if (d.radius > maxRadius) {
     byId('dimensions').querySelector('[data-key="radius"]').setAttribute('aria-invalid','true');
@@ -422,25 +567,31 @@ function validateDesign() {
   const placed = [];
   for (const [index, post] of design.posts.entries()) {
     const row = rows[index];
-    fieldsValid(postFields(post), post, row, `${post.label}: `);
+    const locationFields = post.layout === 'pattern' ? spacingFields : positionFields;
+    const keys = locationFields.map(([key]) => key);
+    fieldsValid([...locationFields, ...postFields(post)], post, row, `${post.label}: `);
     if (post.type === 'column' && post.reinforce) fieldsValid(supportFields, post, row, `${post.label}: `);
     const invalid = (keys, message) => {
       for (const key of keys) row.querySelector(`[data-key="${key}"]`).setAttribute('aria-invalid','true');
       throw new Error(`${post.label}: ${message}`);
     };
+    if (post.layout === 'pattern') {
+      if (post.spacingX > d.width) invalid(['spacingX'], 'Hole spacing exceeds the inside width.');
+      if (post.spacingY > d.depth) invalid(['spacingY'], 'Hole spacing exceeds the inside depth.');
+    }
     if (post.type === 'standoff' && post.height > d.height) invalid(['height'], 'Height exceeds the inside height.');
     if (post.hole > 0 && post.hole > post.diameter - 0.8) invalid(['hole'], 'Leave at least 0.4 mm of material around the pilot hole.');
     for (const copy of mirrorPosts(post, d)) {
       const location = copy.mirrored ? 'mirrored post' : 'post';
-      if (!insideProfile(copy.x, copy.y, inner)) invalid(['x','y'], `Move the ${location} inside the enclosure.`);
+      if (!insideProfile(copy.x, copy.y, inner)) invalid(keys, `Move the ${location} inside the enclosure.`);
       if (post.hole > 0 && !insideProfile(copy.x, copy.y, inner, post.hole / 2)) {
-        invalid(['x','y','hole'], `Move the ${location}’s pilot hole clear of the inside wall.`);
+        invalid([...keys,'hole'], `Move the ${location}’s pilot hole clear of the inside wall.`);
       }
       for (const other of placed) {
         const distance = Math.hypot(copy.x - other.x, copy.y - other.y);
         if (distance < (copy.diameter + other.diameter) / 2 + 0.01) {
-          const target = other.label === post.label ? 'its mirrored partner' : other.label.toLowerCase();
-          invalid(['x','y'], `Move the ${location} clear of ${target}.`);
+          const target = other.label === post.label ? 'another post in the same pattern' : other.label.toLowerCase();
+          invalid(keys, `Move the ${location} clear of ${target}.`);
         }
       }
       placed.push(copy);
@@ -478,20 +629,23 @@ function insideProfile(x, y, points, margin = 0) {
   });
 }
 
-function buildMesh({ CrossSection, Manifold }, { dimensions: d, posts }) {
+function buildParts({ CrossSection, Manifold }, { dimensions: d, posts, lid }) {
   const owned = [];
   const keep = object => { owned.push(object); return object; };
   const w = d.wall;
   const top = d.height + d.floor;
   const overlap = Math.min(0.05, d.floor / 4);
   try {
-    const prism = (outline, height, z = 0) => {
-      const shape = keep(CrossSection.ofPolygons([outline]));
+    const section = outline => keep(CrossSection.ofPolygons([outline]));
+    const extrude = (shape, height, z = 0) => {
       const extruded = keep(shape.extrude(height));
       return z ? keep(extruded.translate([0, 0, z])) : extruded;
     };
-    const outer = prism(roundedRectangle(-w, -w, d.width + 2*w, d.depth + 2*w, d.radius, d.divisions), top);
-    const opening = prism(roundedRectangle(0, 0, d.width, d.depth, Math.max(0, d.radius - w), d.divisions), d.height + overlap, d.floor);
+    const prism = (outline, height, z = 0) => extrude(section(outline), height, z);
+    const outside = section(roundedRectangle(-w, -w, d.width + 2*w, d.depth + 2*w, d.radius, d.divisions));
+    const inside = section(roundedRectangle(0, 0, d.width, d.depth, Math.max(0, d.radius - w), d.divisions));
+    const outer = extrude(outside, top);
+    const opening = extrude(inside, d.height + overlap, d.floor);
     const shell = keep(outer.subtract(opening));
     const cylinder = (height, radius, x, y, z) => {
       const solid = keep(Manifold.cylinder(height, radius, radius, 48));
@@ -504,8 +658,7 @@ function buildMesh({ CrossSection, Manifold }, { dimensions: d, posts }) {
       const height = type === 'column' ? d.height : post.height;
       const bottom = d.floor - overlap;
       const half = diameter / 2;
-      const core = cylinder(height + overlap, half, x, y, bottom);
-      let support = core;
+      let support;
       let holeBottom = d.floor;
       if (type === 'column' && reinforce) {
         const shelf = Math.max(d.floor, top - post.supportDepth);
@@ -520,7 +673,9 @@ function buildMesh({ CrossSection, Manifold }, { dimensions: d, posts }) {
         const nearest = Math.min(...Object.values(walls).map(wall => wall.gap));
         const sides = wallSides?.length ? wallSides : Object.keys(walls).filter(key => walls[key].gap <= nearest + 1);
         const span = Math.max(d.width, d.depth) + 2*w + diameter;
-        const bridges = [];
+        const outline = keep(keep(CrossSection.circle(half, 48)).translate([x, y]));
+        const footprint = [outline];
+        const rectangle = (x0, y0, x1, y1) => section([[x0,y0], [x1,y0], [x1,y1], [x0,y1]]);
         const ramps = [];
         for (const side of sides) {
           const { gap, origin, rotation } = walls[side];
@@ -529,7 +684,11 @@ function buildMesh({ CrossSection, Manifold }, { dimensions: d, posts }) {
             const rotated = keep(solid.rotate([90, 0, rotation]));
             return keep(rotated.translate(origin));
           };
-          bridges.push(towardWall(prism([[-w,bottom], [gap,bottom], [gap,top], [-w,top]], diameter)));
+          const x0 = side === 'left' ? -w : side === 'right' ? x : x - half;
+          const x1 = side === 'left' ? x : side === 'right' ? d.width + w : x + half;
+          const y0 = side === 'front' ? -w : side === 'back' ? y : y - half;
+          const y1 = side === 'front' ? y : side === 'back' ? d.depth + w : y + half;
+          footprint.push(rectangle(x0, y0, x1, y1));
           if (shelf === d.floor) continue;
           // At the shelf the ramp reaches the far edge of the post.
           const reach = gap + half;
@@ -542,28 +701,106 @@ function buildMesh({ CrossSection, Manifold }, { dimensions: d, posts }) {
           const wideRamp = keep(prism(ramp, 2*span).translate([0, 0, -span]));
           ramps.push(towardWall(wideRamp));
         }
-        support = keep(Manifold.union([core, ...bridges]));
+        // Adjacent arms also fill the pocket on the corner side of the post.
+        for (const horizontal of ['left', 'right'].filter(side => sides.includes(side))) {
+          const x0 = horizontal === 'left' ? -w : x;
+          const x1 = horizontal === 'left' ? x : d.width + w;
+          for (const vertical of ['front', 'back'].filter(side => sides.includes(side))) {
+            const y0 = vertical === 'front' ? -w : y;
+            const y1 = vertical === 'front' ? y : d.depth + w;
+            footprint.push(rectangle(x0, y0, x1, y1));
+          }
+        }
+        support = extrude(keep(CrossSection.union(footprint)), top - bottom, bottom);
         if (ramps.length) {
           const cut = ramps.length === 1 ? ramps[0] : keep(Manifold.union(ramps));
           support = keep(support.intersect(cut));
         }
+      } else {
+        support = cylinder(height + overlap, half, x, y, bottom);
       }
       pieces.push(keep(support.intersect(outer)));
       if (hole > 0) holes.push(cylinder(d.floor + height - holeBottom + overlap, hole / 2, x, y, holeBottom));
     }
     const joined = pieces.length === 1 ? shell : keep(Manifold.union(pieces));
     const box = holes.length ? keep(joined.subtract(keep(Manifold.union(holes)))) : joined;
-    if (box.status() !== 'NoError' || box.isEmpty()) throw new Error('These dimensions could not produce a solid model.');
-    const mesh = box.getMesh();
-    const vertices = new Float32Array(mesh.numVert * 3);
-    for (let index = 0; index < mesh.numVert; index++) {
-      const base = index * mesh.numProp;
-      vertices.set(mesh.vertProperties.subarray(base, base + 3), index * 3);
+    const boxMesh = readMesh(keep(box.simplify(0.0001)), 'box');
+    if (!lid?.enabled) return { box: boxMesh };
+
+    const { thickness, countersink, sinkDepth, overlap: lipType, lipHeight, lipThickness, clearance } = lid;
+    const offset = (shape, distance) => distance ? keep(shape.offset(distance, 'Miter')) : shape;
+    const outsideLip = lipType === 'outside';
+    const insideLip = lipType === 'inside';
+    const plateProfile = outsideLip ? offset(outside, clearance + lipThickness) : outside;
+    let lidSolid = extrude(plateProfile, thickness);
+    if (insideLip || outsideLip) {
+      const lipOuter = insideLip ? offset(inside, -clearance) : plateProfile;
+      const lipInner = insideLip ? offset(inside, -clearance - lipThickness) : offset(outside, clearance);
+      if (lipOuter.isEmpty() || lipInner.isEmpty()) throw new Error('The locating lip is too wide for these box dimensions.');
+      let rim = keep(lipOuter.subtract(lipInner));
+      if (insideLip && pieces.length > 1) {
+        // Project all box features within the lip's installed height to allow clearance around them.
+        const features = pieces.length === 2 ? pieces[1] : keep(Manifold.union(pieces.slice(1)));
+        const nearRim = keep(features.trimByPlane([0, 0, 1], top - lipHeight));
+        const occupied = keep(nearRim.project());
+        const keepout = clearance && !occupied.isEmpty() ? keep(occupied.offset(clearance, 'Round', 2, 24)) : occupied;
+        rim = keep(rim.subtract(keepout));
+      }
+      if (rim.isEmpty()) throw new Error('The locating lip has no room beside the mounting points.');
+      const lip = extrude(rim, lipHeight + overlap, thickness - overlap);
+      lidSolid = keep(lidSolid.add(lip));
     }
-    return { vertices, indices: new Uint32Array(mesh.triVerts) };
+    const lidHoles = [];
+    const lidHeight = thickness + (lipType === 'none' ? 0 : lipHeight);
+    const plateOutline = plateProfile.toPolygons()[0];
+    for (const post of posts) {
+      if (post.type !== 'column' || post.hole <= 0) continue;
+      const radius = post.hole / 2;
+      const depth = countersink ? sinkDepth : 0;
+      if (!insideProfile(post.x, post.y, plateOutline, radius + depth)) {
+        throw new Error('A lid hole reaches the edge. Move the lid support inwards or reduce the countersink depth.');
+      }
+      if (depth > 0) {
+        // The face on the build plate is the outside of the lid, where the countersink is widest.
+        const cutter = section([[0,-overlap], [radius+depth+overlap,-overlap],
+          [radius,depth], [radius,lidHeight+overlap], [0,lidHeight+overlap]]);
+        lidHoles.push(keep(keep(cutter.revolve(48)).translate([post.x, post.y, 0])));
+      } else {
+        lidHoles.push(cylinder(lidHeight + 2*overlap, radius, post.x, post.y, -overlap));
+      }
+    }
+    if (lidHoles.length) lidSolid = keep(lidSolid.subtract(keep(Manifold.union(lidHoles))));
+    const printLid = keep(keep(lidSolid.mirror([0, 1, 0])).translate([0, d.depth, 0]));
+    const lidMesh = readMesh(keep(printLid.simplify(0.0001)), 'lid');
+    const lidOffset = box.boundingBox().max[0] - printLid.boundingBox().min[0] + 10;
+    return { box: boxMesh, lid: lidMesh, lidOffset, both: combineMeshes(boxMesh, lidMesh, lidOffset) };
   } finally {
     for (const object of owned.reverse()) object.delete();
   }
+}
+
+function readMesh(solid, name) {
+  if (solid.status() !== 'NoError' || solid.isEmpty()) throw new Error(`These dimensions could not produce a solid ${name}.`);
+  const mesh = solid.getMesh();
+  const vertices = new Float32Array(mesh.numVert * 3);
+  for (let index = 0; index < mesh.numVert; index++) {
+    const base = index * mesh.numProp;
+    vertices.set(mesh.vertProperties.subarray(base, base + 3), index * 3);
+  }
+  return { vertices, indices: new Uint32Array(mesh.triVerts) };
+}
+
+function combineMeshes(box, lid, lidOffset) {
+  const vertices = new Float32Array(box.vertices.length + lid.vertices.length);
+  vertices.set(box.vertices);
+  vertices.set(lid.vertices, box.vertices.length);
+  for (let index = box.vertices.length; index < vertices.length; index += 3) vertices[index] += lidOffset;
+  const indices = new Uint32Array(box.indices.length + lid.indices.length);
+  indices.set(box.indices);
+  for (let index = 0; index < lid.indices.length; index++) {
+    indices[box.indices.length + index] = lid.indices[index] + box.vertices.length / 3;
+  }
+  return { vertices, indices };
 }
 
 function softwareRenderer() {
@@ -764,9 +1001,10 @@ function makePreview() {
       render();
     },
     fit(mode) {
-      const { width, depth, height, wall, floor } = design.dimensions;
-      sceneSize = Math.max(width + 2*wall, depth + 2*wall, height + floor);
-      controls.target.set(width / 2, depth / 2, (height + floor) / 2);
+      const bounds = model.geometry.boundingBox;
+      const size = bounds.getSize(new THREE.Vector3());
+      sceneSize = Math.max(size.x, size.y, size.z);
+      bounds.getCenter(controls.target);
       const direction = mode === 'top' ? new THREE.Vector3(0, -0.00001, 1) : new THREE.Vector3(0.85, -1.25, 1.02);
       camera.position.copy(controls.target).addScaledVector(direction.normalize(), sceneSize * 3);
       camera.zoom = 1;
@@ -799,26 +1037,43 @@ function queueUpdate() {
 }
 
 let previousSize;
+function refreshPreview() {
+  if (!preview || !currentMesh) return;
+  const part = placing ? 'box' : partsSelect.value;
+  const mesh = currentMesh[part] || currentMesh.box;
+  preview.setMesh(mesh);
+  const d = design.dimensions;
+  const lid = design.lid;
+  const size = [part, d.width, d.depth, d.height, d.wall, d.floor,
+    lid.enabled, lid.thickness, lid.overlap, lid.lipHeight, lid.lipThickness, lid.clearance].join(',');
+  if (size !== previousSize) setView(view);
+  previousSize = size;
+  byId('top').disabled = false;
+  byId('fit').disabled = false;
+}
+partsSelect.addEventListener('change', () => {
+  stopPlacing(false);
+  refreshPreview();
+  if (currentMesh) showStatus(previewHint());
+});
+
 function renderModel() {
   clearTimeout(pendingUpdate);
   if (!kernel) return;
   const d = design.dimensions;
   try {
     const posts = validateDesign();
-    currentMesh = buildMesh(kernel, { dimensions: d, posts });
+    currentMesh = buildParts(kernel, { dimensions: d, posts, lid: design.lid });
+    for (const option of partsSelect.options) option.disabled = !currentMesh.lid && option.value !== 'box';
+    if (partsSelect.selectedOptions[0]?.disabled) partsSelect.value = 'box';
+    partsSelect.disabled = false;
     try { localStorage.setItem(storageKey, JSON.stringify(design)); } catch {}
-    if (preview) {
-      preview.setMesh(currentMesh);
-      const size = [d.width, d.depth, d.height, d.wall, d.floor].join(',');
-      if (size !== previousSize) setView(view);
-      previousSize = size;
-      byId('top').disabled = false;
-      byId('fit').disabled = false;
-    }
+    refreshPreview();
     byId('measure').textContent = `${[d.width + 2*d.wall, d.depth + 2*d.wall, d.height + d.floor].map(formatNumber).join(' × ')} mm outside`;
     showStatus(previewHint());
   } catch (error) {
     currentMesh = null;
+    partsSelect.disabled = true;
     byId('measure').textContent = preview && previousSize ? 'Showing last valid model' : '';
     showStatus(error.message || 'Check the highlighted dimensions.', true);
   }
@@ -852,19 +1107,23 @@ function makeSTL({ vertices, indices }) {
   return buffer;
 }
 
-function makeOBJ({ vertices, indices }) {
-  const rows = ['# BoxBuild | coordinates in millimetres', 'o Enclosure'];
+function makeOBJ({ vertices, indices }, name = 'Box', lidStart) {
+  const rows = ['# BoxBuild | coordinates in millimetres'];
   for (let i = 0; i < vertices.length; i += 3) rows.push(`v ${vertices[i]} ${vertices[i+1]} ${vertices[i+2]}`);
-  for (let i = 0; i < indices.length; i += 3) rows.push(`f ${indices[i]+1} ${indices[i+1]+1} ${indices[i+2]+1}`);
+  rows.push(`o ${name}`);
+  for (let i = 0; i < indices.length; i += 3) {
+    if (i === lidStart) rows.push('o Lid');
+    rows.push(`f ${indices[i]+1} ${indices[i+1]+1} ${indices[i+2]+1}`);
+  }
   return rows.join('\n') + '\n';
 }
 
-function downloadFile(data, extension, mimeType) {
+function downloadFile(data, extension, mimeType, suffix = '') {
   const url = URL.createObjectURL(new Blob([data], { type: mimeType }));
   const link = document.createElement('a');
   link.href = url;
   const { width, depth, height } = design.dimensions;
-  link.download = `BoxBuild-${width}x${depth}x${height}mm.${extension}`;
+  link.download = `BoxBuild-${width}x${depth}x${height}mm${suffix}.${extension}`;
   document.body.append(link);
   link.click();
   link.remove();
@@ -873,7 +1132,12 @@ function downloadFile(data, extension, mimeType) {
 for (const button of document.querySelectorAll('[data-format]')) button.addEventListener('click', () => {
   if (!currentMesh) return;
   const { format } = button.dataset;
-  downloadFile(format === 'stl' ? makeSTL(currentMesh) : makeOBJ(currentMesh), format, 'application/octet-stream');
+  const part = partsSelect.value;
+  const mesh = currentMesh[part] || currentMesh.box;
+  const lidStart = part === 'both' ? currentMesh.box.indices.length : undefined;
+  const data = format === 'stl' ? makeSTL(mesh) : makeOBJ(mesh, part === 'lid' ? 'Lid' : 'Box', lidStart);
+  const suffix = part === 'both' ? '-box-and-lid' : part === 'lid' ? '-lid' : '';
+  downloadFile(data, format, 'application/octet-stream', suffix);
 });
 
 byId('save-design').addEventListener('click', () => {
@@ -890,13 +1154,14 @@ fileInput.addEventListener('change', async () => {
     const saved = JSON.parse(await file.text());
     const hasNumbers = (data, fields) => data && fields.every(([key]) => Number.isFinite(data[key]));
     if (saved?.version !== 1 || !hasNumbers(saved.dimensions, dimensionFields) || !Array.isArray(saved.posts)
-      || !saved.posts.every(post => post && ['standoff', 'column'].includes(post.type) && hasNumbers(post, postFields(post)))) {
+      || !saved.posts.every(post => post && ['standoff', 'column'].includes(post.type) && hasNumbers(post, [...postFields(post), ...(post.layout === 'pattern' ? spacingFields : positionFields)]))) {
       throw new Error('That file is not a BoxBuild design.');
     }
     stopPlacing(false);
     design = restoreDesign(saved);
     renderDimensions();
     renderPosts();
+    renderLid();
     renderModel();
     message.textContent = currentMesh ? `Opened ${file.name}.` : 'Design opened. Check the highlighted dimensions.';
   } catch (error) {
@@ -913,6 +1178,7 @@ byId('fit').addEventListener('click', () => {
   setView('3d');
 });
 renderPosts();
+renderLid();
 try {
   kernel = await createManifold();
   kernel.setup();
