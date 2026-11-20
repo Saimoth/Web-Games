@@ -62,7 +62,6 @@ input:not([type=checkbox]),select{width:100%;background:#111c27;color:var(--ink)
 [aria-invalid=true]{border-color:#ffac92!important}
 .inline{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .modifier-tools{margin-top:12px;align-items:center;flex-wrap:wrap}
-.modifier-tools .check{margin-top:0}
 .post-list:not(:empty){display:grid;gap:9px;margin-top:12px}
 .feature{background:#202e3d;border:1px solid var(--line);border-radius:10px}
 .feature[open]{padding-bottom:11px}
@@ -121,7 +120,7 @@ main{grid-template-columns:1fr;gap:12px}
       <h2 id="features-title">Modifiers</h2>
       <p class="hint">X and Y locate stand-offs from the inside left and front walls.</p>
       <div class="toolbar modifier-tools">
-        <button data-add="standoff">+ Stand-off</button><div id="cable-toggle"></div>
+        <button data-add="standoff">+ Stand-off</button><button id="add-cable">+ Cable entry</button>
       </div>
       <div id="stand-offs" class="post-list"></div>
       <div id="cable-settings"></div>
@@ -358,8 +357,22 @@ function renderLid() {
   }), options);
 }
 
+const addCableButton = byId('add-cable');
+addCableButton.addEventListener('click', () => {
+  stopPlacing(false);
+  design.cable.enabled = true;
+  renderCable();
+  byId('cable-settings').querySelector('select').focus();
+  queueUpdate();
+});
+
 function renderCable() {
   const cable = design.cable;
+  const settings = byId('cable-settings');
+  settings.replaceChildren();
+  addCableButton.disabled = cable.enabled;
+  if (!cable.enabled) return;
+
   const fields = document.createElement('div');
   fields.className = 'fields';
   const side = selectField('Side in Top view', cableSides, cable.side, value => { cable.side = value; });
@@ -367,14 +380,21 @@ function renderCable() {
   const hint = document.createElement('p');
   hint.className = 'hint lid-option';
   hint.textContent = '0 mm centres the slot. In Top view, a negative offset moves it left on Top or Bottom, and down on Left or Right.';
-  const controls = document.createElement('div');
-  controls.hidden = !cable.enabled;
-  controls.append(fields, hint);
-  byId('cable-toggle').replaceChildren(checkboxField('Cable entry', cable.enabled, enabled => {
-    cable.enabled = enabled;
-    controls.hidden = !enabled;
-  }));
-  byId('cable-settings').replaceChildren(controls);
+  const actions = document.createElement('div');
+  actions.className = 'row-actions';
+  const remove = document.createElement('button');
+  remove.className = 'danger';
+  remove.textContent = 'Remove';
+  remove.setAttribute('aria-label', 'Remove cable entry');
+  remove.addEventListener('click', () => {
+    stopPlacing(false);
+    cable.enabled = false;
+    renderCable();
+    addCableButton.focus();
+    queueUpdate();
+  });
+  actions.append(remove);
+  settings.append(fields, hint, actions);
 }
 
 function renderPosts(openPost) {
