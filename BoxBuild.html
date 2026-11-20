@@ -1094,8 +1094,10 @@ function buildParts({ CrossSection, Manifold }, { dimensions: d, posts, lid, cab
     if (lidHoles.length) lidSolid = keep(lidSolid.subtract(keep(Manifold.union(lidHoles))));
     const printLid = keep(keep(lidSolid.mirror([0, 1, 0])).translate([0, d.depth, 0]));
     const lidMesh = readMesh(keep(printLid.simplify(toleranceFor(d.radius + outsideAllowance))), 'lid');
-    const lidOffset = box.boundingBox().max[0] - printLid.boundingBox().min[0] + 10;
-    return { box: boxMesh, lid: lidMesh, lidOffset, both: combineMeshes(boxMesh, lidMesh, lidOffset) };
+    const axis = d.width >= d.depth ? 1 : 0;
+    const gap = 10;
+    const lidOffset = box.boundingBox().max[axis] - printLid.boundingBox().min[axis] + gap;
+    return { box: boxMesh, lid: lidMesh, both: combineMeshes(boxMesh, lidMesh, axis, lidOffset) };
   } finally {
     for (const object of owned.reverse()) object.delete();
   }
@@ -1112,11 +1114,11 @@ function readMesh(solid, name) {
   return packMesh(vertices, mesh.triVerts);
 }
 
-function combineMeshes(box, lid, lidOffset) {
+function combineMeshes(box, lid, axis, lidOffset) {
   const vertices = new Float32Array(box.vertices.length + lid.vertices.length);
   vertices.set(box.vertices);
   vertices.set(lid.vertices, box.vertices.length);
-  for (let index = box.vertices.length; index < vertices.length; index += 3) vertices[index] += lidOffset;
+  for (let index = box.vertices.length + axis; index < vertices.length; index += 3) vertices[index] += lidOffset;
   const indices = new Uint32Array(box.indices.length + lid.indices.length);
   indices.set(box.indices);
   for (let index = 0; index < lid.indices.length; index++) {
