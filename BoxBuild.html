@@ -39,6 +39,7 @@ main{display:grid;grid-template-columns:minmax(0,1fr) minmax(340px,395px);gap:20
 .viewer-foot{min-height:47px;border-top:1px solid var(--line);flex-wrap:wrap}
 #viewport{position:relative;height:clamp(340px,66vh,720px);background:#121c28;overflow:hidden}
 canvas{display:block;width:100%;height:100%;touch-action:pan-y}
+.board-overlay{position:absolute;inset:0;pointer-events:none}
 #viewport.placing canvas{cursor:crosshair}
 #viewport-message{position:absolute;inset:0;display:grid;place-items:center;text-align:center;color:var(--muted);padding:20px;pointer-events:none}
 #viewport-message[hidden]{display:none}
@@ -121,12 +122,13 @@ main{grid-template-columns:1fr;gap:12px}
     </section>
     <section class="card" aria-labelledby="features-title">
       <h2 id="features-title">Modifiers</h2>
-      <p class="hint">X and Y locate stand-offs from the inside left and front walls.</p>
+      <p class="hint">X and Y start at the inside left and front walls. Boards rotate anticlockwise in Top view around their bottom-left corner.</p>
       <div class="toolbar modifier-tools">
-        <button data-add="standoff">+ Stand-off</button><button id="add-cable">+ Cable entry</button>
+        <button data-add="standoff">+ Stand-off</button><button id="add-cable">+ Cable entry</button><button id="add-board">+ Board</button>
       </div>
       <div id="stand-offs" class="post-list"></div>
-      <div id="cable-settings"></div>
+      <div id="cable-settings" class="post-list"></div>
+      <div id="board-settings" class="post-list"></div>
     </section>
     <section class="card" aria-labelledby="lid-title">
       <h2 id="lid-title">Lid</h2>
@@ -169,7 +171,19 @@ const dimensionFields = [
   ['radius', 'Corner radius (mm)', 0, 550, 0.1],
 ];
 const storageKey = 'boxbuild.design.v1';
-const cableDefaults = { enabled: false, side: 'top', diameter: 4.4, offset: 0 };
+const cableDefaults = { side: 'top', diameter: 4.4, offset: 0 };
+const boardTemplates = {
+  uno: { name: 'Arduino Uno', width: 77, depth: 54, holes: [[21.5,2.5], [24,50.5], [74,7.5], [74,35.5]] },
+};
+const boardDefaults = { model: 'uno', x: 0, y: 0, rotation: 0, height: 5, diameter: 5, hole: 1 };
+const boardFields = [
+  ['x', 'X offset (mm)', -1000, 1000, 0.1],
+  ['y', 'Y offset (mm)', -1000, 1000, 0.1],
+  ['rotation', 'Rotation (°)', 0, 359, 1],
+  ['height', 'Stand-off height (mm)', 0.5, 500, 0.1],
+  ['diameter', 'Outside diameter (mm)', 1, 100, 0.1],
+  ['hole', 'Pilot hole Ø (mm)', 0, 98, 0.1],
+];
 const cableSides = [['top','Top'], ['bottom','Bottom'], ['left','Left'], ['right','Right']];
 const cableFields = [
   ['diameter', 'Opening diameter (mm)', 0.1, 500, 0.1],
@@ -229,7 +243,13 @@ function restoreDesign(saved) {
     // Pre-lid designs previously opened with the flat lid defaults.
     Object.assign(lid, { countersink: false, overlap: 'none', lipHeight: 1 });
   }
-  return { dimensions, posts, lid, cable: { ...cableDefaults, ...saved.cable } };
+  const { enabled: legacyEnabled, ...legacyCable } = saved.cable ?? {};
+  const savedCables = Array.isArray(saved.cables) ? saved.cables : legacyEnabled ? [legacyCable] : [];
+  const cables = savedCables.map(cable => ({
+    ...cableDefaults, ...cable,
+  }));
+  const boards = Array.isArray(saved.boards) ? saved.boards.map(board => ({ ...boardDefaults, ...board })) : [];
+  return { dimensions, posts, lid, cables, boards };
 }
 function createDefaultDesign() {
   return restoreDesign({ posts: [lidSupportDefaults] });
@@ -360,45 +380,112 @@ function renderLid() {
   }), options);
 }
 
-const addCableButton = byId('add-cable');
-addCableButton.addEventListener('click', () => {
-  stopPlacing(false);
-  design.cable.enabled = true;
-  renderCable();
-  byId('cable-settings').querySelector('select').focus();
-  queueUpdate();
-});
-
-function renderCable() {
-  const cable = design.cable;
-  const settings = byId('cable-settings');
-  settings.replaceChildren();
-  addCableButton.disabled = cable.enabled;
-  if (!cable.enabled) return;
-
-  const fields = document.createElement('div');
-  fields.className = 'fields';
-  const side = selectField('Side in Top view', cableSides, cable.side, value => { cable.side = value; });
-  fields.append(side, ...cableFields.map(field => numberField(field, cable)));
-  const hint = document.createElement('p');
-  hint.className = 'hint lid-option';
-  hint.textContent = '0 mm centres the slot. In Top view, a negative offset moves it left on Top or Bottom, and down on Left or Right.';
+function addModifierRow(container, label, title, controls, removeItem) {
+  const row = document.createElement('details');
+  row.className = 'feature';
+  const summary = document.createElement('summary');
+  summary.textContent = title;
   const actions = document.createElement('div');
   actions.className = 'row-actions';
   const remove = document.createElement('button');
   remove.className = 'danger';
   remove.textContent = 'Remove';
-  remove.setAttribute('aria-label', 'Remove cable entry');
+  remove.setAttribute('aria-label', `Remove ${label}`);
   remove.addEventListener('click', () => {
     stopPlacing(false);
-    cable.enabled = false;
-    renderCable();
-    addCableButton.focus();
+    removeItem();
     queueUpdate();
   });
   actions.append(remove);
-  settings.append(fields, hint, actions);
+  row.append(summary, controls, actions);
+  container.append(row);
+  return row;
 }
+
+function renderCable(openItem) {
+  const settings = byId('cable-settings');
+  settings.replaceChildren();
+  for (const [index, cable] of design.cables.entries()) {
+    cable.label = `Cable entry ${index+1}`;
+    const title = () => `${cable.label} · ${cableSides.find(([side]) => side === cable.side)?.[1] ?? 'Choose side'}`;
+    const fields = document.createElement('div');
+    fields.className = 'fields';
+    fields.append(selectField('Side in Top view', cableSides, cable.side, value => {
+      cable.side = value;
+      row.querySelector('summary').textContent = title();
+    }), ...cableFields.map(field => numberField(field, cable)));
+    const row = addModifierRow(settings, cable.label, title(), fields, () => {
+        design.cables.splice(index, 1);
+        renderCable();
+        byId('add-cable').focus();
+      });
+    row.open = cable === openItem;
+  }
+  if (design.cables.length) {
+    const hint = document.createElement('p');
+    hint.className = 'hint';
+    hint.textContent = 'In Top view, a negative offset moves the entry left on Top or Bottom, and down on Left or Right.';
+    settings.append(hint);
+  }
+}
+
+function renderBoards(openItem) {
+  const settings = byId('board-settings');
+  settings.replaceChildren();
+  for (const [index, board] of design.boards.entries()) {
+    board.label = `Board ${index+1}`;
+    const title = () => `${board.label} · ${boardTemplates[board.model]?.name ?? 'Choose board'}`;
+    const fields = document.createElement('div');
+    fields.className = 'fields';
+    const models = Object.entries(boardTemplates).map(([value, template]) => [value, template.name]);
+    fields.append(selectField('Board type', models, board.model, value => {
+      board.model = value;
+      row.querySelector('summary').textContent = title();
+    }), ...boardFields.map(field => numberField(field, board)));
+    const row = addModifierRow(settings, board.label, title(), fields, () => {
+        design.boards.splice(index, 1);
+        renderBoards();
+        byId('add-board').focus();
+      });
+    row.open = board === openItem;
+  }
+}
+
+byId('add-cable').addEventListener('click', () => {
+  stopPlacing(false);
+  const { dimensions, lid, cables } = design;
+  const candidateSides = cableSides.map(([side]) => side);
+  let cable = { ...cableDefaults };
+  const fits = candidate => {
+    try {
+      cablePassages(dimensions, [...cables, candidate], lid, 0.05);
+      return true;
+    } catch { return false; }
+  };
+  // Prefer a free side, then try offsets on a side already in use.
+  for (const offset of [0, 8, -8, 16, -16, 24, -24]) {
+    const available = candidateSides.map(side => ({ ...cableDefaults, side, offset })).find(fits);
+    if (available) {
+      cable = available;
+      break;
+    }
+  }
+  cables.push(cable);
+  renderCable(cable);
+  queueUpdate();
+});
+
+byId('add-board').addEventListener('click', () => {
+  stopPlacing(false);
+  const board = { ...boardDefaults };
+  const template = boardTemplates[board.model];
+  board.x = Math.max(0, (design.dimensions.width - template.width) / 2);
+  board.y = Math.max(0, (design.dimensions.depth - template.depth) / 2);
+  design.boards.push(board);
+  if (partsSelect.value === 'lid') partsSelect.value = 'both';
+  renderBoards(board);
+  queueUpdate();
+});
 
 function renderPosts(openPost) {
   const standOffList = byId('stand-offs');
@@ -539,7 +626,10 @@ function nextPost(type) {
   const round = value => Math.round(value * 100) / 100;
   const innerRadius = Math.max(0, radius - wall);
   const outline = roundedRectangle(0, 0, width, depth, innerRadius);
-  const occupied = design.posts.flatMap(post => mirrorPosts(post, dimensions));
+  const occupied = [
+    ...design.posts.flatMap(post => mirrorPosts(post, dimensions)),
+    ...design.boards.flatMap(board => boardPlacement(board)?.posts ?? []),
+  ];
   const fits = posts => posts.every((post, index) =>
     insideProfile(post.x, post.y, outline, hole / 2) &&
     [...occupied, ...posts.slice(0, index)].every(other =>
@@ -639,7 +729,9 @@ function validateDesign() {
     byId('dimensions').querySelector('[data-key="radius"]').setAttribute('aria-invalid','true');
     throw new Error(`Corner radius must be at most ${formatNumber(maxRadius)} mm.`);
   }
-  if (design.cable.enabled) fieldsValid(cableFields, design.cable, byId('cable-settings'), 'Cable entry: ');
+  for (const [index, cable] of design.cables.entries()) {
+    fieldsValid(cableFields, cable, byId('cable-settings').children[index], `${cable.label}: `);
+  }
   const inner = roundedRectangle(0, 0, d.width, d.depth, Math.max(0, d.radius - d.wall));
   const placed = [];
   for (const [index, post] of design.posts.entries()) {
@@ -672,6 +764,32 @@ function validateDesign() {
         }
       }
       placed.push(copy);
+    }
+  }
+  for (const [index, board] of design.boards.entries()) {
+    const row = byId('board-settings').children[index];
+    fieldsValid(boardFields, board, row, `${board.label}: `);
+    const invalid = (keys, message) => {
+      for (const key of keys) row.querySelector(`[data-key="${key}"]`)?.setAttribute('aria-invalid','true');
+      throw new Error(`${board.label}: ${message}`);
+    };
+    const placement = boardPlacement(board);
+    if (!placement) invalid([], 'Choose a supported board type.');
+    if (board.height > d.height) invalid(['height'], 'Stand-off height exceeds the inside height.');
+    if (board.hole > 0 && board.hole > board.diameter - 0.8) {
+      invalid(['hole'], 'Leave at least 0.4 mm of material around the pilot hole.');
+    }
+    if (!placement.outline.every(([x,y]) => insideProfile(x, y, inner))) {
+      invalid(['x','y','rotation'], 'Move or rotate the board, or increase the enclosure size so its outline fits.');
+    }
+    for (const post of placement.posts) {
+      if (!insideProfile(post.x, post.y, inner, post.diameter / 2)) {
+        invalid(['x','y','diameter'], 'Move the board stand-offs clear of the walls or reduce their diameter.');
+      }
+      const other = placed.find(other => Math.hypot(post.x-other.x, post.y-other.y) <
+        (post.diameter + other.diameter) / 2 + 0.01);
+      if (other) invalid(['x','y','rotation'], `Move the board stand-offs clear of ${other.label ?? 'the existing stand-offs'}.`);
+      placed.push(post);
     }
   }
   return placed;
@@ -715,6 +833,36 @@ function insideProfile(x, y, points, margin = 0) {
   });
 }
 
+function boardPlacement(board) {
+  const template = Object.hasOwn(boardTemplates, board.model) ? boardTemplates[board.model] : null;
+  if (!template || ![board.x, board.y, board.rotation, board.height].every(Number.isFinite)) return null;
+  const angle = board.rotation * Math.PI / 180;
+  const cos = Math.cos(angle), sin = Math.sin(angle);
+  const transform = ([x,y]) => [board.x + x*cos - y*sin, board.y + x*sin + y*cos];
+  const { width, depth, holes } = template;
+  const outline = [[0,0], [width,0], [width,depth], [0,depth]].map(transform);
+  const posts = holes.map(transform).map(([x,y]) => ({
+    type: 'standoff', x, y, height: board.height, diameter: board.diameter, hole: board.hole, label: board.label,
+  }));
+  return { outline, posts };
+}
+
+function cablePassages(dimensions, cables, lid, overlap) {
+  const passages = [];
+  for (const [index, cable] of cables.entries()) {
+    try {
+      const passage = cablePassage(dimensions, cable, lid, overlap);
+      const overlaps = passages.some(other => other.side === passage.side &&
+        Math.abs(other.centre-passage.centre) <= other.radius + passage.radius);
+      if (overlaps) throw new Error('Move the opening clear of the other cable entries on this side.');
+      passages.push(passage);
+    } catch (error) {
+      throw new Error(`Cable entry ${index+1}: ${error.message}`);
+    }
+  }
+  return passages;
+}
+
 function cablePassage(d, cable, lid, overlap) {
   const { side, diameter } = cable;
   if (!cableSides.some(([key]) => key === side)) throw new Error('Choose a side for the cable entry.');
@@ -740,10 +888,10 @@ function cablePassage(d, cable, lid, overlap) {
     left: [-outside, centre, 0],
     right: [d.width - inside, centre, 0],
   }[side];
-  return { radius, length: inside + outside, origin, rotation: horizontal ? 0 : 90 };
+  return { side, centre, radius, length: inside + outside, origin, rotation: horizontal ? 0 : 90 };
 }
 
-function buildParts({ CrossSection, Manifold }, { dimensions: d, posts, lid, cable }) {
+function buildParts({ CrossSection, Manifold }, { dimensions: d, posts, lid, cables = [] }) {
   const owned = [];
   const keep = object => { owned.push(object); return object; };
   const w = d.wall;
@@ -765,8 +913,8 @@ function buildParts({ CrossSection, Manifold }, { dimensions: d, posts, lid, cab
       const solid = keep(Manifold.cylinder(height, radius, radius, circleSegments(radius)));
       return keep(solid.translate([x, y, z]));
     };
-    const passage = cable?.enabled ? cablePassage(d, cable, lid, overlap) : null;
-    const passageTool = (shoulder, end, height) => {
+    const passages = cablePassages(d, cables, lid, overlap);
+    const passageTool = (passage, shoulder, end, height) => {
       const r = passage.radius;
       const segments = circleSegments(r) / 2;
       const profile = [[-r,end], [-r,shoulder]];
@@ -779,7 +927,8 @@ function buildParts({ CrossSection, Manifold }, { dimensions: d, posts, lid, cab
       const [x, y] = passage.origin;
       return keep(rotated.translate([x, y, height]));
     };
-    const cableNotch = passage ? passageTool(-passage.radius, overlap, top) : null;
+    const cableNotches = passages.map(passage => passageTool(passage, -passage.radius, overlap, top));
+    const cableCut = cableNotches.length ? keep(Manifold.union(cableNotches)) : null;
     const pieces = [shell];
     const holes = [];
     for (const post of posts) {
@@ -849,14 +998,14 @@ function buildParts({ CrossSection, Manifold }, { dimensions: d, posts, lid, cab
         support = cylinder(height + overlap, half, x, y, bottom);
       }
       const clipped = keep(support.intersect(outer));
-      if (cableNotch && keep(clipped.intersect(cableNotch)).volume() > 1e-7) {
+      if (cableCut && keep(clipped.intersect(cableCut)).volume() > 1e-7) {
         throw new Error('The cable entry crosses a mounting support. Move the slot along the wall.');
       }
       pieces.push(clipped);
       if (hole > 0) holes.push(cylinder(d.floor + height - holeBottom + overlap, hole / 2, x, y, holeBottom));
     }
     const joined = pieces.length === 1 ? shell : keep(Manifold.union(pieces));
-    if (cableNotch) holes.push(cableNotch);
+    if (cableCut) holes.push(cableCut);
     const box = holes.length ? keep(joined.subtract(keep(Manifold.union(holes)))) : joined;
     // Keep the sagitta of fine segments on large rounded corners when removing numerical slivers.
     const toleranceFor = radius => Math.min(0.0001, curveStep**2 / (16 * Math.max(1, radius)));
@@ -912,12 +1061,14 @@ function buildParts({ CrossSection, Manifold }, { dimensions: d, posts, lid, cab
     if (rimProfiles.length) {
       const rim = rimProfiles.length === 1 ? rimProfiles[0] : keep(CrossSection.union(rimProfiles));
       let lip = extrude(rim, lipHeight + overlap, thickness - overlap);
-      if (passage) {
-        // Wrap around the upper half of the cable and open toward the free edge so the lid can lower over it.
-        const r = passage.radius;
-        const shoulder = r - Math.min(overlap / 4, r / 10);
-        const relief = passageTool(shoulder, Math.max(lipHeight, shoulder) + overlap, thickness);
-        lip = keep(lip.subtract(relief));
+      if (passages.length) {
+        // Wrap around the upper half of each cable and open toward the free edge.
+        const reliefs = passages.map(passage => {
+          const r = passage.radius;
+          const shoulder = r - Math.min(overlap / 4, r / 10);
+          return passageTool(passage, shoulder, Math.max(lipHeight, shoulder) + overlap, thickness);
+        });
+        lip = keep(lip.subtract(keep(Manifold.union(reliefs))));
       }
       lidSolid = keep(lidSolid.add(lip));
     }
@@ -1106,6 +1257,46 @@ function softwareRenderer() {
   };
 }
 
+function drawBoardGuides(canvas, context, camera, guides) {
+  if (!context) return;
+  const width = canvas.clientWidth, height = canvas.clientHeight;
+  context.clearRect(0, 0, width, height);
+  if (!guides.length) return;
+  camera.updateMatrixWorld();
+  const point = new THREE.Vector3();
+  const project = ([x,y], z) => {
+    point.set(x,y,z).project(camera);
+    return [(point.x + 1)*width/2, (1 - point.y)*height/2];
+  };
+  const stroke = () => {
+    context.lineWidth = 3.5;
+    context.strokeStyle = '#19232c';
+    context.stroke();
+    context.lineWidth = 1.4;
+    context.strokeStyle = '#ffe091';
+    context.stroke();
+  };
+  for (const guide of guides) {
+    const outline = guide.outline.map(point => project(point, guide.z));
+    context.beginPath();
+    context.moveTo(...outline[0]);
+    for (const corner of outline.slice(1)) context.lineTo(...corner);
+    context.closePath();
+    context.setLineDash([6,4]);
+    stroke();
+    context.setLineDash([]);
+    context.beginPath();
+    for (const post of guide.posts) {
+      const [x,y] = project([post.x,post.y], guide.z);
+      context.moveTo(x-4,y);
+      context.lineTo(x+4,y);
+      context.moveTo(x,y-4);
+      context.lineTo(x,y+4);
+    }
+    stroke();
+  }
+}
+
 function makePreview() {
   let renderer;
   try {
@@ -1117,6 +1308,12 @@ function makePreview() {
   }
   renderer.domElement.setAttribute('aria-label', 'Interactive 3D model. Drag to rotate, pinch or scroll to zoom.');
   viewport.prepend(renderer.domElement);
+  const overlay = document.createElement('canvas');
+  overlay.className = 'board-overlay';
+  overlay.setAttribute('aria-hidden', 'true');
+  viewport.append(overlay);
+  const overlayContext = overlay.getContext('2d');
+  let guides = [];
   const scene = new THREE.Scene();
   const orthographic = new THREE.OrthographicCamera(-50, 50, 50, -50, 0.1, 10000);
   const perspective = new THREE.PerspectiveCamera(42, 1, 0.1, 10000);
@@ -1142,7 +1339,10 @@ function makePreview() {
   grid.rotation.x = Math.PI / 2;
   grid.position.z = -0.07;
   scene.add(grid);
-  const render = () => renderer.render(scene, camera, model.geometry, grid);
+  const render = () => {
+    renderer.render(scene, camera, model.geometry, grid);
+    drawBoardGuides(overlay, overlayContext, camera, guides);
+  };
   controls.addEventListener('change', render);
   const ray = new THREE.Raycaster();
   const projection = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
@@ -1167,6 +1367,10 @@ function makePreview() {
     if (!clientWidth || !clientHeight) return;
     aspect = clientWidth / clientHeight;
     renderer.setSize(clientWidth, clientHeight, false);
+    const ratio = Math.min(window.devicePixelRatio || 1, 2);
+    overlay.width = Math.round(clientWidth * ratio);
+    overlay.height = Math.round(clientHeight * ratio);
+    overlayContext?.setTransform(overlay.width/clientWidth, 0, 0, overlay.height/clientHeight, 0, 0);
     updateFrustum();
     render();
   }).observe(viewport);
@@ -1196,6 +1400,10 @@ function makePreview() {
   });
 
   return {
+    setGuides(nextGuides) {
+      guides = nextGuides;
+      drawBoardGuides(overlay, overlayContext, camera, guides);
+    },
     setMesh(mesh) {
       model.geometry.dispose();
       edges.geometry.dispose();
@@ -1260,10 +1468,20 @@ function queueUpdate() {
 }
 
 let previousSize;
+function boardGuides(part) {
+  const { floor } = design.dimensions;
+  if (part === 'lid' || !Number.isFinite(floor)) return [];
+  return design.boards.flatMap(board => {
+    const placement = boardPlacement(board);
+    return placement ? [{ ...placement, z: floor + board.height + 0.03 }] : [];
+  });
+}
+
 function refreshPreview() {
   if (!preview || !currentMesh) return;
   const part = placing ? 'box' : partsSelect.value;
   const mesh = currentMesh[part] || currentMesh.box;
+  preview.setGuides(boardGuides(part));
   preview.setMesh(mesh);
   const d = design.dimensions;
   const lid = design.lid;
@@ -1287,7 +1505,7 @@ function renderModel() {
   const d = design.dimensions;
   try {
     const posts = validateDesign();
-    currentMesh = buildParts(kernel, { dimensions: d, posts, lid: design.lid, cable: design.cable });
+    currentMesh = buildParts(kernel, { dimensions: d, posts, lid: design.lid, cables: design.cables });
     for (const option of partsSelect.options) option.disabled = !currentMesh.lid && option.value !== 'box';
     if (partsSelect.selectedOptions[0]?.disabled) partsSelect.value = 'box';
     partsSelect.disabled = false;
@@ -1298,6 +1516,7 @@ function renderModel() {
   } catch (error) {
     currentMesh = null;
     partsSelect.disabled = true;
+    preview?.setGuides(boardGuides(placing ? 'box' : partsSelect.value));
     byId('measure').textContent = preview && previousSize ? 'Showing last valid model' : '';
     showStatus(error.message || 'Check the highlighted dimensions.', true);
   }
@@ -1378,6 +1597,7 @@ function showDesign(nextDesign) {
   renderPosts();
   renderLid();
   renderCable();
+  renderBoards();
   renderModel();
 }
 
@@ -1411,6 +1631,10 @@ fileInput.addEventListener('change', async () => {
       || !saved.posts.every(post => post && ['standoff', 'column'].includes(post.type) && hasNumbers(post, [...postFields(post), ...(post.layout === 'pattern' ? spacingFields : positionFields)]))) {
       throw new Error('That file is not a BoxBuild design.');
     }
+    if ((saved.cables !== undefined && !Array.isArray(saved.cables)) ||
+        (saved.boards !== undefined && !Array.isArray(saved.boards))) {
+      throw new Error('That file is not a BoxBuild design.');
+    }
     showDesign(restoreDesign(saved));
     message.textContent = currentMesh ? `Opened ${file.name}.` : 'Design opened. Check the highlighted dimensions.';
   } catch (error) {
@@ -1434,6 +1658,7 @@ byId('fit').addEventListener('click', () => {
 renderPosts();
 renderLid();
 renderCable();
+renderBoards();
 try {
   kernel = await createManifold();
   kernel.setup();
