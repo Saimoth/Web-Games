@@ -103,7 +103,7 @@ main{grid-template-columns:1fr;gap:12px}
         <option value="both">Box + lid</option><option value="box">Box only</option><option value="lid">Lid only</option>
       </select>
       <select id="camera-mode" aria-label="3D projection" disabled>
-        <option value="orthographic">Orthographic</option><option value="perspective">Perspective</option>
+        <option value="orthographic">Orthographic</option><option value="perspective" selected>Perspective</option>
       </select>
       <button id="top" disabled>Top</button><button id="fit" disabled>Fit 3D</button>
     </div></div>
@@ -137,6 +137,7 @@ main{grid-template-columns:1fr;gap:12px}
         <input id="design-file" type="file" accept=".json,application/json" hidden>
       </div>
       <p id="file-status" class="hint" role="status"></p>
+      <button id="restart" class="danger" style="margin-top:12px">Restart</button>
     </section>
   </div>
 </main>
@@ -180,7 +181,11 @@ const spacingFields = [
   ['spacingX', 'Width between centres (mm)', 0.1, 1000, 0.1],
   ['spacingY', 'Depth between centres (mm)', 0.1, 1000, 0.1],
 ];
-const supportDefaults = { supportDepth: 4, chamferAngle: 45 };
+const supportDefaults = { supportDepth: 5, chamferAngle: 45 };
+const lidSupportDefaults = {
+  type: 'column', layout: 'position', x: 2, y: 2, diameter: 6, hole: 1,
+  mirrorX: true, mirrorY: true, reinforce: true, side: 'auto', ...supportDefaults,
+};
 const supportFields = [
   ['supportDepth', 'Support depth (mm)', 1, 500, 0.1],
   ['chamferAngle', 'Chamfer (° from vertical)', 1, 45, 0.1],
@@ -215,6 +220,10 @@ function restoreDesign(saved) {
   }
   return { dimensions, posts, lid };
 }
+function createDefaultDesign() {
+  return restoreDesign({ posts: [lidSupportDefaults] });
+}
+
 function loadDesign() {
   try {
     const saved = JSON.parse(localStorage.getItem(storageKey));
@@ -222,7 +231,7 @@ function loadDesign() {
       return restoreDesign(saved);
     }
   } catch {}
-  return restoreDesign({ posts: [] });
+  return createDefaultDesign();
 }
 let design = loadDesign();
 const viewport = byId('viewport');
@@ -472,7 +481,7 @@ function nextPost(type) {
   const dimensions = design.dimensions;
   const { width, depth, height, radius, wall } = dimensions;
   const support = type === 'column';
-  const diameter = support ? 6 : 5;
+  const diameter = support ? lidSupportDefaults.diameter : 5;
   const hole = 1;
   const round = value => Math.round(value * 100) / 100;
   const innerRadius = Math.max(0, radius - wall);
@@ -482,11 +491,11 @@ function nextPost(type) {
     insideProfile(post.x, post.y, outline, hole / 2) &&
     [...occupied, ...posts.slice(0, index)].every(other =>
       Math.hypot(other.x - post.x, other.y - post.y) >= (other.diameter + diameter) / 2 + 0.01));
-  const mirror = support ? { mirrorX: true, mirrorY: true } : {};
+  const mirror = support ? { mirrorX: lidSupportDefaults.mirrorX, mirrorY: lidSupportDefaults.mirrorY } : {};
   const at = (widthFraction, depthFraction) => [round(width * widthFraction), round(depth * depthFraction)];
   const cornerInset = round(Math.max(3, innerRadius * (1 - Math.SQRT1_2) + hole / 2 + 1));
   const preferred = support ? [
-    [2, 2], [Math.min(width / 2, cornerInset), Math.min(depth / 2, cornerInset)],
+    [lidSupportDefaults.x, lidSupportDefaults.y], [Math.min(width / 2, cornerInset), Math.min(depth / 2, cornerInset)],
     at(.19, .19), at(.35, .19), at(.19, .35), at(.31,.31), [width / 2, depth / 2],
   ] : [at(.27,.27), at(.73,.27), at(.73,.73), at(.27,.73), at(.5,.5)];
   const [x, y] = preferred.find(([x, y]) => fits(mirrorPosts({ x, y, diameter, ...mirror }, dimensions))) || preferred[0];
@@ -494,7 +503,7 @@ function nextPost(type) {
     spacingX: Math.max(0.1, round(Math.abs(width - 2*x))),
     spacingY: Math.max(0.1, round(Math.abs(depth - 2*y))) };
   return support
-    ? { ...post, reinforce: true, side: 'auto', ...supportDefaults }
+    ? { ...lidSupportDefaults, ...post }
     : { ...post, height: Math.min(5, height) || 5 };
 }
 
@@ -1251,27 +1260,49 @@ byId('save-design').addEventListener('click', () => {
   if (currentMesh) downloadFile(JSON.stringify({ ...design, version: 1 }, null, 2), 'json', 'application/json');
 });
 const fileInput = byId('design-file');
+let designRequest = 0;
+
+function showDesign(nextDesign) {
+  stopPlacing(false);
+  design = nextDesign;
+  previousSize = undefined;
+  renderDimensions();
+  renderPosts();
+  renderLid();
+  renderModel();
+}
+
+byId('restart').addEventListener('click', () => {
+  if (!window.confirm('Restart and replace the current draft with the default setup?')) return;
+  ++designRequest;
+  fileInput.value = '';
+  partsSelect.value = 'both';
+  cameraModeSelect.value = 'perspective';
+  view = '3d';
+  showDesign(createDefaultDesign());
+  byId('file-status').textContent = 'Default setup restored.';
+});
+
 byId('open-design').addEventListener('click', () => fileInput.click());
 fileInput.addEventListener('change', async () => {
   const file = fileInput.files[0];
   if (!file) return;
   fileInput.value = '';
   const message = byId('file-status');
+  const request = ++designRequest;
   try {
-    const saved = JSON.parse(await file.text());
+    const source = await file.text();
+    if (request !== designRequest) return;
+    const saved = JSON.parse(source);
     const hasNumbers = (data, fields) => data && fields.every(([key]) => Number.isFinite(data[key]));
     if (saved?.version !== 1 || !hasNumbers(saved.dimensions, dimensionFields) || !Array.isArray(saved.posts)
       || !saved.posts.every(post => post && ['standoff', 'column'].includes(post.type) && hasNumbers(post, [...postFields(post), ...(post.layout === 'pattern' ? spacingFields : positionFields)]))) {
       throw new Error('That file is not a BoxBuild design.');
     }
-    stopPlacing(false);
-    design = restoreDesign(saved);
-    renderDimensions();
-    renderPosts();
-    renderLid();
-    renderModel();
+    showDesign(restoreDesign(saved));
     message.textContent = currentMesh ? `Opened ${file.name}.` : 'Design opened. Check the highlighted dimensions.';
   } catch (error) {
+    if (request !== designRequest) return;
     message.textContent = error instanceof SyntaxError ? 'That file is not a BoxBuild design.' : error.message;
   }
 });
