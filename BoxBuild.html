@@ -171,11 +171,12 @@ const dimensionFields = [
   ['radius', 'Corner radius (mm)', 0, 550, 0.1],
 ];
 const storageKey = 'boxbuild.design.v1';
+const defaultPilotHole = 2;
 const cableDefaults = { side: 'top', diameter: 4.4, offset: 0 };
 const boardTemplates = {
   uno: { name: 'Arduino Uno', width: 77, depth: 54, holes: [[21.5,2.5], [24,50.5], [74,7.5], [74,35.5]] },
 };
-const boardDefaults = { model: 'uno', x: 0, y: 0, rotation: 0, height: 5, diameter: 5, hole: 1 };
+const boardDefaults = { model: 'uno', x: 0, y: 0, rotation: 0, height: 5, diameter: 5, hole: defaultPilotHole };
 const boardFields = [
   ['x', 'X offset (mm)', -1000, 1000, 0.1],
   ['y', 'Y offset (mm)', -1000, 1000, 0.1],
@@ -208,7 +209,7 @@ const spacingFields = [
 ];
 const supportDefaults = { supportDepth: 5, chamferAngle: 45 };
 const lidSupportDefaults = {
-  type: 'column', layout: 'position', x: 2, y: 2, diameter: 6, hole: 1,
+  type: 'column', layout: 'position', x: 2, y: 2, diameter: 6, hole: defaultPilotHole,
   mirrorX: true, mirrorY: true, reinforce: true, side: 'auto', ...supportDefaults,
 };
 const supportFields = [
@@ -622,7 +623,7 @@ function nextPost(type) {
   const { width, depth, height, radius, wall } = dimensions;
   const support = type === 'column';
   const diameter = support ? lidSupportDefaults.diameter : 5;
-  const hole = 1;
+  const hole = defaultPilotHole;
   const round = value => Math.round(value * 100) / 100;
   const innerRadius = Math.max(0, radius - wall);
   const outline = roundedRectangle(0, 0, width, depth, innerRadius);
