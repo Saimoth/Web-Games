@@ -26,6 +26,7 @@ h2{font-size:1.06rem;letter-spacing:-.015em}
 .subtitle,.hint,.measure{color:var(--muted);font-size:.83rem}
 .subtitle{display:block;margin-top:3px}
 .exports,.toolbar,.row-actions{display:flex;gap:8px}
+.exports{flex-wrap:wrap}
 .primary{background:var(--mint);color:var(--dark);border-color:var(--mint)}
 main{display:grid;grid-template-columns:minmax(0,1fr) minmax(340px,395px);gap:20px;align-items:start;padding-bottom:max(20px,env(safe-area-inset-bottom))}
 .viewer,.card{border:1px solid var(--line);border-radius:15px;overflow:hidden;background:var(--card)}
@@ -79,6 +80,7 @@ main{grid-template-columns:1fr;gap:12px}
 .panel-head,.viewer-foot{padding:7px 10px}
 .card{padding:12px}
 }
+@media(max-width:440px){header{flex-wrap:wrap;gap:8px;padding-block:8px}}
 @media(max-width:365px){.subtitle{display:none}.brand{gap:7px}.exports{gap:5px}.exports button{padding:0 8px}}
 </style>
 <script type="importmap">
@@ -91,9 +93,10 @@ main{grid-template-columns:1fr;gap:12px}
     <span class="logo" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 2 22 7.5v9L12 22 2 16.5v-9L12 2Z M2 7.5 12 13l10-5.5 M12 13v9 M7 4.75l10 5.5"/></svg></span>
     <div><h1>BoxBuild</h1><span class="subtitle">Enclosure designer</span></div>
   </div>
-  <div class="exports" aria-label="Download model">
+  <div class="exports" role="group" aria-label="Design actions">
     <button class="primary" data-format="stl" disabled>↓ STL</button>
     <button data-format="obj" disabled>↓ OBJ</button>
+    <button data-restart class="danger">Restart</button>
   </div>
 </header>
 <main>
@@ -139,7 +142,7 @@ main{grid-template-columns:1fr;gap:12px}
         <input id="design-file" type="file" accept=".json,application/json" hidden>
       </div>
       <p id="file-status" class="hint" role="status"></p>
-      <button id="restart" class="danger" style="margin-top:12px">Restart</button>
+      <button id="restart" data-restart class="danger" style="margin-top:12px">Restart</button>
     </section>
   </div>
 </main>
@@ -1378,7 +1381,7 @@ function showDesign(nextDesign) {
   renderModel();
 }
 
-byId('restart').addEventListener('click', () => {
+function restartDesign() {
   if (!window.confirm('Restart and replace the current draft with the default setup?')) return;
   ++designRequest;
   fileInput.value = '';
@@ -1387,7 +1390,10 @@ byId('restart').addEventListener('click', () => {
   view = '3d';
   showDesign(createDefaultDesign());
   byId('file-status').textContent = 'Default setup restored.';
-});
+}
+for (const button of document.querySelectorAll('[data-restart]')) {
+  button.addEventListener('click', restartDesign);
+}
 
 byId('open-design').addEventListener('click', () => fileInput.click());
 fileInput.addEventListener('change', async () => {
